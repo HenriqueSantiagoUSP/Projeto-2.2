@@ -12,7 +12,7 @@
 #define REEDSWITCH_GPIO_PULL_DOWN   GPIO_PULLDOWN_DISABLE
 #define REEDSWITCH_GPIO_INTR        GPIO_INTR_ANYEDGE
 /* Mechanical contact: bounces for a few ms on every actuation. */
-#define REEDSWITCH_DEBOUNCE_MS      50
+#define REEDSWITCH_DEBOUNCE_MS      500
 
 esp_err_t reedswitch_init(QueueHandle_t events_queue);
 
