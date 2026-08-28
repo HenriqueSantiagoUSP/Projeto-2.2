@@ -16,7 +16,6 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
-#include "freertos/task.h"
 #include "esp_err.h"
 
 #define SENSOR_EVENT_QUEUE_DEPTH   16
@@ -35,6 +34,3 @@ typedef struct {
 
 /* Creates the dispatcher task that drains events_queue. */
 esp_err_t sensors_task_init(QueueHandle_t events_queue);
-
-/* Maps a FreeRTOS pdPASS/pdFAIL return into an esp_err_t. */
-esp_err_t esp_err_from_pdpass(BaseType_t status);

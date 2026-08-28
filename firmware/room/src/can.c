@@ -1,8 +1,12 @@
 #include <string.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+
 #include "can.h"
 #include "board_pins.h"
-#include "sensor_events.h"
+#include "rtos_err.h"
 #include "esp_log.h"
 
 static const char *TAG = "can";

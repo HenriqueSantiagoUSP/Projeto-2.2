@@ -1,3 +1,8 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "driver/gpio.h"
+#include "esp_err.h"
+
 #include "board_pins.h"
 #include "can.h"
 #include "hcsr501.h"
