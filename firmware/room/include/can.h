@@ -23,7 +23,7 @@
 /* Builds the 11-bit standard ID for a sensor of this node. */
 #define CAN_MSG_ID(sensor)  ((((CAN_NODE_GROUP) & 0xF) << 4) | ((sensor) & 0xF))
 
-#define CAN_BITRATE         200000
+#define CAN_BITRATE         250000
 #define CAN_QUEUE_DEPTH     5
 #define CAN_MAX_PAYLOAD     8       /* classic CAN frame */
 #define CAN_TX_TIMEOUT_MS   10      /* max wait for a free slot in the TX queue */
@@ -34,7 +34,7 @@
  * back (loopback), so it works with no other node on the bus. Set to false for a
  * real bus, where a peer provides the ACK.
  */
-#define CAN_SELF_TEST       true
+#define CAN_SELF_TEST       false
 
 /* Sensor nibble: the S in 0x0GS. Must fit in 4 bits. */
 typedef enum {
