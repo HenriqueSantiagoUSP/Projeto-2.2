@@ -2,6 +2,8 @@
 
 /* HC-SR501 PIR motion sensor, GPIO + interrupt driven. */
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "esp_err.h"
 #include "driver/gpio.h"
 

@@ -1,6 +1,11 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+
 #include "sensor_events.h"
 #include "hcsr501.h"
 #include "reedswitch.h"
+#include "rtos_err.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 
@@ -57,8 +62,4 @@ esp_err_t sensors_task_init(QueueHandle_t events_queue){
 
     ESP_LOGI(TAG, "creating sensors_task");
     return esp_err_from_pdpass(xTaskCreate(sensors_task, "sensors_task", 4096, events_queue, 10, NULL));
-}
-
-esp_err_t esp_err_from_pdpass(BaseType_t status){
-    return (status == pdPASS) ? ESP_OK : ESP_FAIL;
 }

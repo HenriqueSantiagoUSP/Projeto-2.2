@@ -1,4 +1,3 @@
-#ifndef __LM35_H__
-#define __LM35_H__
+#pragma once
 
-#endif
+/* LM35 analog temperature sensor. Not implemented yet. */

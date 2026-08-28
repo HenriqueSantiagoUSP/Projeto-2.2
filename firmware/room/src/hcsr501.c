@@ -1,6 +1,11 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+
 #include "hcsr501.h"
 #include "board_pins.h"
 #include "can.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 
 static const char *TAG = "hcsr501";
