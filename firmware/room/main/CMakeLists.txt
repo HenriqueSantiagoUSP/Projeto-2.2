@@ -1,5 +1,5 @@
 idf_component_register(
     SRC_DIRS "." "../src"
     INCLUDE_DIRS "../include"
-    REQUIRES "esp_driver_twai" "esp_driver_gpio" "esp_hal_ana_conv"
+    REQUIRES "esp_driver_twai" "esp_driver_gpio" "esp_timer"
 )

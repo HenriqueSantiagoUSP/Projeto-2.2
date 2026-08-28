@@ -1,38 +1,56 @@
-#ifndef __CAN_H__
-#define __CAN_H__
+#pragma once
+
+/*
+ * CAN (TWAI) transport.
+ *
+ * Message IDs follow the 0x0GS layout of this network:
+ *   G = group nibble  (which node is talking)
+ *   S = sensor nibble (which sensor of that group)
+ * so a standard 11-bit ID is built as (group << 4) | sensor.
+ */
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #include "esp_twai.h"
 #include "esp_twai_onchip.h"
 #include "esp_err.h"
 
-#include "map_pin.h"
-#include "system_events.h"
+/* Group nibble (0x0-0xF) of this node: the G in 0x0GS. */
+#define CAN_NODE_GROUP      0xF
 
-#define CAN_GROUP_ID        0x0F0
-#define SELF_TEST_ENABLE    1
-#define SELF_TEST_DISABLE   0
+/* Builds the 11-bit standard ID for a sensor of this node. */
+#define CAN_MSG_ID(sensor)  ((((CAN_NODE_GROUP) & 0xF) << 4) | ((sensor) & 0xF))
 
-#define CAN_TX_PIN          _CAN_TX_PIN
-#define CAN_RX_PIN          _CAN_RX_PIN
 #define CAN_BITRATE         200000
 #define CAN_QUEUE_DEPTH     5
-#define CAN_SELF_TEST       SELF_TEST_ENABLE
+#define CAN_MAX_PAYLOAD     8       /* classic CAN frame */
+#define CAN_TX_TIMEOUT_MS   10      /* max wait for a free slot in the TX queue */
+#define CAN_TX_DRAIN_MS     50      /* max wait for the previous frame to leave the TX buffer */
 
+/*
+ * Bench mode: the node acknowledges its own frames (self test) and receives them
+ * back (loopback), so it works with no other node on the bus. Set to false for a
+ * real bus, where a peer provides the ACK.
+ */
+#define CAN_SELF_TEST       true
+
+/* Sensor nibble: the S in 0x0GS. Must fit in 4 bits. */
 typedef enum {
-    HCSR501_ID =       0x1,
-    LM35_ID =          0x2,
-    REEDSWITCH_ID =    0x3,
-
-} can_sensor_id;
+    CAN_SENSOR_HCSR501    = 0x1,
+    CAN_SENSOR_LM35       = 0x2,
+    CAN_SENSOR_REEDSWITCH = 0x3,
+} can_sensor_id_t;
 
 typedef struct {
     uint32_t id;
-    uint8_t dados[8];
-    uint8_t tamanho;
+    uint8_t  data[CAN_MAX_PAYLOAD];
+    uint8_t  length;
     uint32_t timestamp;
-} event_can_t;
+} can_rx_event_t;
 
 esp_err_t can_init(void);
-esp_err_t can_transmit(uint8_t sensor_id, const uint8_t *send_buff, size_t len);
 
-#endif
+/* Queues one frame for transmission. Never blocks longer than CAN_TX_TIMEOUT_MS. */
+esp_err_t can_transmit(can_sensor_id_t sensor, const uint8_t *data, size_t len);

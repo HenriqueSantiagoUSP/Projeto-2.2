@@ -1,20 +1,20 @@
-#ifndef __HCSR501_H__
-#define __HCSR501_H__
+#pragma once
 
-#include "map_pin.h"
+/* HC-SR501 PIR motion sensor, GPIO + interrupt driven. */
+
 #include "esp_err.h"
-#include "system_events.h"
+#include "driver/gpio.h"
 
-#define CAN_HCSR501_ID      HCSR501_ID
+#include "sensor_events.h"
 
-#define HC_GPIO_PIN         _HCSR501_GPIO_PIN
-#define HC_GPIO_MODE        GPIO_MODE_INPUT
-#define HC_GPIO_PULL_UP     GPIO_PULLUP_DISABLE
-#define HC_GPIO_PULL_DOWN   GPIO_PULLDOWN_DISABLE    
-#define HC_GPIO_INTR        GPIO_INTR_POSEDGE
+#define HCSR501_GPIO_MODE        GPIO_MODE_INPUT
+#define HCSR501_GPIO_PULL_UP     GPIO_PULLUP_DISABLE
+#define HCSR501_GPIO_PULL_DOWN   GPIO_PULLDOWN_DISABLE
+/* ANYEDGE so both the start and the end of a detection are reported. */
+#define HCSR501_GPIO_INTR        GPIO_INTR_ANYEDGE
+#define HCSR501_DEBOUNCE_MS      20
 
 esp_err_t hcsr501_init(QueueHandle_t events_queue);
 
-void hcsr501_task_callback();
-
-#endif
+/* Called by sensors_task once an event passed the debounce window. */
+void hcsr501_handle_event(const sensor_event_t *event);
