@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 
 #include "can.h"
+#include "can_ids.h"
 #include "board_pins.h"
 #include "rtos_err.h"
 #include "esp_log.h"
@@ -22,6 +23,20 @@ static QueueHandle_t s_can_rx_queue = NULL;
  */
 static twai_frame_t s_tx_frame;
 static uint8_t s_tx_buffer[CAN_MAX_PAYLOAD];
+
+/*
+ * RX handler registry. Written only by can_rx_handler_register() before can_init()
+ * creates can_task, and read only by can_task afterwards, so it needs no locking.
+ */
+typedef struct {
+    can_group_t        group;
+    can_sensor_kind_t  kind;
+    can_rx_handler_t   handler;
+    void              *ctx;
+} can_rx_handler_entry_t;
+
+static can_rx_handler_entry_t s_handlers[CAN_RX_HANDLER_MAX];
+static size_t s_handler_count = 0;
 
 static bool twai_rx_callback(twai_node_handle_t handle, const twai_rx_done_event_data_t *edata, void *user_ctx){
     uint8_t recv_buff[CAN_MAX_PAYLOAD];
@@ -53,19 +68,83 @@ static bool twai_rx_callback(twai_node_handle_t handle, const twai_rx_done_event
     return task_wakeup == pdTRUE;
 }
 
-static void can_task(void *arg){
-    can_rx_event_t evt;
+/* True when a registered filter accepts a frame from this sender. info->group is
+   non-NULL: both callers only get here after can_id_decode() returned true. */
+static bool handler_matches(const can_rx_handler_entry_t *entry, const can_id_info_t *info){
+    if (entry->group != CAN_GROUP_ANY && entry->group != info->group->group) {
+        return false;
+    }
+    if (entry->kind == CAN_KIND_ANY) {
+        return true;
+    }
+    /* A kind filter cannot match a sensor we could not resolve. */
+    return info->sensor != NULL && entry->kind == info->sensor->kind;
+}
 
-    while (1) {
-        if (xQueueReceive(s_can_rx_queue, &evt, portMAX_DELAY)) {
-
-            ESP_LOGI(TAG, "ID: 0x%03lX, length: %d", evt.id, evt.length);
-            for (int i = 0; i < evt.length; i++) {
-                ESP_LOGI(TAG, "  byte[%d] = 0x%02X", i, evt.data[i]);
-            }
-            /* handling logic goes here */
+static void can_dispatch(const can_rx_event_t *evt, const can_id_info_t *info){
+    for (size_t i = 0; i < s_handler_count; i++) {
+        if (handler_matches(&s_handlers[i], info)) {
+            s_handlers[i].handler(evt, info, s_handlers[i].ctx);
         }
     }
+}
+
+static void can_task(void *arg){
+    can_rx_event_t evt;
+    can_id_info_t info;
+
+    while (1) {
+        if (xQueueReceive(s_can_rx_queue, &evt, portMAX_DELAY) != pdTRUE) {
+            continue;
+        }
+
+        if (!can_id_decode(evt.id, &info)) {
+            ESP_LOGW(TAG, "frame from outside this network, id 0x%03lX", evt.id);
+            continue;
+        }
+
+        if (info.sensor == NULL) {
+            /* Known node, sensor we have no entry for: it published something new. */
+            ESP_LOGW(TAG, "%s: unknown sensor 0x%X (id 0x%03lX)",
+                     info.group->name, (unsigned) CAN_ID_SENSOR(evt.id), evt.id);
+            can_dispatch(&evt, &info);
+            continue;
+        }
+
+        uint8_t expected = can_kind_payload_len(info.sensor->kind);
+        if (expected != 0 && evt.length != expected) {
+            ESP_LOGW(TAG, "%s/%s: expected %u byte(s), got %u",
+                     info.group->name, info.sensor->name, expected, evt.length);
+        }
+
+        if (evt.length > 0) {
+            ESP_LOGI(TAG, "%s/%s: %u byte(s), data[0] = 0x%02X",
+                     info.group->name, info.sensor->name, evt.length, evt.data[0]);
+        } else {
+            ESP_LOGI(TAG, "%s/%s: empty frame", info.group->name, info.sensor->name);
+        }
+
+        can_dispatch(&evt, &info);
+    }
+}
+
+esp_err_t can_rx_handler_register(can_group_t group, can_sensor_kind_t kind,
+                                  can_rx_handler_t handler, void *ctx){
+    if (handler == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_handler_count >= CAN_RX_HANDLER_MAX) {
+        ESP_LOGE(TAG, "handler registry full (%d)", CAN_RX_HANDLER_MAX);
+        return ESP_ERR_NO_MEM;
+    }
+
+    s_handlers[s_handler_count++] = (can_rx_handler_entry_t) {
+        .group = group,
+        .kind = kind,
+        .handler = handler,
+        .ctx = ctx,
+    };
+    return ESP_OK;
 }
 
 esp_err_t can_init(void){
@@ -122,7 +201,7 @@ esp_err_t can_transmit(can_sensor_id_t sensor, const uint8_t *data, size_t len){
 
     memcpy(s_tx_buffer, data, len);
     s_tx_frame = (twai_frame_t) {
-        .header.id = CAN_MSG_ID(sensor),
+        .header.id = CAN_NODE_MSG_ID(sensor),
         .header.ide = false,
         .buffer = s_tx_buffer,
         .buffer_len = len,
