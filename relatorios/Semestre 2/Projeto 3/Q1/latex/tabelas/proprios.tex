@@ -1,0 +1,24 @@
+\begin{table}[H]
+\centering
+\caption{Teste externo nos nossos 18 ensaios (uma pessoa, cintura, $\pm$2\,g): modelos treinados só na SisFall saturada no cenário B, com o limiar de operação tirado da SisFall. Alarmes falsos: disparos classificados como queda nos 8 ensaios de andar e correr.}
+\label{tab:proprios}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Método & \makecell{Quedas\\detectadas} & \makecell{Alarmes\\falsos} & \makecell{Ensaios de atividade\\com alarme} \\
+\midrule
+Limiar atual (2,5\,g) & 10/10 & 8 & 8 de 8 \\
+Regras em cascata & 8/10 & 5 & 4 de 8 \\
+Correlação normalizada & 10/10 & 12 & 6 de 8 \\
+DTW & 10/10 & 8 & 6 de 8 \\
+AR(12) como anomalia & 10/10 & 18 & 8 de 8 \\
+Centroide (cosseno) & 8/10 & 4 & 3 de 8 \\
+kNN (Manhattan) & 8/10 & 1 & 1 de 8 \\
+Regressão logística & 7/10 & 0 & 0 de 8 \\
+SVM (RBF) & 8/10 & 0 & 0 de 8 \\
+Random Forest & 7/10 & 0 & 0 de 8 \\
+CNN 1D (módulos) & 9/10 & 12 & 7 de 8 \\
+\bottomrule
+\end{tabular}
+\end{table}

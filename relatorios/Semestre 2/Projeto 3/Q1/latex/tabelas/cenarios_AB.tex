@@ -1,0 +1,28 @@
+\begin{table}[H]
+\centering
+\caption{Efeito da faixa do sensor: os mesmos métodos no cenário A ($\pm$8\,g / $\pm$500\,°/s) e no B ($\pm$2\,g / $\pm$250\,°/s, a faixa dos nossos ensaios), na SisFall saturada em cada faixa. Mesmas métricas da Tabela~\ref{tab:comparacao_A}. O limiar do firmware detecta 97,4\,\% das quedas em A e 90,0\,\% em B.}
+\label{tab:cenarios_AB}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+ & \multicolumn{2}{c}{AUC} & \multicolumn{2}{c}{Alarmes por hora} & \multicolumn{2}{c}{Quedas com $\le$1 alarme/h} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Método & A & B & A & B & A & B \\
+\midrule
+Limiar atual (2,5\,g) & --- & --- & \num{69.9} & \num{49.5} & --- & --- \\
+Regras em cascata & \num{0.977} & \num{0.974} & \num{54.9} & \num{55.5} & \num{23.5}\,\% & \num{34.7}\,\% \\
+Correlação não normalizada & \num{0.957} & \num{0.843} & \num{139.2} & \num{441.5} & \num{22.0}\,\% & \num{2.1}\,\% \\
+Correlação normalizada & \num{0.956} & \num{0.927} & \num{90.9} & \num{128.9} & \num{1.3}\,\% & \num{4.7}\,\% \\
+DTW & \num{0.974} & \num{0.974} & \num{74.0} & \num{91.2} & \num{7.6}\,\% & \num{27.7}\,\% \\
+AR(12) como anomalia & \num{0.786} & \num{0.661} & \num{688.1} & \num{756.0} & \num{8.6}\,\% & \num{2.6}\,\% \\
+Centroide (cosseno) & \num{0.996} & \num{0.996} & \num{15.8} & \num{15.1} & \num{62.3}\,\% & \num{62.2}\,\% \\
+kNN (Manhattan) & \num{0.995} & \num{0.995} & \num{0.5} & \num{0.6} & \num{96.1}\,\% & \num{96.3}\,\% \\
+Regressão logística & \num{0.997} & \num{0.998} & \num{1.4} & \num{1.4} & \num{92.8}\,\% & \num{91.7}\,\% \\
+SVM (RBF) & \num{0.998} & \num{0.998} & \num{0.8} & \num{0.8} & \num{94.6}\,\% & \num{94.5}\,\% \\
+Random Forest & \num{0.999} & \num{0.999} & \num{0.4} & \num{0.8} & \num{95.7}\,\% & \num{94.4}\,\% \\
+CNN 1D (módulos) & \num{0.994} & \num{0.994} & \num{17.2} & \num{20.5} & \num{59.1}\,\% & \num{30.8}\,\% \\
+CNN 1D (6 eixos) & \num{0.998} & \num{0.999} & \num{1.2} & \num{2.2} & \num{93.9}\,\% & \num{79.4}\,\% \\
+\bottomrule
+\end{tabular}
+\end{table}
