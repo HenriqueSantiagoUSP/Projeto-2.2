@@ -1,0 +1,25 @@
+[project]
+name = "queda"
+version = "0.1.0"
+description = "Modelos de detecção de queda desenvolvidos no PC antes de irem para o vestível (S2 P3 Q1)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "statsmodels>=0.14",
+    "matplotlib>=3.9",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+cnn = ["torch>=2.4"]
+
+[tool.uv]
+package = false
+default-groups = ["dev", "cnn"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
