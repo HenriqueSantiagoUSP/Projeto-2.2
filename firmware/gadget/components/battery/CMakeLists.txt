@@ -1,0 +1,6 @@
+idf_component_register(
+    SRCS "battery.c"
+    INCLUDE_DIRS "include"
+    REQUIRES "esp_driver_gpio"
+    PRIV_REQUIRES "esp_adc" "protocol"
+)

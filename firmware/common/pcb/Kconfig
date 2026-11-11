@@ -1,0 +1,10 @@
+menu "PCB"
+
+    config PCB_DEVKIT_V1_1
+        bool "ESP32-S3-DevKitC-1 v1.1 (RGB LED on GPIO38 instead of GPIO48)"
+        default n
+        help
+            The status LED is the DevKit's own WS2812: GPIO48 on board v1.0, GPIO38 on
+            v1.1. The version is printed on the DevKit.
+
+endmenu

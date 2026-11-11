@@ -1,0 +1,6 @@
+dependencies:
+  idf:
+    version: '>=5.3'
+  # MQTT left ESP-IDF in v6 and lives in the registry. Private: mqtt_link.h does not expose it.
+  espressif/mqtt:
+    version: '^1.0.0'

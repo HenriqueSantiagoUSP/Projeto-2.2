@@ -1,0 +1,11 @@
+menu "CAN bus (TWAI)"
+
+    config APP_CAN_SELF_TEST
+        bool "Bench mode (self test + loopback)"
+        default y
+        help
+            The node acknowledges its own frames and receives them back, so it works
+            with no other node on the bus. Turn it off on the real bus, where another
+            node provides the ACK.
+
+endmenu

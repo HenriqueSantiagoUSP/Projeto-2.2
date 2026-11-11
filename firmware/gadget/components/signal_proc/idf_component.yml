@@ -1,0 +1,7 @@
+dependencies:
+  idf:
+    version: '>=5.3'
+  # Optimized DSP for the ESP32-S3 (aulas/, slide "Segmentação e atributos"): the dot
+  # product of the moments. Private: signal_proc.h does not expose it.
+  espressif/esp-dsp:
+    version: '^1.8.0'

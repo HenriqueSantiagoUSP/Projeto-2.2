@@ -1,0 +1,6 @@
+dependencies:
+  idf:
+    version: '>=5.3'
+  # cJSON left ESP-IDF in v6; the registry component is the same library.
+  espressif/cjson:
+    version: '^1.7.18'
