@@ -4,7 +4,10 @@ menu "Wearable"
         string "MAC of the room hub"
         default ""
         help
-            "aa:bb:cc:dd:ee:ff", the station MAC the hub prints at boot.
+            "aa:bb:cc:dd:ee:ff", the station MAC the hub prints at boot. Empty: no
+            hub (a bench or a demo with this board only). ESP-NOW is then not
+            started, and falls go to the serial log (and to MQTT and CAN when they
+            are on). See sdkconfig.demo.defaults.
 
     config GADGET_ESPNOW_ENCRYPT
         bool "Encrypt ESP-NOW (PMK + LMK)"

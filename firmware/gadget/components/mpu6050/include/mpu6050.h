@@ -33,7 +33,12 @@ typedef struct {
     int16_t gx, gy, gz;
 } mpu6050_sample_t;
 
-/* Resets and configures the chip: ranges above, 44 Hz DLPF, 200 Hz, FIFO on. */
+/*
+ * Resets and configures the chip: ranges above, 44 Hz DLPF, 200 Hz, FIFO on.
+ * ESP_ERR_NOT_FOUND when nothing answers at addr, without logging an error. It may be
+ * called again (sensor plugged in later, or back after a glitch): mpu must start
+ * zeroed, and the device is added to the bus only the first time.
+ */
 esp_err_t mpu6050_init(mpu6050_t *mpu, i2c_master_bus_handle_t bus, uint8_t addr);
 
 /*

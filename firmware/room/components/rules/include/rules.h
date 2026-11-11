@@ -128,6 +128,7 @@ typedef struct {
     rules_alert_cb_t   cb;
     void              *cb_ctx;
 
+    bool               presence_fitted;  /* false: no PIR, the presence rules are suspended */
     bool               present;
     uint64_t           last_presence_ms;
     bool               door_known[RULES_MAX_DOORS];   /* a first state has been reported */
@@ -156,6 +157,13 @@ void rules_default_params(rules_params_t *params);
 void rules_init(rules_t *rules, const rules_params_t *params,
                 const char *const *door_ids, size_t door_count,
                 rules_alert_cb_t cb, void *cb_ctx, const rules_clock_t *now);
+
+/*
+ * No presence sensor fitted (menuconfig): without it "nobody seen" means nothing, so
+ * the rules built on it are suspended: inactivity, and night exit (door open AND no
+ * presence inside). Call right after rules_init(). Fitted by default.
+ */
+void rules_set_presence_fitted(rules_t *rules, bool fitted);
 
 /* Replaces the parameters; running episodes keep their state. */
 void rules_set_params(rules_t *rules, const rules_params_t *params);

@@ -218,6 +218,47 @@ static void test_inactivity_by_day_only(void){
     CHECK(count(ALERT_INACTIVITY, ALERT_ACTIVE) == 0);
 }
 
+static void test_no_pir_suspends_presence_rules(void){
+    rules_t r;
+    /* At night: the bedroom door opens and stays open, with no PIR to say anyone is inside. */
+    setup(&r, 23, 0);
+    rules_set_presence_fitted(&r, false);
+    rules_on_door(&r, 0, true, &s_clock);
+    advance(&r, MIN(30));
+    CHECK(count(ALERT_NIGHT_EXIT, ALERT_ACTIVE) == 0);
+
+    /* By day: hours without "presence" are only a sensor that is not there. */
+    setup(&r, 9, 0);
+    rules_set_presence_fitted(&r, false);
+    advance(&r, MIN(180));
+    CHECK(count(ALERT_INACTIVITY, ALERT_ACTIVE) == 0);
+
+    /* The rules that do not need it still run: the bathroom door. */
+    rules_on_door(&r, 1, true, &s_clock);
+    rules_on_door(&r, 1, false, &s_clock);
+    advance(&r, MIN(41));
+    CHECK(count(ALERT_BATHROOM, ALERT_ACTIVE) == 1);
+}
+
+static void test_absent_door_never_alerts(void){
+    rules_t r;
+    /* A door that is not fitted never reports, not even its boot state: nothing can arm. */
+    memset(&s_clock, 0, sizeof(s_clock));
+    s_clock.mono_ms = 1000;
+    clock_at(23, 0);
+    s_event_count = 0;
+    rules_params_t p;
+    rules_default_params(&p);
+    p.door_role[0] = DOOR_ROLE_EXIT;
+    p.door_role[1] = DOOR_ROLE_BATHROOM;
+    rules_init(&r, &p, DOOR_IDS, 2, record, NULL, &s_clock);
+    rules_on_door(&r, 1, false, &s_clock);          /* only the bathroom is fitted */
+    rules_on_presence(&r, false, &s_clock);
+    advance(&r, MIN(60));
+    CHECK(count(ALERT_NIGHT_EXIT, ALERT_ACTIVE) == 0);
+    CHECK(s_event_count == 0);
+}
+
 static void test_inactivity_not_after_leaving(void){
     rules_t r;
     setup(&r, 9, 0);
@@ -348,6 +389,8 @@ int main(void){
         { "bathroom cleared when leaving",         test_bathroom_cleared_when_resident_leaves },
         { "inactivity by day only",                test_inactivity_by_day_only },
         { "inactivity not after leaving",          test_inactivity_not_after_leaving },
+        { "no PIR suspends presence rules",        test_no_pir_suspends_presence_rules },
+        { "absent door never alerts",              test_absent_door_never_alerts },
         { "temperature persistence/hysteresis",    test_temperature_persistence_and_hysteresis },
         { "temperature brief spike ignored",       test_temperature_brief_spike_ignored },
         { "fall and cancel",                       test_fall_and_cancel },

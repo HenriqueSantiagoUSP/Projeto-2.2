@@ -1,22 +1,31 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "freertos/FreeRTOS.h"
 #include "mqtt_link.h"
 #include "mqtt_client.h"
+#include "net.h"
 #include "protocol_mqtt.h"
 #include "sys_events.h"
+#include "esp_event.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 
 static const char *TAG = "mqtt_link";
 
 #define MQTT_TOPIC_MAX      96
 #define MQTT_WILL_MAX       64
+#define MQTT_RETRY_S        10      /* esp-mqtt's default reconnect_timeout_ms */
 
 /* Written once by mqtt_link_start(), before the client exists; then only read. */
 static esp_mqtt_client_handle_t s_client = NULL;
 static mqtt_link_connected_cb_t s_on_connected = NULL;
 static mqtt_link_message_cb_t s_on_message = NULL;
 static void *s_cb_ctx = NULL;
+static bool s_disabled = false;          /* no network configured: never started */
+
+/* Touched only by the MQTT task: one warning per outage, the retries stay quiet. */
+static bool s_outage_reported = false;
 
 static char s_will_topic[MQTT_TOPIC_MAX];
 static char s_will_payload[MQTT_WILL_MAX];
@@ -40,6 +49,7 @@ static void on_mqtt_event(void *arg, esp_event_base_t base, int32_t id, void *da
     switch ((esp_mqtt_event_id_t) id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "connected to %s", CONFIG_APP_MQTT_URI);
+            s_outage_reported = false;
             sys_events_set(SYS_EV_MQTT_CONNECTED);
             if (s_subscribe_topic[0] != '\0') {
                 esp_mqtt_client_subscribe_single(s_client, s_subscribe_topic, 1);
@@ -51,7 +61,9 @@ static void on_mqtt_event(void *arg, esp_event_base_t base, int32_t id, void *da
 
         case MQTT_EVENT_DISCONNECTED:
             if (mqtt_link_connected()) {
-                ESP_LOGW(TAG, "disconnected; QoS 1 messages wait in the outbox");
+                ESP_LOGW(TAG, "broker connection lost: carrying on, retrying every %d s; QoS 1 messages wait "
+                         "in the outbox", MQTT_RETRY_S);
+                s_outage_reported = true;
             }
             sys_events_clear(SYS_EV_MQTT_CONNECTED);
             break;
@@ -71,15 +83,51 @@ static void on_mqtt_event(void *arg, esp_event_base_t base, int32_t id, void *da
             break;
 
         case MQTT_EVENT_ERROR:
+            /* The library's own logs are off (mqtt_link_start): one line per outage, from here. */
+            if (s_outage_reported) {
+                break;
+            }
+            s_outage_reported = true;
             if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+                /* Not a missing piece but a wrong setting: the one error worth its level. */
                 ESP_LOGE(TAG, "broker refused the connection (code %d): check user and password",
                          event->error_handle->connect_return_code);
+            } else {
+                ESP_LOGW(TAG, "broker %s not reachable (errno %d): carrying on without it, retrying every %d s",
+                         CONFIG_APP_MQTT_URI, event->error_handle->esp_transport_sock_errno, MQTT_RETRY_S);
             }
             break;
 
         default:
             break;
     }
+}
+
+/* Starts the client the first time the network comes up, whoever gets there first. */
+static esp_event_handler_instance_t s_first_ip = NULL;
+static portMUX_TYPE s_start_lock = portMUX_INITIALIZER_UNLOCKED;
+static bool s_started = false;
+
+static void start_once(void){
+    taskENTER_CRITICAL(&s_start_lock);
+    bool start = !s_started;
+    s_started = true;
+    taskEXIT_CRITICAL(&s_start_lock);
+    if (start) {
+        esp_err_t err = esp_mqtt_client_start(s_client);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "client not started: %s", esp_err_to_name(err));
+        }
+    }
+}
+
+/* Runs in the default event loop task. */
+static void on_first_ip(void *arg, esp_event_base_t base, int32_t id, void *data){
+    (void) arg;
+    (void) base;
+    (void) id;
+    (void) data;
+    start_once();
 }
 
 esp_err_t mqtt_link_start(const mqtt_link_config_t *config){
@@ -120,13 +168,39 @@ esp_err_t mqtt_link_start(const mqtt_link_config_t *config){
         .outbox.limit = (uint64_t) CONFIG_APP_MQTT_OUTBOX_KB * 1024,
     };
 
+    if (!net_joins_ap()) {
+        /* Nothing to reach: no client, no retries, no outbox filling up. */
+        s_disabled = true;
+        ESP_LOGW(TAG, "MQTT off: no Wi-Fi network configured (menu \"Network (Wi-Fi)\")");
+        return ESP_OK;
+    }
+
+    /*
+     * The library logs every failed attempt as an error; a broker that is not there is a
+     * state, reported once per outage by on_mqtt_event instead.
+     */
+    esp_log_level_set("mqtt_client", ESP_LOG_NONE);
+    esp_log_level_set("transport_base", ESP_LOG_NONE);
+    esp_log_level_set("transport", ESP_LOG_NONE);
+    esp_log_level_set("esp-tls", ESP_LOG_NONE);
+
     s_client = esp_mqtt_client_init(&client_config);
     if (s_client == NULL) {
         return ESP_FAIL;
     }
     esp_err_t err = esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, on_mqtt_event, NULL);
     if (err != ESP_OK) return err;
-    return esp_mqtt_client_start(s_client);
+
+    /*
+     * First attempt once the network is up; after that the client reconnects by itself.
+     * Registered before looking, so an address that arrives in between is not missed.
+     */
+    err = esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_first_ip, NULL, &s_first_ip);
+    if (err != ESP_OK) return err;
+    if (net_connected()) {
+        start_once();
+    }
+    return ESP_OK;
 }
 
 bool mqtt_link_connected(void){

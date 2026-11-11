@@ -1,0 +1,29 @@
+menu "Room hub: sensors"
+
+    config HUB_PIR_FITTED
+        bool "HC-SR501 presence sensor (PIR) fitted"
+        default y
+        help
+            Off: the presence input is not read, published nor sent on CAN, and the
+            rules built on presence (inactivity, night exit) are suspended. An
+            unplugged PIR reads as "nobody here", which would raise a false
+            inactivity alert by day.
+
+    config HUB_LM35_FITTED
+        bool "LM35 temperature sensor fitted"
+        default y
+        help
+            Off: no temperature is read, published nor sent on CAN, and the
+            temperature rule never fires. A fitted LM35 that comes loose is caught
+            anyway: readings outside 0-57 degC are dropped, with one warning.
+
+    config HUB_DOORS_ABSENT
+        string "Doors not fitted (ids of BOARD_DOORS, comma separated)"
+        default ""
+        help
+            For example "banheiro" or "quarto,banheiro". An unplugged reed switch
+            reads as "open", which would raise false night exit alerts. A door
+            listed here is not read, published nor sent on CAN, and the rules never
+            see it move. The other doors keep their indexes and CAN ids.
+
+endmenu

@@ -115,6 +115,10 @@ Para compilar os caminhos opcionais do vestível sem mexer no `sdkconfig` dele, 
 `idf.py -B <dir>/build -D SDKCONFIG=<dir>/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;<dir>/extra.defaults" build`,
 com `CONFIG_GADGET_MQTT=y`, `CONFIG_GADGET_CAN=y` etc. no `extra.defaults`.
 
+Demonstração com uma placa só (vestível sem hub, perfil `firmware/gadget/sdkconfig.demo.defaults`; no PC,
+`interface/demo_vestivel.py`):
+`idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" build flash`.
+
 Pegadinhas dos firmwares:
 
 - `MINIMAL_BUILD` está ligado: todo componente usado por `main` precisa estar em `PRIV_REQUIRES` de
@@ -147,7 +151,14 @@ Pegadinhas dos firmwares:
 - `hub_task` é a única task que chama o motor de regras e publica; os demais só enfileiram eventos.
 - Autoteste do CAN: `menuconfig` → CAN bus (TWAI) (ligado por padrão; desligar no barramento real).
 - No vestível, MQTT (`GADGET_MQTT`) e CAN (`GADGET_CAN`) são opcionais e desligados por padrão; o CAN dele é só
-  de bancada (requisito da disciplina e testes), a comunicação real é ESP-NOW.
+  de bancada (requisito da disciplina e testes), a comunicação real é ESP-NOW. **MAC do hub vazio = sem hub**:
+  o ESP-NOW não é ligado (bancada, demonstração), e o compilador então descarta o Wi-Fi do binário. Para
+  compilar o caminho do ESP-NOW, use um build de teste com um MAC.
+- **Peça ausente = um aviso, não erro:** sensor, CAN, Wi-Fi ou broker que faltam dão **um** `ESP_LOGW` quando
+  percebidos e um `ESP_LOGI` quando voltam; as novas tentativas ficam em `ESP_LOGD`, com espera crescente. `E`
+  só para falha de verdade (configuração recusada, queda perdida). Nada opcional pode derrubar a placa: nada de
+  `ESP_ERROR_CHECK` no que pode faltar. No hub, PIR, LM35 e portas não instalados são declarados em "Room hub:
+  sensors", porque soltos geram alertas falsos.
 - `sdkconfig` e `build/` são ignorados pelo git; o que precisa valer para todos vai em `sdkconfig.defaults`
   (watchdog de 30 s com pânico, partição de app grande, usuário MQTT `vestivel` no vestível). O
   `sdkconfig.defaults` vale para opções que o `sdkconfig` ainda não tem; uma opção que já está nele não muda.
@@ -160,6 +171,7 @@ copy .env.example .env       # e troque as senhas
 docker compose up -d         # Mosquitto, Telegraf, InfluxDB, Grafana (:3000), notificador
 python simulador.py --host <IP da máquina> --senha <MQTT_HUB_PASSWORD>
 python -m unittest discover -s notificador
+python -m unittest test_demo_vestivel       # demo_vestivel.py (requirements-demo.txt para rodar a janela)
 ```
 
 Usuários do broker: `hub`, `vestivel` (MQTT opcional da pulseira), `telegraf`, `notificador`, `painel`; a ACL

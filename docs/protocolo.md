@@ -108,7 +108,12 @@ queda**:
   `queda`, com o **mesmo `id`** que o hub usaria (`<vestível>-<seq>`) e `"via":"vestivel"` no `detalhe`. Se o
   hub também tiver recebido, o notificador descarta a cópia (mesmo `id` + `estado`);
 - o "estou bem" segue o mesmo caminho: se a queda saiu pelo MQTT, ou se o `FALL_CANCEL` não for confirmado, o
-  vestível publica o `cancelado` com o mesmo `id`.
+  vestível publica o `cancelado` com o mesmo `id`;
+- **sem hub configurado** (MAC do hub vazio, bancada ou demonstração), o vestível não liga o ESP-NOW e publica o
+  alerta direto, sem tentar o hub antes.
+
+A demonstração com uma placa só (`interface/demo_vestivel.py`) não muda este contrato: o programa lê a placa pela
+USB e publica no papel do hub (usuário `hub`, `status` com `"fw":"demo-usb"`).
 
 ### `alerta`
 

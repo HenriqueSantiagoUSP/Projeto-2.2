@@ -46,7 +46,7 @@ Detalhes que o plano deixava em aberto e foram decididos ao escrever o código; 
 | ESP-NOW descarta reenvio pelo par (`seq`, `uptime_ms`) | só o `seq` confundiria o primeiro quadro de um vestível que reiniciou |
 | Presença só conta como "alguém no quarto" 60 s depois do evento de porta | antes disso, é o residente passando pelo PIR a caminho da porta |
 | Episódio de queda só fecha com `FALL_CANCEL` | o hub não tem como saber que o socorro chegou; o reconhecimento pelo cuidador é futuro (backend) |
-| Vestível reinicia se o MPU-6050 não responde | um vestível sem sensor não pode mandar heartbeats que pareçam saudáveis |
+| ~~Vestível reinicia se o MPU-6050 não responde~~ (trocado em 2026-11-11: segue rodando sem heartbeat; ver "Peças ausentes") | um vestível sem sensor não pode mandar heartbeats que pareçam saudáveis |
 | Usuários do broker fixos (`hub`, `telegraf`, `notificador`, `painel`); só as senhas no `.env` | a ACL do Mosquitto se refere a nomes literais |
 | Telegraf grava com a hora de recepção; `ts` vira campo | antes de sincronizar, o hub manda sem `ts`, e o Telegraf descartaria o ponto |
 | Demonstração de 18/09 movida para `interface/legado/` | os arquivos não estavam no git; reescrever no lugar apagaria a versão entregue |
@@ -182,6 +182,23 @@ provisório com histerese. Os números são da SisFall no cenário A (±8 g), co
 | O alerta continua saindo do hub; o vestível só publica no MQTT se o hub não confirmar | processamento na borda e deduplicação pelo `id`, como antes; o caminho de reserva já existia |
 | Cooldown de 30 s depois de uma queda informada; as janelas seguintes continuam classificadas e vão para o log | a mesma queda, ainda tremendo, não vira dois alertas |
 | `fall_detect` (histerese) removido do firmware | o limiar virou só o gatilho. A linha de base continua no Python (`avaliacao.detector_do_firmware`) |
+
+## Peças ausentes e demonstração com uma placa (2026-11-11)
+
+Pedido: mostrar o modelo funcionando com uma ESP só, com o MPU-6050, ligada ao computador; e, nas duas placas,
+seguir funcionando sem CAN, sem um sensor ou sem rede, com um aviso em vez de erros repetidos.
+
+| Decisão | Por quê |
+|---|---|
+| **MAC do hub vazio = vestível sem hub:** não liga o ESP-NOW; as quedas vão ao log serial (e ao MQTT e ao CAN, se ligados), e com MQTT o alerta sai direto | antes, o `espnow_tx_init` falhava e o vestível reiniciava em laço; com um MAC falso, cada queda gastaria ~1 s em reenvios |
+| **Perfil `sdkconfig.demo.defaults`**: sem hub, modo de coleta, 5 s entre quedas, console a 921600 (console UART "custom", a mesma UART0) | o CSV a 200 Hz ocupa ~75 % de uma UART a 115200, e o `printf` espera a UART dentro da task de amostragem. A opção de baud só existe com o console "custom" |
+| **`interface/demo_vestivel.py`**: lê a placa pela USB, mostra o sinal e as decisões ao vivo e, opcionalmente, publica no papel do hub | dispensa Wi-Fi na sala e hub. A placa decide e o programa só mostra e repassa, então o contrato MQTT não muda |
+| **Sem MPU-6050, o vestível segue rodando, sem heartbeat**, com LED de falha e nova tentativa a cada 5 s, no boot e se o sensor soltar durante o uso | mantém a intenção antiga (sem sensor, o hub o declara offline) sem o reinício em laço, que impedia usar o resto da placa e enchia o log |
+| **Peça ausente = um aviso (W) ao ser percebida e um I ao voltar**; novas tentativas em silêncio, com espera crescente até 60 s (Wi-Fi, CAN) | uma peça que falta é um estado, não um erro por tentativa. Continuam como E, uma vez: usuário/senha recusados no broker (configuração errada) e uma queda que não chegou a lugar nenhum |
+| **O cliente MQTT só começa com a rede de pé**, e sem rede configurada nem começa; os logs da biblioteca (`mqtt_client`, `transport_base`, `esp-tls`) são silenciados, e o `mqtt_link` dá o aviso | a biblioteca tentava mesmo sem Wi-Fi e logava erros a cada ~10 s. Parar e religar o cliente a cada queda do Wi-Fi poderia travar o laço de eventos por segundos (`esp_mqtt_client_stop` espera a tentativa em curso) |
+| **CAN sem barramento:** bus-off e "error passive" viram um aviso cada; a recuperação espera 1 s → 60 s | sem transceptor e com o modo bancada desligado, era um E a cada ~1 s |
+| **Hub: menu "Room hub: sensors"** (`HUB_PIR_FITTED`, `HUB_LM35_FITTED`, `HUB_DOORS_ABSENT`); sem PIR, a inatividade e a saída noturna ficam suspensas | PIR e portas soltos não dão para detectar (leem "ninguém" e "aberta") e gerariam alertas falsos. No `menuconfig`, como escolheu o usuário; pela config MQTT mexeria no contrato |
+| LM35 solto: aviso uma vez, sem publicar | já era descartado por estar fora da faixa, mas com um W a cada leitura |
 
 ## O que foi bom ter mudado
 

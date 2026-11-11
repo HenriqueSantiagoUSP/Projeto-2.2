@@ -21,9 +21,23 @@ static const char *TAG = "can";
 #define CAN_RX_QUEUE_DEPTH      16      /* frames waiting for can_rx */
 /* A frame takes well under 1 ms at 250 kbit/s; still pending after this, nobody ACKed it. */
 #define CAN_TX_DONE_MS          20
-/* Pause before leaving bus-off, so a broken bus does not keep the node toggling. */
-#define CAN_RECOVER_DELAY_MS    1000
+/*
+ * Pause before leaving bus-off, so a broken bus does not keep the node toggling. It
+ * doubles while the bus stays unreachable (no transceiver, no cable), up to a minute.
+ */
+#define CAN_RECOVER_MIN_MS      1000
+#define CAN_RECOVER_MAX_MS      60000
 #define CAN_DROP_LOG_MS         10000
+
+/*
+ * What can_tx knows about the bus, so a missing one is reported once and not on every
+ * recovery attempt. Only can_tx touches it.
+ */
+typedef struct {
+    bool     no_bus;              /* bus-off reported: quiet until the node is back */
+    bool     no_ack;              /* error passive, nobody acknowledges: reported once */
+    uint32_t recover_delay_ms;
+} can_link_t;
 
 /* Task notification bits of can_tx. */
 #define CAN_NOTIFY_FRAME        (1u << 0)
@@ -188,33 +202,58 @@ static const char *state_name(twai_error_state_t state){
     }
 }
 
-/* Reads the node state after a change; returns when to start a recovery (0 = none). */
-static int64_t handle_state_change(int64_t recover_at_us){
+/*
+ * Reads the node state after a change; returns when to start a recovery (0 = none).
+ * A missing bus is a state, not an error: one warning when it is first seen, quiet
+ * retries with a growing pause, and one line when it is back.
+ */
+static int64_t handle_state_change(int64_t recover_at_us, can_link_t *link){
     twai_node_status_t status;
     if (twai_node_get_info(s_node, &status, NULL) != ESP_OK) {
         return recover_at_us;
     }
 
     switch (status.state) {
-        case TWAI_ERROR_BUS_OFF:
+        case TWAI_ERROR_BUS_OFF: {
             sys_events_clear(SYS_EV_CAN_RUNNING);
             sys_events_set(SYS_EV_CAN_BUS_OFF);
-            ESP_LOGE(TAG, "bus-off (TEC %u, REC %u): recovering in %d ms",
-                     status.tx_error_count, status.rx_error_count, CAN_RECOVER_DELAY_MS);
-            return esp_timer_get_time() + (int64_t) CAN_RECOVER_DELAY_MS * 1000;
+            if (!link->no_bus) {
+                ESP_LOGW(TAG, "CAN bus not connected (no transceiver, cable or other node?): carrying on "
+                         "without CAN, retrying every %d s at most", CAN_RECOVER_MAX_MS / 1000);
+                link->no_bus = true;
+            } else {
+                ESP_LOGD(TAG, "still bus-off (TEC %u, REC %u), next try in %lu ms", status.tx_error_count,
+                         status.rx_error_count, (unsigned long) link->recover_delay_ms);
+            }
+            int64_t at = esp_timer_get_time() + (int64_t) link->recover_delay_ms * 1000;
+            link->recover_delay_ms = link->recover_delay_ms * 2 > CAN_RECOVER_MAX_MS ? CAN_RECOVER_MAX_MS
+                                                                                      : link->recover_delay_ms * 2;
+            return at;
+        }
 
         case TWAI_ERROR_ACTIVE:
-            if (sys_events_all(SYS_EV_CAN_BUS_OFF)) {
-                ESP_LOGI(TAG, "recovered from bus-off");
+            if (link->no_bus || link->no_ack) {
+                ESP_LOGI(TAG, "CAN bus connected again");
             }
+            link->no_bus = false;
+            link->no_ack = false;
+            link->recover_delay_ms = CAN_RECOVER_MIN_MS;
             sys_events_clear(SYS_EV_CAN_BUS_OFF);
             sys_events_set(SYS_EV_CAN_RUNNING);
             return 0;
 
+        case TWAI_ERROR_PASSIVE:
+            /* With a transceiver but no other node, nothing ACKs: the node stays here for good. */
+            if (!link->no_bus && !link->no_ack) {
+                ESP_LOGW(TAG, "no other CAN node answers (error passive): carrying on, frames are dropped");
+                link->no_ack = true;
+            }
+            return recover_at_us;
+
         default:
-            /* Warning and passive still transmit: only worth a log. */
-            ESP_LOGW(TAG, "%s (TEC %u, REC %u)", state_name(status.state),
-                     status.tx_error_count, status.rx_error_count);
+            /* Warning still transmits normally: a step on the way, not worth more than a debug line. */
+            ESP_LOGD(TAG, "%s (TEC %u, REC %u)", state_name(status.state), status.tx_error_count,
+                     status.rx_error_count);
             return recover_at_us;
     }
 }
@@ -247,6 +286,7 @@ static void can_tx_task(void *arg){
     int64_t recover_at_us = 0;
     uint32_t dropped = 0;
     int64_t last_drop_log_us = 0;
+    can_link_t link = { .recover_delay_ms = CAN_RECOVER_MIN_MS };
 
     while (1) {
         TickType_t wait = portMAX_DELAY;
@@ -259,7 +299,7 @@ static void can_tx_task(void *arg){
         xTaskNotifyWait(0, UINT32_MAX, &notified, wait);
 
         if (notified & CAN_NOTIFY_STATE) {
-            recover_at_us = handle_state_change(recover_at_us);
+            recover_at_us = handle_state_change(recover_at_us, &link);
         }
         if (recover_at_us != 0 && esp_timer_get_time() >= recover_at_us) {
             recover_at_us = 0;
@@ -277,10 +317,14 @@ static void can_tx_task(void *arg){
             }
         }
 
+        /* Drops without a known reason are worth a line; with the bus missing they are expected. */
         int64_t now_us = esp_timer_get_time();
         if (dropped > 0 && now_us - last_drop_log_us >= (int64_t) CAN_DROP_LOG_MS * 1000) {
-            ESP_LOGW(TAG, "%lu frame(s) dropped: bus-off, or no other node ACKs (bench mode off?)",
-                     (unsigned long) dropped);
+            if (link.no_bus || link.no_ack) {
+                ESP_LOGD(TAG, "%lu frame(s) dropped while the bus is missing", (unsigned long) dropped);
+            } else {
+                ESP_LOGW(TAG, "%lu frame(s) dropped", (unsigned long) dropped);
+            }
             dropped = 0;
             last_drop_log_us = now_us;
         }

@@ -136,6 +136,15 @@ episódio: publicado uma vez como `ativo` e encerrado como `resolvido` ou `cance
 Sem hora válida, as regras com janela de horário ficam suspensas e `status` informa `"hora":false`. A
 inatividade só vale de dia porque, à noite, o residente dormindo não aciona o PIR.
 
+**Sensor não instalado:** um PIR solto lê "ninguém" e uma porta solta lê "aberta", e nada no sinal os distingue
+de um caso real. Por isso o hub tem o menu "Room hub: sensors" para declarar o que está instalado:
+- sem PIR, a inatividade e a saída noturna (que depende de "sem presença") ficam suspensas;
+- uma porta ausente não é lida, então não arma regra nenhuma;
+- sem LM35 (ou com ele solto, lendo fora de 0–57 °C), a regra de temperatura não dispara.
+
+Cada peça ausente (sensor, CAN, Wi-Fi, broker) dá um aviso único no log, não um erro por tentativa
+([`firmware/room/README.md`](../firmware/room/README.md)).
+
 ### Vestível — `firmware/gadget/`
 
 Componentes próprios: `mpu6050`, `fall_pipeline` (pipeline de queda; C puro, testado no PC contra o Python),
@@ -178,8 +187,15 @@ Wearable, mais os menus comuns Network (Wi-Fi), MQTT e CAN bus (TWAI) quando os 
 - **Energia:** no protótipo, power bank na entrada USB-C da placa, sem medição de bateria; o vestível informa
   "bateria desconhecida" (`0xFFFF`). O firmware já sabe ler um divisor no ADC1 (`GADGET_BATTERY_SENSE`), para a
   placa própria do vestível com LiPo.
-- **Falha do sensor:** se o MPU-6050 não responde, o vestível reinicia em vez de mandar heartbeats que
-  pareçam saudáveis, e o hub acaba declarando-o offline.
+- **Falha do sensor (desde 2026-11-11):** se o MPU-6050 não responde, no boot ou durante o uso, o vestível
+  continua rodando:
+  - LED vermelho lento (falha);
+  - procura o sensor a cada 5 s;
+  - **não manda heartbeat**, para não parecer saudável sem detectar quedas. O hub acaba declarando-o offline,
+    como antes, quando ele reiniciava em laço.
+- **Sem hub (MAC vazio):** modo de bancada e de demonstração. O ESP-NOW não é ligado, e as quedas vão para o log
+  serial (e para o MQTT e o CAN, se ligados). É o que usa a demonstração com uma placa só
+  ([`firmware/gadget/README.md`](../firmware/gadget/README.md)).
 
 ### Central
 
@@ -235,7 +251,7 @@ rádio e tudo o que fala com ele; o núcleo 1, com o tempo real.
 | hub | `espnow_task` | 0 | MEDIA | valida e encaminha as mensagens do vestível |
 | as duas | `can_rx`, `can_tx` | 0 | MEDIA | recepção e despacho; transmissão e estado do nó |
 | as duas | `indicators` | 0 | MINIMA | LED |
-| vestível | `sampling` | 1 | ALTA | FIFO do MPU-6050, buffer circular, detector, atributos |
+| vestível | `sampling` | 1 | ALTA | FIFO do MPU-6050 (e as novas tentativas sem ele), pipeline de queda |
 | vestível | `comm` | 0 | MEDIA | ESP-NOW, MQTT e CAN opcionais, botão, heartbeat |
 
 Como os recursos são compartilhados:

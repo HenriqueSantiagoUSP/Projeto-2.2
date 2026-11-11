@@ -28,7 +28,13 @@ typedef struct {
     void                    *ctx;
 } mqtt_link_config_t;
 
-/* Creates and starts the client; it reconnects by itself. Needs net_init() and sys_events_init(). */
+/*
+ * Creates the client and starts it as soon as the network is up; from then on it
+ * reconnects by itself. Without a Wi-Fi network configured it warns once and stays
+ * off (publishing then returns ESP_ERR_INVALID_STATE, silently). A broker that cannot
+ * be reached is one warning per outage, not an error per attempt. Needs net_init()
+ * and sys_events_init().
+ */
 esp_err_t mqtt_link_start(const mqtt_link_config_t *config);
 
 bool mqtt_link_connected(void);

@@ -24,6 +24,8 @@ static volatile esp_now_send_status_t s_last_status;
 static int s_failures = 0;
 static bool s_scanning = false;
 static bool s_fixed_channel = false;
+/* A hub out of reach is a state: warned once when it goes, one line when it is back. comm_task only. */
+static bool s_hub_missing = false;
 
 /* Survive a reset from sleep, so the hub never sees a reused seq for a new message. */
 static RTC_DATA_ATTR uint16_t s_seq;
@@ -78,8 +80,11 @@ static bool ping_current_channel(const espnow_ping_t *ping){
     if (found) {
         ESP_LOGI(TAG, "hub answers on channel %u (the access point's)", s_channel);
         s_failures = 0;
-    } else {
-        ESP_LOGW(TAG, "hub not heard on channel %u (the access point's)", s_channel);
+        s_hub_missing = false;
+    } else if (!s_hub_missing) {
+        ESP_LOGW(TAG, "hub not heard on channel %u (the access point's): carrying on, falls go to the "
+                 "fallbacks until it answers", s_channel);
+        s_hub_missing = true;
     }
     return found;
 }
@@ -112,8 +117,15 @@ bool espnow_tx_scan(void){
     if (found) {
         ESP_LOGI(TAG, "hub found on channel %u", s_channel);
         s_failures = 0;
+        s_hub_missing = false;
     } else {
-        ESP_LOGW(TAG, "hub not found on any channel");
+        if (!s_hub_missing) {
+            ESP_LOGW(TAG, "hub not found on any channel: carrying on, falls go to the fallbacks until it "
+                     "answers");
+            s_hub_missing = true;
+        } else {
+            ESP_LOGD(TAG, "hub still not found");
+        }
         if (s_channel) {
             esp_wifi_set_channel(s_channel, WIFI_SECOND_CHAN_NONE);
         }
