@@ -1,0 +1,20 @@
+\begin{tabular}{@{}l p{7.4cm} r r@{}}
+\toprule
+Método & Ideia & \makecell[r]{Alarmes\\falsos/h} & \makecell[r]{Quedas com\\$\le$1 alarme/h} \\
+\midrule
+\multicolumn{4}{@{}l}{\textcolor{uspblue}{\textbf{Das aulas}}} \\
+{Correlação com templates} & compara a forma de $|a|$ com quedas e atividades típicas (filtro casado) & 90,9 & 1,3\,\% \\
+{DTW} & a mesma comparação, aceitando que o movimento estique ou encolha no tempo & 74,0 & 7,6\,\% \\
+{AR(12) como anomalia} & prevê $|a|$ pelas amostras anteriores; erro grande = movimento estranho & 688,1 & 8,6\,\% \\
+{Centroide (cosseno)} & distância aos vetores de atributos médios de cada classe & 15,8 & 62,3\,\% \\
+{kNN (Manhattan)} & votação entre as 7 janelas de treino mais parecidas & 0,48 & 96,1\,\% \\
+\midrule
+\multicolumn{4}{@{}l}{\textcolor{uspblue}{\textbf{Da literatura}}} \\
+{Regras em cascata} & queda livre E (corpo parado OU inclinação mudou) & 54,9 & 23,5\,\% \\
+{Regressão logística} & soma ponderada dos atributos vira probabilidade & 1,44 & 92,8\,\% \\
+{Árvore de decisão} & uma sequência de perguntas sim/não sobre os atributos & 5,30 & 0,0\,\% \\
+{SVM (RBF)} & fronteira curva com a maior margem entre as classes & 0,76 & 94,6\,\% \\
+{CNN 1D (6 eixos)} & rede convolucional que aprende direto do sinal & 1,17 & 93,9\,\% \\
+\textbf{Random Forest} & muitas árvores diferentes, e a média dos votos & 0,41 & 95,7\,\% \\
+\bottomrule
+\end{tabular}

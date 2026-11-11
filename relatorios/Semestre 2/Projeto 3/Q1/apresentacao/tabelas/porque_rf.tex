@@ -1,0 +1,14 @@
+\begin{tabular}{@{}l rr rr r r@{}}
+\toprule
+ & \multicolumn{2}{c}{Alarmes falsos/h} & \multicolumn{2}{c}{Quedas com $\le$1 alarme/h} & \makecell[r]{Modelo\\na flash} & \makecell[r]{Operações\\por janela} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Método & A (±8\,g) & B (±2\,g) & A & B & & \\
+\midrule
+\textbf{Random Forest} & \textbf{0,41} & \textbf{0,76} & \textbf{95,7\,\%} & \textbf{94,4\,\%} & \textbf{252\,kB} & \textbf{46\,492} \\
+SVM (RBF) & 0,76 & 0,76 & 94,6\,\% & 94,5\,\% & 45\,kB & 77\,752 \\
+kNN (Manhattan) & 0,48 & 0,62 & 96,1\,\% & 96,3\,\% & 1,6\,MB & 819\,972 \\
+Regressão logística & 1,44 & 1,44 & 92,8\,\% & 91,7\,\% & 412\,B & 44\,806 \\
+CNN 1D (6 eixos) & 1,17 & 2,20 & 93,9\,\% & 79,4\,\% & 26\,kB & 243\,296 \\
+Uma árvore só & 5,30 & 6,60 & 0,0\,\% & 0,9\,\% & 612\,B & 44\,710 \\
+\bottomrule
+\end{tabular}

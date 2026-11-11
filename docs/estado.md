@@ -67,6 +67,27 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-11 — apresentação do Q1 em Beamer
+
+- **Pedido:** apresentação do relatório do Q1, com:
+  - os modelos testados (visão geral), o pipeline e os resultados, com figuras;
+  - um sinal de exemplo antes e depois do filtro;
+  - o Random Forest explicado a fundo.
+
+  Sem o limiar antigo como "problema": o limiar aparece só como o gatilho do pipeline.
+- **Feito:** `relatorios/Semestre 2/Projeto 3/Q1/apresentacao/`, em Beamer 16:9 com 26 slides e a identidade do
+  relatório.
+  - As figuras ficam em tamanho de slide, geradas por `modelo/experimentos/10_figuras_apresentacao.py`.
+  - As tabelas e os números (`numeros.tex`) são gerados pelo mesmo script: nenhum é digitado à mão.
+  - O `roteiro-apresentacao.md` foi reescrito para seguir os slides.
+  - O estilo das figuras passou para `experimentos/_estilo.py`, usado pelo `07` e pelo `10`.
+- **Verificado:**
+  - o `07` gera as mesmas figuras, byte a byte, depois de extrair o estilo;
+  - o script 10 confere que o Random Forest que ele explica é o do vestível (limiar e vetores de teste,
+    \|ΔP\| = 5·10⁻⁷);
+  - `pdflatex` sem erros nem *overfull*;
+  - os 26 slides foram renderizados (`pdftoppm`) e conferidos um a um.
+
 ### 2026-11-11 — pipeline de queda no vestível
 
 - **Pedido:** registrar a escolha do modelo e do gatilho e levar o pipeline ao firmware, com o envio da

@@ -191,6 +191,16 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-11 — Apresentação do Q1 em Beamer** (`relatorios/Semestre 2/Projeto 3/Q1/apresentacao/`).
+  - 26 slides:
+    - objetivo e dados;
+    - o pipeline, com o sinal antes e depois do filtro;
+    - visão geral dos métodos e resultados;
+    - o Random Forest a fundo (árvore, Gini, floresta, votos, importância, por que foi escolhido);
+    - a versão no vestível.
+  - Figuras, tabelas e números gerados por `modelo/experimentos/10_figuras_apresentacao.py`; roteiro da fala
+    atualizado.
+  - Verificado: `pdflatex` sem erros nem *overfull*; slides renderizados e conferidos um a um.
 - [x] **2026-11-11 — Pipeline de queda no vestível** (`firmware/gadget/components/fall_pipeline`), no lugar do
   detector provisório (`fall_detect`, removido).
   - Etapas: biquad de 20 Hz (ESP-DSP) → gatilho causal em picos de \|a\| ≥ 2,0 g → janela de −1,0 a +0,8 s →
