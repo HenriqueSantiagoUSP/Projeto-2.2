@@ -1,0 +1,35 @@
+menu "Network (Wi-Fi)"
+
+    config APP_WIFI_SSID
+        string "Wi-Fi SSID"
+        default ""
+        help
+            Network of the central (the Raspberry Pi access point or the institution's
+            Wi-Fi). Empty: the board does not join any network and only uses the radio
+            for ESP-NOW (the hub stays on APP_WIFI_CHANNEL_NO_AP), for bench tests
+            without a router.
+
+    config APP_WIFI_PASSWORD
+        string "Wi-Fi password"
+        default ""
+
+    config APP_WIFI_CHANNEL_NO_AP
+        int "Radio channel of the hub when no SSID is configured"
+        range 1 13
+        default 1
+
+    config APP_SNTP_SERVER
+        string "SNTP server"
+        default "pool.ntp.org"
+        help
+            Use the central's address to run without internet (an NTP server on the
+            Raspberry Pi).
+
+    config APP_TIMEZONE
+        string "POSIX TZ of the institution"
+        default "<-03>3"
+        help
+            Local time for the night window of the rules. "<-03>3" is Brasilia time
+            (UTC-3, no daylight saving).
+
+endmenu

@@ -1,0 +1,109 @@
+menu "Wearable"
+
+    config GADGET_HUB_MAC
+        string "MAC of the room hub"
+        default ""
+        help
+            "aa:bb:cc:dd:ee:ff", the station MAC the hub prints at boot.
+
+    config GADGET_ESPNOW_ENCRYPT
+        bool "Encrypt ESP-NOW (PMK + LMK)"
+        default y
+        help
+            Must match the hub: same PMK, and this wearable's MAC configured there.
+
+    config GADGET_ESPNOW_PMK
+        string "Primary master key (16 characters)"
+        default "pmk-change-me-16"
+
+    config GADGET_ESPNOW_LMK
+        string "Local master key (16 characters)"
+        default "lmk-change-me-16"
+
+    config GADGET_FALL_TRIGGER_CG
+        int "Fall trigger: peak of filtered |a| (L_on), in hundredths of g"
+        range 120 800
+        default 200
+        help
+            A peak of |a| (20 Hz low-pass) at or above this wakes the classifier
+            (200 = 2.0 g). The trigger decides nothing: running or sitting down hard
+            cross it too, and the classifier tells them from a fall. 2.0 g is what
+            the models were trained with (SisFall at +-8 g: 99.2 % of the falls cross
+            it); changing it moves the windows away from the training data. Revisit
+            it with the wrist data (modelo/experimentos/02_gatilho.py), then retrain.
+
+    choice GADGET_FALL_CLASSIFIER
+        prompt "Fall classifier"
+        default GADGET_FALL_CLASSIFIER_RF
+        help
+            Both come from modelo/experimentos/09_exportar_vestivel.py (SisFall,
+            waist, +-8 g) and run on the same 23 features. They are provisional
+            until retrained with the wrist data (docs/pendencias.md).
+
+        config GADGET_FALL_CLASSIFIER_RF
+            bool "Random forest (60 trees): the chosen model"
+
+        config GADGET_FALL_CLASSIFIER_LR
+            bool "Logistic regression (23 weights)"
+    endchoice
+
+    config GADGET_FALL_COOLDOWN_S
+        int "Seconds after a reported fall before another one is reported"
+        range 1 600
+        default 30
+
+    config GADGET_CANCEL_WINDOW_S
+        int "Seconds the resident has to cancel a fall with the button"
+        range 0 120
+        default 15
+
+    config GADGET_BUTTON_SIMULATES_FALL
+        bool "Button simulates a fall when none is pending (tests only)"
+        default n
+        help
+            Exercises the whole path wearable -> hub -> central -> Telegram without
+            having to fall. Leave off in use.
+
+    config GADGET_COLLECT_MODE
+        bool "Data collection mode: print every raw sample as CSV"
+        default n
+        help
+            Prints "CSV:t_ms,ax,ay,az,gx,gy,gz" in raw counts at 200 Hz, for building
+            the dataset of the fall model (docs/coleta-de-dados.md), and a "FEAT:"
+            line per trigger with its 23 features, P(fall) and the CPU cycles.
+
+    config GADGET_BATTERY_SENSE
+        bool "Battery voltage divider fitted"
+        default n
+        help
+            The single prototype PCB has no divider: the wearable runs from a power bank
+            on the board's USB-C input, and heartbeats report the battery as unknown
+            (0xFFFF), so the hub skips the low-battery rule. Turn it on for a board with
+            a LiPo and a divider on PIN_BATTERY.
+
+    config GADGET_BATTERY_DIVIDER_X1000
+        int "Divider ratio (battery / pin voltage) x 1000"
+        depends on GADGET_BATTERY_SENSE
+        range 1000 10000
+        default 2000
+
+    config GADGET_MQTT
+        bool "Also join the Wi-Fi and talk to the central over MQTT"
+        default n
+        help
+            The wearable joins APP_WIFI_SSID (menu "Network (Wi-Fi)") and the broker
+            (menu "MQTT", user "vestivel"). ESP-NOW to the hub stays the main path and
+            then rides on the access point's channel. Over MQTT the wearable publishes
+            its own telemetry and, when the hub does not acknowledge a fall even after
+            looking for it, publishes the fall alert itself (docs/protocolo.md §1).
+            Costs battery: the radio stays associated.
+
+    config GADGET_CAN
+        bool "CAN bus (bench tests and course requirement only)"
+        default n
+        help
+            Sends falls and heartbeats as CAN frames 0x0FD / 0x0FE (docs/protocolo.md
+            §2) through a transceiver on PIN_CAN_TX / PIN_CAN_RX, and logs what the
+            other nodes send. Not part of the product: the wearable has no transceiver.
+
+endmenu

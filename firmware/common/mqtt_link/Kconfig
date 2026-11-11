@@ -1,0 +1,41 @@
+menu "MQTT"
+
+    config APP_MQTT_URI
+        string "Broker URI"
+        default "mqtt://192.168.0.10:1883"
+        help
+            Address of the central's Mosquitto. Use mqtts://...:8883 when TLS is set up.
+
+    config APP_MQTT_USERNAME
+        string "Broker username"
+        default "hub"
+        help
+            "hub" for a room hub, "vestivel" for a wearable (interface/mosquitto/acl):
+            each user may only publish its own topics.
+
+    config APP_MQTT_PASSWORD
+        string "Broker password"
+        default ""
+        help
+            Lives only in sdkconfig, which git ignores. Must match the user's password
+            in interface/.env.
+
+    config APP_SITE
+        string "Site (institution) in the topic"
+        default "butanta"
+        help
+            Topics are idoso/<site>/<room>/... (docs/protocolo.md).
+
+    config APP_ROOM
+        string "Room in the topic"
+        default "quarto101"
+
+    config APP_MQTT_OUTBOX_KB
+        int "Outbox limit while offline, in KiB"
+        range 4 256
+        default 32
+        help
+            QoS 1 messages queued while the broker is unreachable are kept up to this
+            size and sent on reconnection.
+
+endmenu

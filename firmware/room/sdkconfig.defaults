@@ -1,0 +1,9 @@
+# Versioned defaults; sdkconfig itself is generated and ignored by git.
+CONFIG_IDF_TARGET="esp32s3"
+
+# Reboot when a critical task stays stuck for more than 30 s (docs/requisitos.md RNF07).
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=30
+CONFIG_ESP_TASK_WDT_PANIC=y
+
+# Wi-Fi + MQTT + ESP-NOW do not fit the default 1 MB app partition.
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y

@@ -1,0 +1,25 @@
+menu "Room hub: ESP-NOW"
+
+    config HUB_WEARABLE_MAC
+        string "MAC of the paired wearable"
+        default ""
+        help
+            "aa:bb:cc:dd:ee:ff". The hub expects it from boot, so silence counts as
+            offline, and registers it as an encrypted peer. Empty: accept any wearable,
+            unencrypted (bench only).
+
+    config HUB_ESPNOW_ENCRYPT
+        bool "Encrypt ESP-NOW (PMK + LMK)"
+        default y
+        help
+            Needs HUB_WEARABLE_MAC. Both sides must use the same keys.
+
+    config HUB_ESPNOW_PMK
+        string "Primary master key (16 characters)"
+        default "pmk-change-me-16"
+
+    config HUB_ESPNOW_LMK
+        string "Local master key of the wearable (16 characters)"
+        default "lmk-change-me-16"
+
+endmenu
