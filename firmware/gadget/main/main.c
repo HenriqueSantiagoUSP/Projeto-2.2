@@ -45,6 +45,8 @@ static const char *TAG = "main";
 #define COMM_MAX_WAIT_MS    500     /* comm_task wakes this often to feed the watchdog */
 #define LOCK_WAIT_MS        100     /* no task waits forever for the activity lock */
 #define NET_WAIT_MS         10000   /* with MQTT on: how long the first contact waits for the AP */
+#define IMU_RETRY_MS        5000    /* without the MPU-6050, look for it again this often */
+#define IMU_LOST_AFTER      10      /* consecutive failed FIFO reads (0.5 s) before the sensor counts as gone */
 
 #define WEARABLE_ID_LEN     7       /* last 3 MAC bytes in hex, as the hub names this wearable */
 #define JSON_MAX            256
@@ -86,9 +88,16 @@ typedef struct {
 } comm_state_t;
 
 static QueueHandle_t s_comm_queue = NULL;
-static mpu6050_t s_mpu;
+static mpu6050_t s_mpu;                           /* sampling_task only, after boot */
+static i2c_master_bus_handle_t s_i2c_bus = NULL;  /* written once at boot */
 static fall_pipeline_t s_pipeline;                /* sampling_task only (~20 KB, not on its stack) */
 static fp_classifier_t s_classifier;              /* written once at boot */
+
+/*
+ * GADGET_HUB_MAC empty: no hub to talk to (a bench or a demo with one board). ESP-NOW
+ * is never started, and falls go to the log (and to MQTT and CAN when they are on).
+ */
+static bool s_has_hub = false;                    /* written once at boot */
 
 /* Activity between heartbeats: sampling_task merges each batch, comm_task takes the average. */
 static sp_activity_t s_activity;
@@ -145,6 +154,24 @@ static void classify_window(void){
     post_from_sampling(&ev);
 }
 
+/*
+ * Brings the MPU-6050 up and restarts the pipeline from a clean state, so a window
+ * never mixes samples from before and after a gap. sampling_task only.
+ */
+static bool imu_start(void){
+    if (mpu6050_init(&s_mpu, s_i2c_bus, MPU6050_ADDR_DEFAULT) != ESP_OK) {
+        return false;
+    }
+    fall_pipeline_init(&s_pipeline, CONFIG_GADGET_FALL_TRIGGER_CG / 100.0f, s_classifier);
+    sys_events_set(SYS_EV_IMU_OK);
+#ifdef CONFIG_GADGET_COLLECT_MODE
+    /* A header starts every run of samples: the sample count (t_ms, pico) restarts here. */
+    printf("CSV:t_ms,ax,ay,az,gx,gy,gz  (raw counts; %.0f LSB/g, %.1f LSB/dps, %d Hz)\n",
+           MPU6050_ACCEL_LSB_PER_G, MPU6050_GYRO_LSB_PER_DPS, MPU6050_SAMPLE_RATE_HZ);
+#endif
+    return true;
+}
+
 static void sampling_task(void *arg){
     (void) arg;
     static mpu6050_sample_t batch[FIFO_BATCH_MAX];
@@ -152,25 +179,63 @@ static void sampling_task(void *arg){
     ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
 #ifdef CONFIG_GADGET_COLLECT_MODE
     uint32_t sample_index = 0;   /* the sensor's clock: one tick per sample */
-    printf("CSV:t_ms,ax,ay,az,gx,gy,gz  (raw counts; %.0f LSB/g, %.1f LSB/dps, %d Hz)\n",
-           MPU6050_ACCEL_LSB_PER_G, MPU6050_GYRO_LSB_PER_DPS, MPU6050_SAMPLE_RATE_HZ);
 #endif
+    /*
+     * Without the sensor the wearable keeps running, with the LED in fault and no
+     * heartbeats (comm_task), so the hub still reports it offline. It looks for the
+     * sensor again every IMU_RETRY_MS, and says so once, not on every try.
+     */
+    bool imu_ok = imu_start();
+    int failures = 0;
+    int64_t next_try_ms = 0;
+    if (!imu_ok) {
+        ESP_LOGW(TAG, "MPU-6050 not connected (I2C SDA GPIO%d, SCL GPIO%d): no fall detection, looking for it "
+                 "every %d s", PIN_I2C_SDA, PIN_I2C_SCL, IMU_RETRY_MS / 1000);
+        next_try_ms = now_ms() + IMU_RETRY_MS;
+    }
     TickType_t last_wake = xTaskGetTickCount();
 
     while (1) {
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(SAMPLE_BATCH_MS));
         esp_task_wdt_reset();
 
+        if (!imu_ok) {
+            if (now_ms() < next_try_ms) {
+                continue;
+            }
+            imu_ok = imu_start();
+            if (!imu_ok) {
+                next_try_ms = now_ms() + IMU_RETRY_MS;
+                continue;
+            }
+            ESP_LOGI(TAG, "MPU-6050 connected: fall detection on");
+            failures = 0;
+#ifdef CONFIG_GADGET_COLLECT_MODE
+            sample_index = 0;
+#endif
+            last_wake = xTaskGetTickCount();
+            continue;
+        }
+
         size_t n = 0;
         esp_err_t err = mpu6050_fifo_read(&s_mpu, batch, FIFO_BATCH_MAX, &n);
         if (err == ESP_ERR_INVALID_STATE) {
             ESP_LOGW(TAG, "FIFO overflow: samples lost");
+            failures = 0;
             continue;
         }
         if (err != ESP_OK) {
-            ESP_LOGW(TAG, "FIFO read failed: %s", esp_err_to_name(err));
+            /* One bad read is noise on the bus; a run of them is a sensor that came loose. */
+            if (++failures >= IMU_LOST_AFTER) {
+                imu_ok = false;
+                sys_events_clear(SYS_EV_IMU_OK);
+                ESP_LOGW(TAG, "MPU-6050 stopped answering (%s): no fall detection, looking for it every %d s",
+                         esp_err_to_name(err), IMU_RETRY_MS / 1000);
+                next_try_ms = now_ms() + IMU_RETRY_MS;
+            }
             continue;
         }
+        failures = 0;
 
         sp_activity_t batch_activity = { 0 };
         for (size_t i = 0; i < n; i++) {
@@ -340,7 +405,7 @@ static bool send_heartbeat(void){
     hb.activity_mg = take_activity_mg();
 
     /* Never resent: the next one comes in 30 s, and the hub tolerates two lost. */
-    bool delivered = espnow_tx_send(&hb, sizeof(hb), 1) == ESP_OK;
+    bool delivered = s_has_hub && espnow_tx_send(&hb, sizeof(hb), 1) == ESP_OK;
 
     can_send_heartbeat(hb.battery_mv, hb.activity_mg);
 #ifdef CONFIG_GADGET_MQTT
@@ -359,10 +424,13 @@ static void send_fall(comm_state_t *st, const fall_info_t *info){
     ESP_LOGW(TAG, "FALL (a2 = %.2f g2, P = %u %%), seq %u", info->a2_peak, info->prob_pct, fall.hdr.seq);
     can_send_fall(info);
 
-    bool delivered = espnow_tx_send(&fall, sizeof(fall), ESPNOW_TX_RETRIES) == ESP_OK;
-    if (!delivered) {
-        espnow_tx_scan();
+    bool delivered = false;
+    if (s_has_hub) {
         delivered = espnow_tx_send(&fall, sizeof(fall), ESPNOW_TX_RETRIES) == ESP_OK;
+        if (!delivered) {
+            espnow_tx_scan();
+            delivered = espnow_tx_send(&fall, sizeof(fall), ESPNOW_TX_RETRIES) == ESP_OK;
+        }
     }
 
     st->fall_seq = fall.hdr.seq;
@@ -372,11 +440,12 @@ static void send_fall(comm_state_t *st, const fall_info_t *info){
         st->fall_via_mqtt = publish_fall_alert(fall.hdr.seq, info, true);
 #endif
         if (st->fall_via_mqtt) {
-            ESP_LOGW(TAG, "hub did not ACK the FALL: alert published over MQTT");
-        } else {
-            /* The local LED (and a buzzer, if one is ever fitted) is the only alarm left. */
+            ESP_LOGW(TAG, "%s: alert published over MQTT", s_has_hub ? "hub did not ACK the FALL" : "no hub");
+        } else if (s_has_hub) {
+            /* A fall that reached nobody: the one real error here. The LED is the only alarm left. */
             ESP_LOGE(TAG, "FALL not delivered to the hub");
         }
+        /* Stand-alone without MQTT: the FALL line above and the serial are where it goes. */
     }
 }
 
@@ -386,8 +455,8 @@ static void send_fall_cancel(const comm_state_t *st){
     cancel.fall_seq = st->fall_seq;
 
     ESP_LOGI(TAG, "FALL_CANCEL for seq %u", st->fall_seq);
-    bool delivered = espnow_tx_send(&cancel, sizeof(cancel), ESPNOW_TX_RETRIES) == ESP_OK;
-    if (!delivered) {
+    bool delivered = s_has_hub && espnow_tx_send(&cancel, sizeof(cancel), ESPNOW_TX_RETRIES) == ESP_OK;
+    if (s_has_hub && !delivered) {
         ESP_LOGE(TAG, "FALL_CANCEL not delivered to the hub");
     }
 #ifdef CONFIG_GADGET_MQTT
@@ -465,16 +534,16 @@ static void comm_task(void *arg){
     (void) arg;
     ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
 
-    if (net_joins_ap()) {
+    if (s_has_hub && net_joins_ap()) {
         /* ESP-NOW rides on the access point's channel: wait for it (well inside the watchdog). */
         if (!sys_events_wait_all(SYS_EV_NET_CONNECTED, pdMS_TO_TICKS(NET_WAIT_MS))) {
-            ESP_LOGW(TAG, "access point not joined yet; ESP-NOW tries anyway");
+            ESP_LOGD(TAG, "access point not joined yet; ESP-NOW tries anyway");
         }
         esp_task_wdt_reset();
     }
 
     comm_state_t st = {
-        .link_ok = espnow_tx_scan(),
+        .link_ok = s_has_hub && espnow_tx_scan(),
         .next_heartbeat_ms = now_ms() + 2000,   /* announce ourselves soon after boot */
     };
 
@@ -488,13 +557,21 @@ static void comm_task(void *arg){
         if (st.fall_pending && now >= st.cancel_deadline_ms) {
             st.fall_pending = false;   /* the alarm now belongs to the hub and the caregivers */
         }
+        bool imu_ok = sys_events_all(SYS_EV_IMU_OK);
         if (now >= st.next_heartbeat_ms) {
-            st.link_ok = send_heartbeat();
+            /* No sensor, no heartbeat: a wearable that cannot detect falls must not look healthy. */
+            if (imu_ok) {
+                st.link_ok = send_heartbeat();
+            }
             st.next_heartbeat_ms = now + ESPNOW_HEARTBEAT_PERIOD_MS;
         }
 
         if (st.fall_pending) {
             indicators_set_status(IND_STATUS_ALERT);
+        } else if (!imu_ok) {
+            indicators_set_status(IND_STATUS_FAULT);
+        } else if (!s_has_hub) {
+            indicators_set_status(IND_STATUS_OK);       /* stand-alone: there is no link to miss */
         } else {
             indicators_set_status(st.link_ok ? IND_STATUS_OK : IND_STATUS_NO_NETWORK);
         }
@@ -585,10 +662,12 @@ void app_main(void){
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
-    i2c_master_bus_handle_t bus;
-    ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &bus));
-    /* No sensor, no detection: reboot rather than send heartbeats that look healthy. */
-    ESP_ERROR_CHECK(mpu6050_init(&s_mpu, bus, MPU6050_ADDR_DEFAULT));
+    /*
+     * The driver logs every unanswered transaction as an error; an unplugged sensor is a
+     * state, reported once by sampling_task, which also brings the MPU-6050 up.
+     */
+    esp_log_level_set("i2c.master", ESP_LOG_NONE);
+    ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &s_i2c_bus));
 
 #ifdef CONFIG_GADGET_BATTERY_SENSE
     esp_err_t battery_err = battery_init(PIN_BATTERY, CONFIG_GADGET_BATTERY_DIVIDER_X1000);
@@ -601,25 +680,36 @@ void app_main(void){
     read_wearable_id();
 
     // ========== RADIO ==========
-    /* Without MQTT the radio only carries ESP-NOW; with it, the wearable also joins the AP. */
-    net_config_t net_config = {
+    s_has_hub = CONFIG_GADGET_HUB_MAC[0] != '\0';
 #ifdef CONFIG_GADGET_MQTT
-        .join_ap = true,
+    const bool wants_mqtt = true;
+#else
+    const bool wants_mqtt = false;
 #endif
-        .power_save = true,
-    };
-    ESP_ERROR_CHECK(net_init(&net_config));
+    if (s_has_hub || wants_mqtt) {
+        /* Without MQTT the radio only carries ESP-NOW; with it, the wearable also joins the AP. */
+        net_config_t net_config = {
+            .join_ap = wants_mqtt,
+            .power_save = true,
+        };
+        ESP_ERROR_CHECK(net_init(&net_config));
+    }
 
-    espnow_tx_config_t radio = {
-        .hub_mac = CONFIG_GADGET_HUB_MAC,
+    if (s_has_hub) {
+        espnow_tx_config_t radio = {
+            .hub_mac = CONFIG_GADGET_HUB_MAC,
 #ifdef CONFIG_GADGET_ESPNOW_ENCRYPT
-        .encrypt = true,
+            .encrypt = true,
 #endif
-        .pmk = CONFIG_GADGET_ESPNOW_PMK,
-        .lmk = CONFIG_GADGET_ESPNOW_LMK,
-        .fixed_channel = net_joins_ap(),
-    };
-    ESP_ERROR_CHECK(espnow_tx_init(&radio));
+            .pmk = CONFIG_GADGET_ESPNOW_PMK,
+            .lmk = CONFIG_GADGET_ESPNOW_LMK,
+            .fixed_channel = net_joins_ap(),
+        };
+        ESP_ERROR_CHECK(espnow_tx_init(&radio));
+    } else {
+        ESP_LOGW(TAG, "no hub configured (menu Wearable > MAC of the room hub): stand-alone, falls go to the "
+                 "serial log%s", wants_mqtt ? " and to MQTT" : "");
+    }
 
 #ifdef CONFIG_GADGET_MQTT
     ESP_ERROR_CHECK(start_mqtt());
@@ -635,7 +725,7 @@ void app_main(void){
     esp_err_t can_err = can_init(&can_config);
     if (can_err != ESP_OK) {
         /* A bench extra: never worth losing the fall detection over. */
-        ESP_LOGE(TAG, "CAN disabled: %s", esp_err_to_name(can_err));
+        ESP_LOGW(TAG, "CAN off: %s", esp_err_to_name(can_err));
     }
 #endif
 

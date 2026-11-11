@@ -19,6 +19,7 @@ typedef enum {
     IND_STATUS_OK,           /* short green flash at 1 Hz */
     IND_STATUS_NO_NETWORK,   /* short yellow flash at 1 Hz */
     IND_STATUS_ALERT,        /* red blinking at 4 Hz */
+    IND_STATUS_FAULT,        /* slow red: 500 ms on every 2 s, an essential sensor is missing */
 } ind_status_t;
 
 typedef struct {

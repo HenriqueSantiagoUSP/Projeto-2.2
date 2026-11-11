@@ -614,19 +614,37 @@ void app_main(void){
     rules_clock_t now;
     hub_clock(&now);
     rules_init(&s_rules, &s_params, s_door_ids, s_door_count, on_alert, NULL, &now);
+#ifndef CONFIG_HUB_PIR_FITTED
+    rules_set_presence_fitted(&s_rules, false);
+#endif
 
     log_bus_map();
 
     // ========== SENSORS ==========
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     ESP_ERROR_CHECK(sensor_events_init(on_sensor, NULL));
+    /*
+     * A sensor that is not fitted (menu "Room hub: sensors") is skipped with one warning:
+     * an unplugged PIR or reed switch would read as "nobody" or "open" and raise false
+     * alerts, and nothing in the signal tells them apart from a real one.
+     */
+#ifdef CONFIG_HUB_PIR_FITTED
     ESP_ERROR_CHECK(hcsr501_init());
+#else
+    ESP_LOGW(TAG, "presence sensor not fitted (menuconfig): no presence; inactivity and night exit rules "
+             "suspended");
+#endif
     ESP_ERROR_CHECK(reedswitch_init());
-    esp_err_t err = lm35_init();
+    esp_err_t err = ESP_OK;
+#ifdef CONFIG_HUB_LM35_FITTED
+    err = lm35_init();
     if (err != ESP_OK) {
         /* One missing sensor must not take the doors and the fall alarm down with it. */
-        ESP_LOGE(TAG, "temperature disabled: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "temperature off: %s", esp_err_to_name(err));
     }
+#else
+    ESP_LOGW(TAG, "temperature sensor not fitted (menuconfig): no temperature, no temperature rule");
+#endif
 
     // ========== CAN ==========
     /* Handlers must be registered before can_init(), which starts can_rx. */
@@ -640,7 +658,8 @@ void app_main(void){
     };
     err = can_init(&can_config);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "CAN disabled: %s", esp_err_to_name(err));
+        /* The rest of the hub never depends on the bus. A missing bus is reported by can itself. */
+        ESP_LOGW(TAG, "CAN off: %s", esp_err_to_name(err));
     }
 
     // ========== NETWORK ==========

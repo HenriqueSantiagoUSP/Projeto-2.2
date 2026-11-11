@@ -55,6 +55,9 @@ static void led_update(ind_status_t status, int64_t now_ms){
         case IND_STATUS_ALERT:
             if (now_ms % 250 < 125) led_show(IND_BRIGHTNESS, 0, 0); else led_show(0, 0, 0);
             break;
+        case IND_STATUS_FAULT:
+            if (now_ms % 2000 < 500) led_show(IND_BRIGHTNESS, 0, 0); else led_show(0, 0, 0);
+            break;
     }
 }
 

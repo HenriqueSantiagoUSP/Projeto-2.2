@@ -18,9 +18,29 @@ Tudo isto já está no código e compila; falta rodar na placa.
     - portas com abre-fecha rápido, sem perder nem inventar estado;
     - PIR depois dos 60 s de aquecimento;
     - temperatura contra um termômetro;
-    - `status` offline (Last Will) até ~45 s depois de desligar.
+    - `status` offline (Last Will) até ~45 s depois de desligar;
+  - **sem peças**, cada caso dá **um** aviso no log e o resto continua:
+    - Wi-Fi sem SSID ou com senha errada (o aviso diz o motivo);
+    - broker parado;
+    - LM35 solto;
+    - CAN sem transceptor, com o modo bancada desligado;
+    - PIR, LM35 e uma porta declarados ausentes no menu "Room hub: sensors": nenhum alerta falso de inatividade
+      nem de saída noturna.
+- [ ] **Ensaio da demonstração com uma placa** (antes da aula; é o primeiro teste do firmware em placa).
+  - Gravar o perfil demo ([`firmware/gadget/README.md`](../firmware/gadget/README.md), "Demonstração com uma placa
+    só"). No boot devem aparecer:
+    - `+-8 g, +-500 dps`;
+    - `fall pipeline: trigger 2.00 g, random forest…`;
+    - `no hub configured … stand-alone`.
+  - `interface/demo_vestivel.py --porta COMx`:
+    - balançar a placa: disparos com P baixa;
+    - soltar a placa de pé numa almofada e deixá-la deitada: "QUEDA DETECTADA".
+  - Com a central no Docker e `--mqtt-host`: o alerta aparece no Grafana, com a P(queda).
+  - Gravar a sessão com `--gravar`: ela serve de primeiro dado real do sensor.
 - [ ] **Vestível gravado e conferido**
   - 200 Hz ± 5 ms medidos pelo modo de coleta;
+  - **sem peças:** MPU solto no boot e durante o uso dá um aviso, LED vermelho lento e nenhum heartbeat, e volta
+    com "MPU-6050 connected"; hub desligado dá um aviso só;
   - **faixa de ±8 g:**
     - no boot, a linha `+-8 g, +-500 dps, 200 Hz into the FIFO`;
     - parada, o eixo vertical lê ~4096 no CSV do modo de coleta (~16384 seria ±2 g);
@@ -39,7 +59,8 @@ Tudo isto já está no código e compila; falta rodar na placa.
 - [ ] **CAN entre as duas placas**
   - vestível com `GADGET_CAN`, modo de bancada desligado nas duas, dois transceptores e terminação;
   - quadros `0x0FD` (3 bytes, com P) e `0x0FE` no log do hub;
-  - recuperação de *bus-off* tirando um fio do barramento.
+  - recuperação de *bus-off* tirando um fio do barramento: um aviso "CAN bus not connected" e um "connected again"
+    ao recolocar.
 - [ ] **MQTT do vestível**
   - com o hub desligado, uma queda simulada chega ao Telegram "enviada pela própria pulseira";
   - com o hub ligado, chega uma só notificação.
@@ -191,6 +212,27 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-11 — Demonstração com uma placa e peças ausentes sem erro.**
+  - **Vestível:**
+    - sem hub (MAC vazio) não liga o ESP-NOW;
+    - sem MPU-6050 segue rodando, sem heartbeat;
+    - perfil `sdkconfig.demo.defaults`.
+  - **Hub:** menu "Room hub: sensors" (PIR, LM35, portas ausentes); sem PIR, as regras de presença ficam suspensas.
+  - **Comuns:** Wi-Fi, MQTT e CAN dão um aviso por queda, não um erro por tentativa.
+  - **Central:**
+    - `interface/demo_vestivel.py` (janela ao vivo e ponte para a central);
+    - coluna P(queda) no Grafana.
+  - **Verificado no PC:**
+    - build sem avisos: vestível padrão, demo, e com MAC, MQTT, CAN e coleta; hub padrão, e com PIR, LM35 e uma
+      porta ausentes e o CAN fora do modo bancada;
+    - testes: regras (59, com 2 casos novos), `hub_config` (60), `fall_pipeline` (885), `signal_proc` (25),
+      notificador (12), `demo_vestivel` (9), `pytest` do `modelo/` (16);
+    - a janela tocando uma sessão sintética (trechos da SisFall): disparos de corrida com P = 0,00 e a queda com
+      P = 0,99 e a faixa;
+    - a ponte num broker Mosquitto local: `status` online/offline, `vestivel/<id>` e dois alertas com `prob`.
+  - **Não verificado:**
+    - nada rodou em placa;
+    - o caminho até o Grafana, porque o Docker não estava no ar.
 - [x] **2026-11-11 — Apresentação do Q1 em Beamer** (`relatorios/Semestre 2/Projeto 3/Q1/apresentacao/`).
   - 26 slides:
     - objetivo e dados;

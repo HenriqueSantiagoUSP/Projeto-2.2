@@ -67,6 +67,47 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-11 — demonstração com uma placa e peças ausentes sem erro
+
+- **Pedidos:**
+  - mostrar o modelo funcionando com uma ESP só, com o MPU-6050, ligada ao computador, de preferência mandando a
+    queda à interface;
+  - nas duas placas, seguir funcionando sem CAN, sem um sensor ou sem rede, com um aviso em vez de erros.
+- **Encontrado no código:**
+  - o vestível sem MAC do hub, ou sem o MPU-6050, reiniciava em laço;
+  - CAN sem barramento dava um E a cada ~1 s;
+  - o cliente MQTT tentava mesmo sem Wi-Fi, com erros da biblioteca a cada ~10 s;
+  - PIR e portas soltos geravam alertas falsos (inatividade, saída noturna).
+- **Vestível:**
+  - modo sem hub (MAC vazio);
+  - sem MPU segue rodando, com LED de falha, nova tentativa a cada 5 s e sem heartbeat;
+  - hub fora do alcance dá um aviso só;
+  - perfil `sdkconfig.demo.defaults`: coleta, 5 s de espera, console UART "custom" a 921600.
+- **Hub:**
+  - menu "Room hub: sensors";
+  - `rules_set_presence_fitted` suspende inatividade e saída noturna;
+  - o LM35 solto dá um aviso por transição.
+- **Comuns:**
+  - `net`: um aviso por queda, com o motivo;
+  - `mqtt_link`: começa só com a rede de pé e silencia a biblioteca;
+  - `can`: um aviso para bus-off e outro para "error passive", com recuperação de 1 s a 60 s;
+  - `indicators`: `IND_STATUS_FAULT`;
+  - `sys_events`: `SYS_EV_IMU_OK`.
+- **Central:**
+  - `interface/demo_vestivel.py`: lê CSV e FEAT da serial, mostra o \|a\| filtrado, os disparos com P(queda) e a
+    faixa de queda, e com `--mqtt-host` publica `status`, `vestivel/<id>` e o alerta como o hub;
+  - `--gravar` e `--reproduzir` para ensaiar sem a placa;
+  - a tabela de alertas do Grafana ganhou a coluna P(queda).
+- **Verificado no PC:**
+  - os builds e os testes listados em `pendencias.md` (Concluído);
+  - a janela renderizada a partir de uma sessão sintética;
+  - a ponte contra o Mosquitto local, com as mensagens conferidas por `mosquitto_sub`.
+- **Não verificado:**
+  - nada em placa;
+  - o caminho até o Grafana, porque o Docker não estava no ar.
+
+  Ficam para o ensaio da demonstração (`pendencias.md`).
+
 ### 2026-11-11 — apresentação do Q1 em Beamer
 
 - **Pedido:** apresentação do relatório do Q1, com:

@@ -1,0 +1,30 @@
+# Demonstration with this board only: the MPU-6050 on GPIO 1 (SDA) / 2 (SCL), the USB
+# cable to a computer, no hub. Applied on top of sdkconfig.defaults, in its own build
+# directory, so the everyday sdkconfig is left alone (README, "Demonstração"):
+#
+#   idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" build flash
+#
+# Defaults only fill options the sdkconfig does not have yet: after changing this file,
+# delete build/demo/sdkconfig so it is generated again.
+#
+# On the computer, interface/demo_vestivel.py shows the signal and the decisions live
+# and can forward the falls to the central.
+
+# No hub: ESP-NOW is not started; falls go to the serial log.
+CONFIG_GADGET_HUB_MAC=""
+
+# Every sample (CSV:) and every trigger with its features and P(fall) (FEAT:), for the
+# live view on the computer.
+CONFIG_GADGET_COLLECT_MODE=y
+
+# Several falls in a row in front of the audience.
+CONFIG_GADGET_FALL_COOLDOWN_S=5
+
+# 200 samples/s of CSV take ~75 % of a 115200 baud console: 8 times the room. The baud
+# rate can only be set on a "custom" console UART, here the same UART0 on its usual pins
+# (43/44); idf.py monitor follows it.
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_UART_CUSTOM_NUM_0=y
+CONFIG_ESP_CONSOLE_UART_TX_GPIO=43
+CONFIG_ESP_CONSOLE_UART_RX_GPIO=44
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=921600

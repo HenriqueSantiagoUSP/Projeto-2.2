@@ -19,6 +19,7 @@
 #define SYS_EV_MQTT_CONNECTED   (1u << 2)   /* mqtt_link: session with the broker */
 #define SYS_EV_CAN_RUNNING      (1u << 3)   /* can: node enabled and not bus-off */
 #define SYS_EV_CAN_BUS_OFF      (1u << 4)   /* can: bus-off, recovery under way */
+#define SYS_EV_IMU_OK           (1u << 5)   /* wearable sampling task: the MPU-6050 answers */
 
 /* Creates the group. Call first thing in app_main, before any component that uses it. */
 esp_err_t sys_events_init(void);

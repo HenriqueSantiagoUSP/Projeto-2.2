@@ -24,6 +24,7 @@ static bool s_joins_ap = false;
 /* Touched only by the event loop task. */
 static uint32_t s_backoff_ms = NET_BACKOFF_MIN_MS;
 static esp_timer_handle_t s_reconnect_timer = NULL;
+static bool s_outage_reported = false;   /* one warning per outage; the retries stay quiet */
 
 static bool ssid_configured(void){
     return CONFIG_APP_WIFI_SSID[0] != '\0';
@@ -43,6 +44,24 @@ static void on_time_sync(struct timeval *tv){
     sys_events_set(SYS_EV_TIME_VALID);
 }
 
+/* Why the access point was not reached, in words a person on the bench can act on. */
+static const char *disconnect_reason(uint8_t reason){
+    switch (reason) {
+        case WIFI_REASON_NO_AP_FOUND:
+        case WIFI_REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY:
+            return "network not found";
+        case WIFI_REASON_AUTH_FAIL:
+        case WIFI_REASON_AUTH_EXPIRE:
+        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        case WIFI_REASON_HANDSHAKE_TIMEOUT:
+            return "password refused?";
+        case WIFI_REASON_BEACON_TIMEOUT:
+            return "signal lost";
+        default:
+            return "could not connect";
+    }
+}
+
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data){
     (void) arg;
 
@@ -54,12 +73,22 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data){
         if (!s_joins_ap) {
             return;
         }
+        const wifi_event_sta_disconnected_t *info = (const wifi_event_sta_disconnected_t *) data;
         bool was_connected = sys_events_all(SYS_EV_NET_CONNECTED);
         sys_events_clear(SYS_EV_NET_CONNECTED);
         if (was_connected && s_cb != NULL) {
             s_cb(false, s_cb_ctx);
         }
-        ESP_LOGW(TAG, "disconnected, retrying in %lu ms", (unsigned long) s_backoff_ms);
+        /* A missing network is a state, not an error: say it once, then retry quietly. */
+        if (!s_outage_reported) {
+            ESP_LOGW(TAG, "Wi-Fi \"%s\" not connected (%s, reason %u): carrying on without the network, "
+                     "retrying every %d s at most", CONFIG_APP_WIFI_SSID, disconnect_reason(info->reason),
+                     info->reason, NET_BACKOFF_MAX_MS / 1000);
+            s_outage_reported = true;
+        } else {
+            ESP_LOGD(TAG, "still not connected (reason %u), retrying in %lu ms", info->reason,
+                     (unsigned long) s_backoff_ms);
+        }
         esp_timer_start_once(s_reconnect_timer, (uint64_t) s_backoff_ms * 1000);
         s_backoff_ms = s_backoff_ms * 2 > NET_BACKOFF_MAX_MS ? NET_BACKOFF_MAX_MS : s_backoff_ms * 2;
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
@@ -68,6 +97,7 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data){
         wifi_second_chan_t second;
         esp_wifi_get_channel(&channel, &second);
         ESP_LOGI(TAG, "connected, ip " IPSTR ", channel %u", IP2STR(&got->ip_info.ip), channel);
+        s_outage_reported = false;
         s_backoff_ms = NET_BACKOFF_MIN_MS;
         sys_events_set(SYS_EV_NET_CONNECTED);
         if (s_cb != NULL) {

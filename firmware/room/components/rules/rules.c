@@ -186,8 +186,16 @@ void rules_init(rules_t *rules, const rules_params_t *params,
     rules->door_count = door_count > RULES_MAX_DOORS ? RULES_MAX_DOORS : door_count;
     rules->cb = cb;
     rules->cb_ctx = cb_ctx;
+    rules->presence_fitted = true;
     /* Nobody has been seen yet: inactivity counts from boot. */
     rules->last_presence_ms = now->mono_ms;
+}
+
+void rules_set_presence_fitted(rules_t *rules, bool fitted){
+    rules->presence_fitted = fitted;
+    if (!fitted) {
+        rules->night_exit.armed = false;
+    }
 }
 
 void rules_set_params(rules_t *rules, const rules_params_t *params){
@@ -235,8 +243,8 @@ void rules_on_door(rules_t *rules, size_t door, bool open, const rules_clock_t *
                 break;
             }
             rules->exit_opened_after_presence = true;
-            /* Re-arming restarts the wait, unless the alert already fired. */
-            if (is_night(p, now) && !rules->night_exit.episode.active) {
+            /* Re-arming restarts the wait, unless the alert already fired. Needs the PIR to clear it. */
+            if (rules->presence_fitted && is_night(p, now) && !rules->night_exit.episode.active) {
                 armed_arm(&rules->night_exit, door, now);
             }
             /* Leaving the bedroom means nobody is shut in the bathroom. */
@@ -399,7 +407,8 @@ void rules_tick(rules_t *rules, const rules_clock_t *now){
     armed_check(rules, &rules->bathroom, ALERT_BATHROOM, p->bathroom_min, now);
 
     /* At night a sleeping resident does not move, so inactivity only counts by day. */
-    if (!rules->inactivity.active && !rules->present && now->time_valid && !is_night(p, now) &&
+    if (rules->presence_fitted && !rules->inactivity.active && !rules->present && now->time_valid &&
+        !is_night(p, now) &&
         !rules->exit_opened_after_presence &&
         now->mono_ms - rules->last_presence_ms >= MIN_TO_MS(p->inactivity_min)) {
         rules_alert_t alert;

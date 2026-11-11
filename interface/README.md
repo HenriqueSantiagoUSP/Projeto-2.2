@@ -18,6 +18,7 @@ hubs (ou simulador.py) ──MQTT 1883──▶ Mosquitto ─┬─▶ Telegraf 
 | Grafana | `grafana/` | painel "Quartos": estado atual e histórico, com seletor de quarto |
 | Notificador | `notificador/` | assina `idoso/+/+/alerta` e envia ao Telegram |
 | Simulador | `simulador.py` | faz o papel de um hub, para testar sem hardware |
+| Demonstração | `demo_vestivel.py` | uma placa só pela USB: o modelo de queda ao vivo e, opcionalmente, no papel do hub (seção 2) |
 | Legado | `legado/` | a demonstração de 18/09/2026 (painel HTML, formato antigo), só como histórico |
 
 ## 1. Subir a central
@@ -65,6 +66,52 @@ O simulador publica estados, sinais de vida da pulseira e, sob comando, alertas:
 Abra o Grafana (painel **Quartos**) e acompanhe; os alertas aparecem na tabela e nos logs do notificador
 (`docker compose logs -f notificador`). Um segundo quarto: rode outro simulador com `--quarto quarto102`.
 
+### Demonstração com uma placa só
+
+`demo_vestivel.py` mostra o modelo de queda funcionando com uma ESP e o MPU-6050 ligados pela USB, sem hub.
+
+1. **Grave na placa o perfil de demonstração** ([`firmware/gadget/README.md`](../firmware/gadget/README.md), seção
+   "Demonstração com uma placa só").
+2. **Instale as dependências**, uma vez:
+
+   ```powershell
+   .venv\Scripts\pip install -r requirements-demo.txt     # pyserial, paho-mqtt, matplotlib
+   ```
+3. **Escolha um modo:**
+   - só a janela:
+
+     ```powershell
+     .venv\Scripts\python demo_vestivel.py --porta COM5
+     ```
+   - janela e central, com o programa no papel do hub:
+
+     ```powershell
+     .venv\Scripts\python demo_vestivel.py --porta COM5 --mqtt-host <IP desta máquina> --senha <MQTT_HUB_PASSWORD>
+     ```
+
+A janela mostra:
+- o \|a\| filtrado rolando, com a linha do gatilho;
+- cada disparo com a P(queda) da placa (azul: não é queda; laranja: queda);
+- uma faixa grande "QUEDA DETECTADA";
+- os atributos da última janela (pico, queda livre, quietude, inclinação);
+- os avisos da placa.
+
+Teclas: `c` = "estou bem" (publica o `cancelado` da última queda); `q` = sai.
+
+Ao abrir a porta, o programa reinicia a placa, para ler no boot o id do vestível e o modelo (`--sem-reset`
+desliga isso).
+
+Com a central, o programa publica no contrato do hub ([`docs/protocolo.md`](../docs/protocolo.md)):
+- `status` online, com `"fw":"demo-usb"`;
+- `vestivel/<id>` com a atividade, a cada 30 s;
+- o `alerta` `queda` com `a2` e `prob`, a cada queda que a placa decide. Ele aparece na tabela de alertas do
+  Grafana (coluna P(queda)) e, com o bot configurado, no Telegram.
+
+Lembre do serviço Mosquitto do Windows: use o IP da máquina, não `localhost` (seção 7).
+
+Para ensaiar sem a placa, `--gravar sessao.log` guarda o que chega da serial, e `--reproduzir sessao.log` toca a
+sessão de novo no mesmo ritmo.
+
 ## 3. Telegram
 
 1. Crie um bot com o [@BotFather](https://t.me/BotFather) e copie o token.
@@ -111,6 +158,7 @@ No PowerShell 5.1, escape as aspas internas com `\"`.
 
 ```powershell
 python -m unittest discover -s notificador     # lógica do notificador
+python -m unittest test_demo_vestivel          # leitura da serial, filtro e alerta do demo_vestivel.py
 ```
 
 ## 7. Problemas comuns

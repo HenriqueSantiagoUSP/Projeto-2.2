@@ -34,6 +34,8 @@ static esp_err_t read_mv(float *mv){
 static void lm35_task(void *arg){
     (void) arg;
     TickType_t last_wake = xTaskGetTickCount();
+    /* A loose sensor reads out of range on every try: said once, and once more when it is back. */
+    bool missing = false;
 
     while (1) {
         float mv;
@@ -43,8 +45,16 @@ static void lm35_task(void *arg){
         } else {
             float celsius = (mv - LM35_CHAIN_OFFSET_MV) / LM35_CHAIN_SLOPE_MV_PER_C;
             if (celsius < LM35_MIN_VALID_C || celsius > LM35_MAX_VALID_C) {
-                ESP_LOGW(TAG, "%.0f mV -> %.1f C is out of the valid range, sensor fault?", mv, celsius);
+                if (!missing) {
+                    ESP_LOGW(TAG, "temperature sensor not connected (%.0f mV -> %.1f C, out of range): no "
+                             "temperature until it reads sensibly again", mv, celsius);
+                    missing = true;
+                }
             } else {
+                if (missing) {
+                    ESP_LOGI(TAG, "temperature sensor connected again");
+                    missing = false;
+                }
                 ESP_LOGI(TAG, "%.0f mV -> %.2f C", mv, celsius);
                 sensor_reading_t reading = {
                     .kind = SENSOR_KIND_TEMPERATURE,

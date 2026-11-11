@@ -55,19 +55,23 @@ static esp_err_t fifo_reset(mpu6050_t *mpu){
 }
 
 esp_err_t mpu6050_init(mpu6050_t *mpu, i2c_master_bus_handle_t bus, uint8_t addr){
-    i2c_device_config_t dev_config = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = addr,
-        .scl_speed_hz = 400000,
-    };
-    esp_err_t err = i2c_master_bus_add_device(bus, &dev_config, &mpu->dev);
-    if (err != ESP_OK) return err;
+    esp_err_t err;
+    /* On the bus once: the caller may try again and again while the sensor is unplugged. */
+    if (mpu->dev == NULL) {
+        i2c_device_config_t dev_config = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = addr,
+            .scl_speed_hz = 400000,
+        };
+        err = i2c_master_bus_add_device(bus, &dev_config, &mpu->dev);
+        if (err != ESP_OK) return err;
+    }
 
     uint8_t who = 0;
-    err = read_regs(mpu, REG_WHO_AM_I, &who, 1);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "no answer at 0x%02X", addr);
-        return err;
+    if (read_regs(mpu, REG_WHO_AM_I, &who, 1) != ESP_OK) {
+        /* Not plugged in: a state the caller reports, once. */
+        ESP_LOGD(TAG, "no answer at 0x%02X", addr);
+        return ESP_ERR_NOT_FOUND;
     }
     if (who != WHO_AM_I_MPU6050) {
         /* Clones answer 0x70/0x72 and usually work the same; say so, do not refuse. */
