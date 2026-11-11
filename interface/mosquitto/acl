@@ -1,0 +1,28 @@
+# Who may read and write what (docs/protocolo.md §1). Topics: idoso/<site>/<quarto>/...
+
+# Room hubs (and the simulator, which plays one): publish everything of a room,
+# read their configuration.
+user hub
+topic write idoso/#
+topic read idoso/+/+/config/desejada
+
+# Wearables with the optional MQTT link (firmware GADGET_MQTT): their own telemetry and
+# link status, and the fall alert when the hub does not answer. Not vestivel/<id> itself,
+# which is the hub's view of the wearable.
+user vestivel
+topic write idoso/+/+/vestivel/+/telemetria
+topic write idoso/+/+/vestivel/+/mqtt
+topic write idoso/+/+/alerta
+
+# History: reads everything.
+user telegraf
+topic read idoso/#
+
+# Telegram notifications: only the alerts.
+user notificador
+topic read idoso/+/+/alerta
+
+# People and tools: read everything, change the rule parameters of a room.
+user painel
+topic read idoso/#
+topic write idoso/+/+/config/desejada

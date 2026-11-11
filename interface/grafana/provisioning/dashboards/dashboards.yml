@@ -1,0 +1,11 @@
+# Loads the dashboards versioned in interface/grafana/dashboards/.
+# Edits made in the Grafana UI are not saved back: change the JSON file instead.
+apiVersion: 1
+
+providers:
+  - name: monitoramento
+    folder: Monitoramento
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
