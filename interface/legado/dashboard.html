@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<!--
+  =============================================================================
+   dashboard.html — Painel em tempo real do Sistema de Monitoramento de Idosos
+   Escola Politécnica da USP — Interface Aberta de Dados (Q1) / Rede Sem Fio (Q3)
+  =============================================================================
+
+   Como funciona (relatório, §4.6 — "MQTT over WebSockets e a Exibição em Tempo Real"):
+
+     ESP32-S3 (hub) ──MQTT/TCP──▶ Mosquitto :1883
+                                      │  roteia por tópico
+     este painel  ◀──MQTT/WebSocket── Mosquitto :9001
+
+   1. O navegador abre uma conexão WebSocket com o broker (porta 9001).
+   2. A biblioteca MQTT.js fala o protocolo MQTT por cima desse WebSocket.
+   3. O painel ASSINA "idoso/quarto101/#" — o curinga # recebe todos os
+      sub-tópicos do quarto: queda, temperatura, porta, presenca e status.
+   4. Cada mensagem publicada pelo hub chega por "push": nenhuma consulta
+      periódica (polling) é feita — o broker empurra o dado no instante em
+      que ele é publicado.
+
+   O arquivo é autocontido (HTML + CSS + JS) e abre direto do disco. A única
+   dependência externa é a MQTT.js (CDN), com cópia local opcional como
+   plano B (ver README.md, seção 3).
+  =============================================================================
+-->
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitoramento — Quarto 101</title>
+<meta name="description" content="Painel MQTT em tempo real do sistema de monitoramento não invasivo de idosos (Poli-USP): queda, temperatura, porta e presença do Quarto 101.">
+<script>
+  /* Aplica o tema salvo ANTES da primeira pintura, para não piscar. */
+  try { var t = localStorage.getItem('painel.tema'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<style>
+/* =============================================================================
+   1. TOKENS DE COR E TIPOGRAFIA
+   Todas as cores são variáveis: o tema claro (padrão, melhor para projetor)
+   e o escuro trocam apenas estes valores. As cores de ESTADO (bom / atenção /
+   crítico) são reservadas para significar estado e nunca usadas como enfeite.
+   ========================================================================== */
+:root {
+  color-scheme: light;
+  --plano: #f9f9f7;                    /* fundo da página                       */
+  --superficie: #fcfcfb;               /* fundo dos cards                       */
+  --ink: #0b0b0b;                      /* texto principal                       */
+  --ink-2: #52514e;                    /* texto secundário                      */
+  --ink-3: #898781;                    /* texto discreto (rótulos, eixos)       */
+  --grade: #e1e0d9;                    /* linhas-guia (hairline)                */
+  --borda: rgba(11, 11, 11, 0.10);     /* contorno dos cards                    */
+  --serie: #2a78d6;                    /* azul da série (sparkline)             */
+  --botao-fundo: #1c5cab;              /* botão principal (6,6:1 com branco)    */
+  --botao-texto: #ffffff;
+  --bom: #0ca30c;                      /* estado bom                            */
+  --atencao: #fab219;                  /* estado de atenção (porta aberta…)     */
+  --critico: #d03b3b;                  /* estado crítico (queda, erro)          */
+  --critico-tinta: rgba(208, 59, 59, 0.10);
+  --atencao-tinta: rgba(250, 178, 25, 0.16);
+  --sombra: 0 1px 2px rgba(11, 11, 11, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plano: #0d0d0d; --superficie: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+    --ink-3: #898781; --grade: #2c2c2a; --borda: rgba(255, 255, 255, 0.10);
+    --serie: #3987e5; --botao-fundo: #3987e5; --botao-texto: #0b0b0b; --critico-tinta: rgba(208, 59, 59, 0.22);
+    --atencao-tinta: rgba(250, 178, 25, 0.20); --sombra: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plano: #0d0d0d; --superficie: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+  --ink-3: #898781; --grade: #2c2c2a; --borda: rgba(255, 255, 255, 0.10);
+  --serie: #3987e5; --botao-fundo: #3987e5; --botao-texto: #0b0b0b; --critico-tinta: rgba(208, 59, 59, 0.22);
+  --atencao-tinta: rgba(250, 178, 25, 0.20); --sombra: none;
+}
+
+/* =============================================================================
+   2. BASE E CABEÇALHO
+   ========================================================================== */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--plano); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px; line-height: 1.4;
+  padding: 16px clamp(16px, 2vw, 32px) 32px;
+}
+h1 { font-size: clamp(22px, 2.2vw, 30px); margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+.sub { color: var(--ink-2); margin: 2px 0 0; font-size: 15px; }
+.topo { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
+.pilulas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.pilula {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
+  border-radius: 999px; background: var(--superficie); border: 1px solid var(--borda);
+  font-weight: 600; font-size: 15px;
+}
+/* O "ponto" colorido carrega o estado; o texto ao lado o nomeia (nunca só a cor). */
+.ponto { width: 12px; height: 12px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.ponto--bom { background: var(--bom); }
+.ponto--atencao { background: var(--atencao); }
+.ponto--critico { background: var(--critico); }
+.ponto--pulsa { animation: pulsa 1s infinite; }
+@keyframes pulsa { 50% { opacity: 0.35; } }
+
+/* =============================================================================
+   3. BARRA DE CONFIGURAÇÃO (host, porta, som)
+   ========================================================================== */
+.config {
+  display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end;
+  margin: 16px 0; padding: 14px 16px; background: var(--superficie);
+  border: 1px solid var(--borda); border-radius: 12px;
+}
+.campo { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-2); }
+.campo input {
+  font: inherit; font-size: 16px; padding: 8px 10px; border: 1px solid var(--grade);
+  border-radius: 8px; background: var(--plano); color: var(--ink); min-width: 0;
+}
+#host { width: 230px; }
+#porta { width: 110px; }
+button {
+  font: inherit; font-size: 15px; font-weight: 600; padding: 9px 16px; border-radius: 8px;
+  border: 1px solid var(--borda); background: var(--superficie); color: var(--ink); cursor: pointer;
+}
+button:hover { filter: brightness(0.95); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primario { background: var(--botao-fundo); color: var(--botao-texto); border-color: transparent; }
+button.mini { font-size: 13px; font-weight: 500; padding: 2px 8px; border-radius: 6px; margin-left: 6px; }
+.interruptor { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; padding-bottom: 8px; }
+.interruptor input { width: 18px; height: 18px; }
+#detalhe-conexao { font-size: 13px; color: var(--ink-2); padding-bottom: 10px; flex-basis: 100%; }
+
+/* =============================================================================
+   4. BANNER DE ALERTA DE QUEDA
+   ========================================================================== */
+.alerta {
+  display: none; margin: 0 0 16px; padding: 18px 22px; border-radius: 12px;
+  background: var(--critico); color: #fff; align-items: center; gap: 12px 24px; flex-wrap: wrap;
+}
+.alerta[data-estado="ativo"] { display: flex; animation: pulsa-alerta 1.2s infinite; }
+.alerta[data-estado="reconhecido"] {
+  display: flex; background: var(--superficie); color: var(--ink-2);
+  border: 1px solid var(--borda); padding: 10px 18px;
+}
+.alerta h2 { margin: 0; font-size: clamp(22px, 2.6vw, 34px); letter-spacing: 0.01em; }
+.alerta[data-estado="reconhecido"] h2 { font-size: 16px; font-weight: 600; }
+.alerta p { margin: 4px 0 0; font-size: 16px; }
+.alerta[data-estado="reconhecido"] p { display: none; }
+.alerta button { margin-left: auto; background: #fff; color: var(--critico); border-color: transparent; font-size: 16px; }
+.alerta[data-estado="reconhecido"] button { display: none; }
+@keyframes pulsa-alerta {
+  0%   { box-shadow: 0 0 0 0 rgba(208, 59, 59, 0.55); }
+  70%  { box-shadow: 0 0 0 14px rgba(208, 59, 59, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(208, 59, 59, 0); }
+}
+
+/* =============================================================================
+   5. CARDS DOS SENSORES
+   Grade de 4 colunas em telas largas (projetor 16:9), 2 em médias, 1 em celular.
+   ========================================================================== */
+.grade-cards { display: grid; gap: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .grade-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px)  { .grade-cards { grid-template-columns: 1fr; } }
+.card {
+  background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px;
+  padding: 18px 20px 16px; box-shadow: var(--sombra); display: flex; flex-direction: column;
+  gap: 6px; min-height: 230px; transition: background 0.3s, border-color 0.3s;
+}
+.card__topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.card__rotulo { font-size: 17px; font-weight: 650; }
+.card__sensor { font-size: 13px; color: var(--ink-2); font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
+.card__valor {
+  font-size: clamp(28px, 2.6vw, 38px); font-weight: 650; line-height: 1.1;
+  display: flex; align-items: center; gap: 12px; min-height: 52px;
+}
+.card__valor .ponto { width: 16px; height: 16px; }
+.card__hero { font-size: clamp(44px, 4.6vw, 64px); }   /* o número-destaque do painel */
+.card__unidade { font-size: 0.45em; color: var(--ink-2); font-weight: 500; }
+.card__meta { font-size: 14px; color: var(--ink-2); }
+.card__meta b { color: var(--ink); font-weight: 600; }
+.card__bruto {
+  font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--ink-2);
+  word-break: break-all; margin-top: auto; padding-top: 6px;
+}
+.card--critico { background: var(--critico-tinta); border-color: var(--critico); }
+.card--atencao { background: var(--atencao-tinta); border-color: var(--atencao); }
+.card--flash { animation: flash 0.7s; }
+@keyframes flash { from { box-shadow: 0 0 0 3px var(--serie); } to { box-shadow: var(--sombra); } }
+
+/* --- Sparkline da temperatura (SVG) --- */
+.spark { position: relative; height: 96px; margin-top: 4px; }
+.spark svg { width: 100%; height: 100%; display: block; overflow: visible; outline: none; border-radius: 6px; }
+.spark svg:focus-visible { outline: 2px solid var(--serie); }
+.spark__dica {
+  position: absolute; display: none; pointer-events: none; white-space: nowrap;
+  background: var(--ink); color: var(--plano); padding: 6px 10px; border-radius: 6px;
+  font-size: 13px; transform: translate(-50%, calc(-100% - 12px)); z-index: 2;
+}
+.spark__dica b { font-size: 15px; display: block; }
+.spark__tabela { display: none; max-height: 96px; overflow: auto; font-size: 13px; }
+.spark__tabela table { width: 100%; border-collapse: collapse; }
+.spark__tabela td, .spark__tabela th { padding: 2px 6px; text-align: left; border-bottom: 1px solid var(--grade); }
+.spark__tabela td { font-variant-numeric: tabular-nums; }
+.spark--tabela svg, .spark--tabela .spark__dica { display: none; }
+.spark--tabela .spark__tabela { display: block; }
+.spark__vazio { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 13px; }
+
+/* =============================================================================
+   6. LOG DE MENSAGENS
+   ========================================================================== */
+.log { margin-top: 20px; background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; padding: 14px 18px; }
+.log__topo { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.log h2 { margin: 0; font-size: 18px; }
+.contadores { font-size: 14px; color: var(--ink-2); }
+.log__corpo { max-height: 300px; overflow: auto; }
+table.mensagens { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.mensagens th {
+  text-align: left; font-weight: 600; color: var(--ink-2); font-size: 12px; text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 6px 8px; border-bottom: 1px solid var(--grade);
+  position: sticky; top: 0; background: var(--superficie);
+}
+table.mensagens td { padding: 6px 8px; border-bottom: 1px solid var(--grade); vertical-align: top; }
+td.hora { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-2); }
+td.topico, td.payload { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+td.payload { word-break: break-all; }
+td.centro { text-align: center; }
+tr.linha--queda td { background: var(--critico-tinta); font-weight: 600; }
+tr.linha--invalida td { background: var(--atencao-tinta); }
+.vazio { color: var(--ink-2); padding: 12px 8px; }
+.rodape { margin-top: 16px; font-size: 13px; color: var(--ink-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .alerta[data-estado="ativo"], .ponto--pulsa, .card--flash { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ====================== CABEÇALHO: título e status ====================== -->
+<header class="topo">
+  <div>
+    <h1>Monitoramento de Idosos — Quarto 101</h1>
+    <p class="sub">Interface aberta de dados via MQTT sobre WebSockets · Escola Politécnica da USP</p>
+  </div>
+  <div class="pilulas">
+    <span class="pilula" id="pilula-conexao" role="status" title="Conexão deste painel com o broker Mosquitto">
+      <span class="ponto" id="ponto-conexao"></span><span id="texto-conexao">Desconectado</span>
+    </span>
+    <span class="pilula" id="pilula-gateway" title="Tópico idoso/quarto101/status — Last Will and Testament do gateway (relatório §4.7)">
+      <span class="ponto" id="ponto-gateway"></span><span id="texto-gateway">Gateway: —</span>
+    </span>
+    <button id="btn-tema" type="button" title="Alternar tema claro/escuro" aria-label="Alternar tema">🌙</button>
+  </div>
+</header>
+
+<!-- ====================== CONFIGURAÇÃO DO BROKER ====================== -->
+<section class="config" aria-label="Configuração do broker">
+  <label class="campo">Host do broker
+    <input id="host" type="text" value="localhost" autocomplete="off" spellcheck="false">
+  </label>
+  <label class="campo">Porta WebSocket
+    <input id="porta" type="number" value="9001" min="1" max="65535">
+  </label>
+  <button id="btn-conectar" class="primario" type="button">Conectar</button>
+  <button id="btn-desconectar" type="button" disabled>Desconectar</button>
+  <label class="interruptor"><input id="som" type="checkbox" checked> 🔊 Alerta sonoro</label>
+  <button id="btn-testar-som" type="button">Testar som</button>
+  <span id="detalhe-conexao" aria-live="polite">Informe o endereço do Mosquitto e clique em Conectar.</span>
+</section>
+
+<!-- ====================== BANNER DE QUEDA ====================== -->
+<section class="alerta" id="alerta" data-estado="oculto" role="alert" aria-live="assertive">
+  <div>
+    <h2 id="alerta-titulo"> QUEDA DETECTADA — Quarto 101</h2>
+    <p id="alerta-detalhe"></p>
+  </div>
+  <button id="btn-reconhecer" type="button">Reconhecer alerta</button>
+</section>
+
+<!-- ====================== CARDS DOS 4 SENSORES ====================== -->
+<main class="grade-cards">
+
+  <article class="card" id="card-queda" aria-labelledby="rot-queda">
+    <div class="card__topo">
+      <span class="card__rotulo" id="rot-queda"> Queda</span>
+      <span class="card__sensor" title="Acelerômetro do dispositivo vestível">MPU-6050 · QoS 1</span>
+    </div>
+    <div class="card__valor"><span class="ponto ponto--bom" id="ponto-queda"></span><span id="valor-queda">Sem queda</span></div>
+    <div class="card__meta" id="meta-queda">Nenhum evento recebido nesta sessão.</div>
+    <div class="card__meta" id="hora-queda"></div>
+    <div class="card__bruto" id="bruto-queda"></div>
+  </article>
+
+  <article class="card" id="card-temperatura" aria-labelledby="rot-temperatura">
+    <div class="card__topo">
+      <span class="card__rotulo" id="rot-temperatura"> Temperatura ambiente</span>
+      <span class="card__sensor" title="Sensor analógico condicionado por amplificador (G = 5,5)">LM35DZ · QoS 0</span>
+    </div>
+    <div class="card__valor card__hero"><span id="valor-temperatura">—</span><span class="card__unidade">°C</span></div>
+    <div class="spark" id="spark-caixa">
+      <svg id="spark-temperatura" tabindex="0" role="img" aria-label="Histórico das últimas leituras de temperatura"></svg>
+      <div class="spark__dica" id="dica-temperatura"></div>
+      <div class="spark__tabela" id="tabela-temperatura"></div>
+      <div class="spark__vazio" id="spark-vazio">o histórico aparece a partir da 2ª leitura</div>
+    </div>
+    <div class="card__meta" id="meta-temperatura">Aguardando dados… <button class="mini" id="btn-tabela-temp" type="button" aria-pressed="false">ver tabela</button></div>
+    <div class="card__meta" id="hora-temperatura"></div>
+    <div class="card__bruto" id="bruto-temperatura"></div>
+  </article>
+
+  <article class="card" id="card-porta" aria-labelledby="rot-porta">
+    <div class="card__topo">
+      <span class="card__rotulo" id="rot-porta"> Porta</span>
+      <span class="card__sensor" title="Reed switch magnético">MC-38 · QoS 1</span>
+    </div>
+    <div class="card__valor"><span class="ponto" id="ponto-porta"></span><span id="valor-porta">—</span></div>
+    <div class="card__meta" id="meta-porta">Aguardando dados…</div>
+    <div class="card__meta" id="hora-porta"></div>
+    <div class="card__bruto" id="bruto-porta"></div>
+  </article>
+
+  <article class="card" id="card-presenca" aria-labelledby="rot-presenca">
+    <div class="card__topo">
+      <span class="card__rotulo" id="rot-presenca"> Presença</span>
+      <span class="card__sensor" title="Sensor infravermelho passivo (PIR)">HC-SR501 · QoS 1</span>
+    </div>
+    <div class="card__valor"><span class="ponto" id="ponto-presenca"></span><span id="valor-presenca">—</span></div>
+    <div class="card__meta" id="meta-presenca">Aguardando dados…</div>
+    <div class="card__meta" id="hora-presenca"></div>
+    <div class="card__bruto" id="bruto-presenca"></div>
+  </article>
+
+</main>
+
+<!-- ====================== LOG DAS ÚLTIMAS MENSAGENS ====================== -->
+<section class="log" aria-labelledby="log-titulo">
+  <div class="log__topo">
+    <h2 id="log-titulo">Últimas mensagens recebidas</h2>
+    <span class="contadores" id="contadores">Nenhuma mensagem ainda.</span>
+    <button id="btn-limpar" type="button">Limpar</button>
+  </div>
+  <div class="log__corpo">
+    <table class="mensagens">
+      <thead><tr><th>Hora</th><th>Tópico</th><th class="centro">QoS</th><th class="centro">Retida</th><th>Payload</th></tr></thead>
+      <tbody id="log-corpo"><tr><td class="vazio" colspan="5">As mensagens aparecem aqui assim que o painel se conectar ao broker.</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="rodape">
+  Protótipo acadêmico · Sistema de Monitoramento Não Invasivo de Idosos · Escola Politécnica da USP ·
+  Painel: MQTT.js 5.16.0 sobre WebSockets · Broker: Eclipse Mosquitto
+</footer>
+
+<!-- ====================== BIBLIOTECA MQTT.js ======================
+     A MQTT.js implementa o cliente MQTT em JavaScript e, no navegador, usa
+     WebSocket como transporte. Vem do CDN; se ele falhar (sem internet),
+     tentamos uma cópia local "mqtt.min.js" na mesma pasta (README, seção 3). -->
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.16.0/dist/mqtt.min.js"></script>
+<script>
+  if (!window.mqtt) { document.write('<script src="mqtt.min.js"><\/script>'); }
+</script>
+
+<script>
+'use strict';
+
+/* =============================================================================
+   1. CONSTANTES
+   ========================================================================== */
+const TOPICO_BASE = 'idoso/quarto101';        // hierarquia definida no relatório (§4.3)
+const TOPICO_ASSINATURA = TOPICO_BASE + '/#'; // "#" = todos os níveis abaixo de quarto101
+const LOG_MAX = 20;                           // mensagens mantidas no histórico visível
+const HISTORICO_TEMP_MAX = 30;                // leituras guardadas para a sparkline
+const PRESENCA_RECENTE_S = 120;               // "presença recente" = detecção há menos de 2 min
+const LIMIAR_A2 = 6.25;                       // limiar de |a|² em g² (relatório §2 e §6.2)
+const TITULO_PADRAO = document.title;
+
+/* =============================================================================
+   2. ESTADO DA APLICAÇÃO
+   Tudo o que a tela mostra deriva deste objeto: cada mensagem MQTT o atualiza e
+   em seguida a função renderizarTudo() redesenha os cards a partir dele.
+   ========================================================================== */
+const estado = {
+  conexao: 'desconectado',   // desconectado | conectando | conectado | reconectando | erro
+  gateway: null,             // 'online' | 'offline' | null (tópico .../status, LWT)
+  queda:       { total: 0, ativo: false, reconhecidoEm: null, retido: false, a2: null, ts: null, hora: null, texto: '' },
+  temperatura: { valor: null, ts: null, hora: null, retido: false, texto: '', historico: [] }, // historico: [{valor, hora}]
+  porta:       { estado: null, desde: null, ts: null, hora: null, retido: false, texto: '' },
+  presenca:    { total: 0, ts: null, hora: null, retido: false, texto: '' },
+  contadores:  {},           // mensagens recebidas por sub-tópico
+  log: [],                   // últimas LOG_MAX mensagens, mais recente primeiro
+};
+
+let cliente = null;              // instância do cliente MQTT.js
+let encerradoPeloUsuario = false; // distingue "Desconectar" de uma queda de conexão
+
+/* =============================================================================
+   3. UTILITÁRIOS (DOM e formatação)
+   ========================================================================== */
+const $ = (seletor) => document.querySelector(seletor);
+
+/* Formata número no padrão brasileiro: 22.5 -> "22,5". */
+const fmtNum = (v, casas = 1) =>
+  (typeof v !== 'number' || !isFinite(v)) ? '—'
+    : v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+
+const fmtHora = (d) => d ? d.toLocaleTimeString('pt-BR', { hour12: false }) : '—';
+
+const dois = (n) => String(n).padStart(2, '0');
+
+/* "ts" do ESP32 é o tempo desde o boot, em ms — aqui vira "4 min 03 s". */
+function formatarUptime(ms) {
+  if (typeof ms !== 'number' || !isFinite(ms)) return '—';
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), seg = s % 60;
+  if (h) return `${h} h ${dois(m)} min ${dois(seg)} s`;
+  if (m) return `${m} min ${dois(seg)} s`;
+  return `${fmtNum(ms / 1000, 1)} s`;
+}
+
+/* Tempo decorrido desde uma data: "há 12 s", "há 3 min 05 s", "há 1 h 02 min". */
+function tempoDesde(d) {
+  if (!d) return '';
+  const s = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
+  if (s < 60) return `há ${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m} min ${dois(s % 60)} s`;
+  return `há ${Math.floor(m / 60)} h ${dois(m % 60)} min`;
+}
+
+/* Realce breve no card que acabou de receber dado (ajuda a plateia a acompanhar). */
+function piscar(card) {
+  card.classList.remove('card--flash');
+  void card.offsetWidth;                // força o navegador a reiniciar a animação
+  card.classList.add('card--flash');
+}
+
+/* Cria elemento SVG com atributos (a sparkline é desenhada à mão, sem biblioteca). */
+function svgEl(tag, atributos) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(atributos)) el.setAttribute(k, v);
+  return el;
+}
+
+/* localStorage pode estar indisponível (modo privado etc.): nunca deixar quebrar. */
+const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const lerGuardado = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+
+/* =============================================================================
+   4. CONEXÃO MQTT (via WebSocket)
+   ========================================================================== */
+const ROTULO_CONEXAO = {
+  desconectado: ['Desconectado',   'ponto'],
+  conectando:   ['Conectando…',    'ponto ponto--atencao ponto--pulsa'],
+  conectado:    ['Conectado',      'ponto ponto--bom'],
+  reconectando: ['Reconectando…',  'ponto ponto--atencao ponto--pulsa'],
+  erro:         ['Erro',           'ponto ponto--critico'],
+};
+
+function setConexao(novo, detalhe) {
+  estado.conexao = novo;
+  const [rotulo, classes] = ROTULO_CONEXAO[novo];
+  $('#texto-conexao').textContent = rotulo;
+  $('#ponto-conexao').className = classes;
+  if (detalhe !== undefined) $('#detalhe-conexao').textContent = detalhe;
+  $('#btn-conectar').disabled = (novo === 'conectado' || novo === 'conectando' || novo === 'reconectando');
+  $('#btn-desconectar').disabled = (novo === 'desconectado' || novo === 'erro') && !cliente;
+}
+
+function conectar() {
+  if (typeof mqtt === 'undefined') {     // biblioteca não carregou (CDN e cópia local falharam)
+    setConexao('erro', 'Biblioteca MQTT.js não carregada — sem internet? Baixe mqtt.min.js para esta pasta (README, seção 3) e recarregue.');
+    return;
+  }
+  const host = $('#host').value.trim() || 'localhost';
+  const porta = parseInt($('#porta').value, 10) || 9001;
+  guardar('painel.host', host);
+  guardar('painel.porta', String(porta));
+  desbloquearAudio();                    // o clique do usuário libera o áudio para o alarme
+
+  if (cliente) { cliente.end(true); cliente = null; }
+  encerradoPeloUsuario = false;
+
+  // MQTT sobre WebSockets: "ws://" em vez de "mqtt://". O Mosquitto atende na 9001 (mosquitto.conf).
+  const url = `ws://${host}:${porta}`;
+  setConexao('conectando', `Conectando a ${url}…`);
+
+  cliente = mqtt.connect(url, {
+    clientId: 'dashboard-' + Math.random().toString(16).slice(2, 8), // identifica este painel no log do broker
+    keepalive: 30,          // PINGREQ a cada 30 s: o broker detecta um painel que sumiu
+    reconnectPeriod: 2000,  // tenta reconectar sozinho a cada 2 s se a conexão cair
+    connectTimeout: 5000,   // desiste da tentativa (e reagenda) se o CONNACK não vier em 5 s
+    clean: true,            // sessão limpa: sem fila de mensagens antigas para este painel
+  });
+
+  // CONNECT aceito pelo broker (CONNACK). Aqui fazemos a ASSINATURA (SUBSCRIBE).
+  cliente.on('connect', () => {
+    setConexao('conectado', `Conectado a ${url}. Assinando ${TOPICO_ASSINATURA}…`);
+    // QoS 1 na assinatura: o broker entrega com o MENOR QoS entre o da publicação e o da
+    // assinatura — por isso a temperatura (publicada em QoS 0) chega em 0 e as demais em 1.
+    cliente.subscribe(TOPICO_ASSINATURA, { qos: 1 }, (erro, concedido) => {
+      if (erro) { setConexao('erro', 'Falha ao assinar: ' + erro.message); return; }
+      // Numa RECONEXÃO a MQTT.js já refaz sozinha as assinaturas anteriores (opção
+      // resubscribe) e devolve uma lista vazia aqui; na primeira conexão vem o QoS concedido.
+      const info = (concedido && concedido[0])
+        ? `aceita (QoS ${concedido[0].qos})`
+        : 'restabelecida automaticamente após a reconexão';
+      $('#detalhe-conexao').textContent = `Conectado a ${url} · assinatura ${TOPICO_ASSINATURA} ${info}. Aguardando mensagens…`;
+    });
+  });
+
+  // Toda mensagem publicada em um tópico assinado chega por aqui (push do broker).
+  cliente.on('message', aoReceberMensagem);
+
+  cliente.on('reconnect', () => setConexao('reconectando', `Broker fora do ar? Tentando novamente em ${url}…`));
+  cliente.on('close', () => {
+    if (encerradoPeloUsuario) return;
+    if (estado.conexao !== 'reconectando') setConexao('reconectando', `Conexão com ${url} perdida. Reconectando automaticamente…`);
+  });
+  cliente.on('error', (erro) => {
+    // A MQTT.js continua tentando reconectar; só informamos o motivo.
+    $('#detalhe-conexao').textContent = `Erro: ${erro.message}. Verifique se o Mosquitto está rodando com a porta WebSocket ${porta}.`;
+  });
+  cliente.on('end', () => { if (encerradoPeloUsuario) setConexao('desconectado', 'Desconectado pelo usuário.'); });
+}
+
+function desconectar() {
+  if (!cliente) return;
+  encerradoPeloUsuario = true;
+  cliente.end(true);           // envia DISCONNECT e fecha o WebSocket
+  cliente = null;
+  setConexao('desconectado', 'Desconectado pelo usuário.');
+  estado.gateway = null;       // sem conexão não sabemos mais o estado do gateway
+  renderizarGateway();
+}
+
+/* =============================================================================
+   5. RECEPÇÃO E ROTEAMENTO DAS MENSAGENS
+   ========================================================================== */
+function aoReceberMensagem(topico, payload, pacote) {
+  const texto = new TextDecoder().decode(payload);   // o payload chega como bytes
+  const hora = new Date();                            // hora de recepção (relógio do PC)
+  let dados = null;
+  try { dados = JSON.parse(texto); } catch (e) { dados = null; }  // inválido -> só no log
+
+  // Sub-tópico = o que vem depois de "idoso/quarto101/" (queda, temperatura, ...).
+  const sensor = topico.startsWith(TOPICO_BASE + '/') ? topico.slice(TOPICO_BASE.length + 1) : topico;
+  const meta = { hora, texto, qos: pacote.qos, retido: Boolean(pacote.retain) };
+
+  estado.contadores[sensor] = (estado.contadores[sensor] || 0) + 1;
+  registrarLog(topico, sensor, meta, dados !== null);
+
+  const tratador = TRATADORES[sensor];
+  if (tratador) tratador(dados, meta);
+  renderizarTudo();
+}
+
+/* Um tratador por sensor. Cada um valida o JSON esperado e atualiza o estado. */
+const TRATADORES = {
+  // {"sensor":"MPU-6050","evento":"queda","a2":7.88,"ts":243946}
+  queda(d, m) {
+    if (!d || typeof d !== 'object') return;
+    const q = estado.queda;
+    q.total++; q.a2 = Number(d.a2); q.ts = d.ts; q.hora = m.hora; q.texto = m.texto; q.retido = m.retido;
+    if (m.retido) {
+      // Mensagem RETIDA = replay do broker de um evento antigo, entregue ao assinar.
+      // Não é uma queda acontecendo agora: mostramos como histórico, sem sirene.
+      q.ativo = false;
+    } else {
+      q.ativo = true; q.reconhecidoEm = null;
+      tocarAlarme();
+    }
+    piscar($('#card-queda'));
+  },
+  // {"sensor":"LM35DZ","valor":22.5,"ts":244316}
+  temperatura(d, m) {
+    if (!d || typeof d !== 'object') return;
+    const valor = Number(d.valor);
+    if (!isFinite(valor)) return;
+    const t = estado.temperatura;
+    t.valor = valor; t.ts = d.ts; t.hora = m.hora; t.texto = m.texto; t.retido = m.retido;
+    t.historico.push({ valor, hora: m.hora });
+    if (t.historico.length > HISTORICO_TEMP_MAX) t.historico.shift();
+    piscar($('#card-temperatura'));
+  },
+  // {"sensor":"MC-38","estado":"aberta","ts":250316}
+  porta(d, m) {
+    if (!d || typeof d !== 'object' || typeof d.estado !== 'string') return;
+    const p = estado.porta;
+    const novo = d.estado.trim().toLowerCase();
+    if (novo !== p.estado) p.desde = m.hora;   // marca o instante da mudança de estado
+    p.estado = novo; p.ts = d.ts; p.hora = m.hora; p.texto = m.texto; p.retido = m.retido;
+    piscar($('#card-porta'));
+  },
+  // {"sensor":"HC-SR501","evento":"presenca","ts":257196}
+  presenca(d, m) {
+    if (!d || typeof d !== 'object') return;
+    const pr = estado.presenca;
+    pr.total++; pr.ts = d.ts; pr.hora = m.hora; pr.texto = m.texto; pr.retido = m.retido;
+    piscar($('#card-presenca'));
+  },
+  // "online" / "offline" — texto puro, não JSON (Last Will and Testament, relatório §4.7)
+  status(d, m) {
+    estado.gateway = (typeof d === 'string' ? d : m.texto).trim().toLowerCase();
+  },
+};
+
+/* =============================================================================
+   6. ALERTA DE QUEDA — banner + alarme sonoro (Web Audio API)
+   Navegadores só permitem som após um gesto do usuário; o clique em "Conectar"
+   cria/destrava o AudioContext. O som é sintetizado (dois tons alternados),
+   sem arquivo de áudio externo.
+   ========================================================================== */
+let audioCtx = null;
+let sireneTimer = null;
+
+function desbloquearAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function bipe(frequencia, inicio, duracao) {
+  const osc = audioCtx.createOscillator();
+  const ganho = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = frequencia;
+  ganho.gain.setValueAtTime(0.0001, inicio);
+  ganho.gain.exponentialRampToValueAtTime(0.18, inicio + 0.02);
+  ganho.gain.exponentialRampToValueAtTime(0.0001, inicio + duracao);
+  osc.connect(ganho).connect(audioCtx.destination);
+  osc.start(inicio);
+  osc.stop(inicio + duracao + 0.05);
+}
+
+function cicloSirene() {
+  const t = audioCtx.currentTime;
+  bipe(880, t, 0.25);
+  bipe(660, t + 0.3, 0.25);
+}
+
+function tocarAlarme() {
+  if (!$('#som').checked) return;
+  desbloquearAudio();
+  if (!audioCtx) return;
+  pararAlarme();
+  cicloSirene();
+  sireneTimer = setInterval(cicloSirene, 700);   // repete até o alerta ser reconhecido
+}
+
+function pararAlarme() {
+  if (sireneTimer) { clearInterval(sireneTimer); sireneTimer = null; }
+}
+
+function reconhecerAlerta() {
+  const q = estado.queda;
+  if (!q.ativo) return;
+  q.ativo = false;
+  q.reconhecidoEm = new Date();
+  pararAlarme();
+  renderizarTudo();
+}
+
+/* =============================================================================
+   7. RENDERIZAÇÃO DOS CARDS
+   ========================================================================== */
+function renderizarTudo() {
+  renderizarGateway();
+  renderizarAlerta();
+  renderizarQueda();
+  renderizarTemperatura();
+  renderizarPorta();
+  renderizarPresenca();
+  renderizarLog();
+}
+
+function renderizarGateway() {
+  const g = estado.gateway, ponto = $('#ponto-gateway'), texto = $('#texto-gateway');
+  if (g === 'online')       { ponto.className = 'ponto ponto--bom';     texto.textContent = 'Gateway: online'; }
+  else if (g === 'offline') { ponto.className = 'ponto ponto--critico'; texto.textContent = 'Gateway: offline (Last Will)'; }
+  else if (g)               { ponto.className = 'ponto ponto--atencao'; texto.textContent = 'Gateway: ' + g; }
+  else                      { ponto.className = 'ponto';                texto.textContent = 'Gateway: —'; }
+}
+
+function renderizarAlerta() {
+  const q = estado.queda, banner = $('#alerta');
+  if (q.ativo) {
+    banner.dataset.estado = 'ativo';
+    $('#alerta-titulo').textContent = 'QUEDA DETECTADA — Quarto 101';
+    $('#alerta-detalhe').textContent =
+      `|a|² = ${fmtNum(q.a2, 2)} g² (|a| ≈ ${fmtNum(Math.sqrt(q.a2), 2)} g; limiar ${fmtNum(LIMIAR_A2, 2)} g²) · ` +
+      `recebida às ${fmtHora(q.hora)} · ts ${q.ts} ms (uptime ${formatarUptime(q.ts)}) · sensor MPU-6050`;
+  } else if (q.reconhecidoEm) {
+    banner.dataset.estado = 'reconhecido';
+    $('#alerta-titulo').textContent =
+      `✔ Último alerta de queda reconhecido às ${fmtHora(q.reconhecidoEm)} (evento recebido às ${fmtHora(q.hora)}).`;
+  } else {
+    banner.dataset.estado = 'oculto';
+  }
+}
+
+function renderizarQueda() {
+  const q = estado.queda, card = $('#card-queda'), ponto = $('#ponto-queda'), valor = $('#valor-queda');
+  card.classList.toggle('card--critico', q.ativo);
+  if (q.total === 0) {
+    valor.textContent = 'Sem queda'; ponto.className = 'ponto ponto--bom';
+    $('#meta-queda').textContent = 'Nenhum evento recebido nesta sessão.';
+    $('#hora-queda').textContent = ''; $('#bruto-queda').textContent = '';
+    return;
+  }
+  if (q.ativo)        { valor.textContent = 'QUEDA DETECTADA';          ponto.className = 'ponto ponto--critico ponto--pulsa'; }
+  else if (q.retido)  { valor.textContent = 'Queda registrada (retida)'; ponto.className = 'ponto'; }
+  else                { valor.textContent = 'Queda reconhecida';        ponto.className = 'ponto ponto--atencao'; }
+  $('#meta-queda').textContent =
+    `|a|² = ${fmtNum(q.a2, 2)} g² → |a| ≈ ${fmtNum(Math.sqrt(q.a2), 2)} g (limiar ${fmtNum(LIMIAR_A2, 2)} g²) · eventos na sessão: ${q.total}`;
+  $('#hora-queda').textContent = `Recebida às ${fmtHora(q.hora)} (${tempoDesde(q.hora)}) · ts ${q.ts} ms (uptime ${formatarUptime(q.ts)})`;
+  $('#bruto-queda').textContent = q.texto;
+}
+
+function renderizarTemperatura() {
+  const t = estado.temperatura;
+  $('#valor-temperatura').textContent = fmtNum(t.valor, 1);
+  const botao = $('#btn-tabela-temp');
+  const meta = $('#meta-temperatura');
+  if (t.valor === null) {
+    meta.replaceChildren('Aguardando dados… ', botao);
+    $('#hora-temperatura').textContent = ''; $('#bruto-temperatura').textContent = '';
+  } else {
+    const vals = t.historico.map(p => p.valor);
+    meta.replaceChildren(
+      `mín ${fmtNum(Math.min(...vals), 1)} °C · máx ${fmtNum(Math.max(...vals), 1)} °C nas últimas ${vals.length} leituras `, botao);
+    $('#hora-temperatura').textContent =
+      `Última leitura às ${fmtHora(t.hora)} (${tempoDesde(t.hora)})${t.retido ? ' · retida' : ''} · ts ${t.ts} ms (uptime ${formatarUptime(t.ts)})`;
+    $('#bruto-temperatura').textContent = t.texto;
+  }
+  desenharSparkline();
+  desenharTabelaTemperatura();
+}
+
+function renderizarPorta() {
+  const p = estado.porta, card = $('#card-porta'), ponto = $('#ponto-porta'), valor = $('#valor-porta');
+  const aberta = p.estado === 'aberta';
+  card.classList.toggle('card--atencao', aberta);
+  if (!p.estado) {
+    valor.textContent = '—'; ponto.className = 'ponto';
+    $('#meta-porta').textContent = 'Aguardando dados…';
+    $('#hora-porta').textContent = ''; $('#bruto-porta').textContent = '';
+    return;
+  }
+  valor.textContent = aberta ? 'Aberta' : (p.estado === 'fechada' ? 'Fechada' : p.estado);
+  ponto.className = aberta ? 'ponto ponto--atencao' : 'ponto ponto--bom';
+  $('#meta-porta').textContent = `${aberta ? 'Aberta' : 'Neste estado'} desde ${fmtHora(p.desde)} (${tempoDesde(p.desde)})`;
+  $('#hora-porta').textContent = `Última mensagem às ${fmtHora(p.hora)}${p.retido ? ' · retida' : ''} · ts ${p.ts} ms (uptime ${formatarUptime(p.ts)})`;
+  $('#bruto-porta').textContent = p.texto;
+}
+
+function renderizarPresenca() {
+  const pr = estado.presenca, ponto = $('#ponto-presenca'), valor = $('#valor-presenca');
+  if (pr.total === 0) {
+    valor.textContent = '—'; ponto.className = 'ponto';
+    $('#meta-presenca').textContent = 'Aguardando dados…';
+    $('#hora-presenca').textContent = ''; $('#bruto-presenca').textContent = '';
+    return;
+  }
+  const recente = (Date.now() - pr.hora.getTime()) / 1000 < PRESENCA_RECENTE_S;
+  valor.textContent = recente ? 'Presença detectada' : 'Sem movimento recente';
+  ponto.className = recente ? 'ponto ponto--bom' : 'ponto';
+  $('#meta-presenca').textContent = `Última detecção ${tempoDesde(pr.hora)} · detecções na sessão: ${pr.total}`;
+  $('#hora-presenca').textContent = `Recebida às ${fmtHora(pr.hora)}${pr.retido ? ' · retida' : ''} · ts ${pr.ts} ms (uptime ${formatarUptime(pr.ts)})`;
+  $('#bruto-presenca').textContent = pr.texto;
+}
+
+/* =============================================================================
+   8. SPARKLINE DA TEMPERATURA (SVG desenhado à mão)
+   Linha de 2 px com área suave abaixo, marcador no último ponto e uma "mira"
+   que segue o mouse (ou as setas do teclado) mostrando valor e hora.
+   ========================================================================== */
+const svgTemp = $('#spark-temperatura');
+const dicaTemp = $('#dica-temperatura');
+let pontosSpark = [];        // [{x, y, valor, hora}] da última renderização
+let miraLinha = null, miraPonto = null;
+
+function desenharSparkline() {
+  const hist = estado.temperatura.historico;
+  svgTemp.replaceChildren();
+  pontosSpark = [];
+  $('#spark-vazio').style.display = hist.length < 2 ? 'flex' : 'none';
+  if (hist.length < 2) return;
+
+  const caixa = svgTemp.getBoundingClientRect();
+  const W = Math.max(120, caixa.width), H = Math.max(60, caixa.height);
+  svgTemp.setAttribute('viewBox', `0 0 ${W} ${H}`);       // 1 unidade = 1 px: traços ficam exatos
+  const PAD = { esq: 6, dir: 8, topo: 10, base: 6 };
+
+  const vals = hist.map(p => p.valor);
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (max - min < 1) { const c = (max + min) / 2; min = c - 0.5; max = c + 0.5; } // faixa mínima de 1 °C: ruído não vira montanha
+  const x = i => PAD.esq + (i / (hist.length - 1)) * (W - PAD.esq - PAD.dir);
+  const y = v => PAD.topo + (1 - (v - min) / (max - min)) * (H - PAD.topo - PAD.base);
+
+  pontosSpark = hist.map((p, i) => ({ x: x(i), y: y(p.valor), valor: p.valor, hora: p.hora }));
+  const caminho = pontosSpark.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const primeiro = pontosSpark[0], ultimo = pontosSpark[pontosSpark.length - 1];
+  const chao = (H - PAD.base).toFixed(1);
+
+  svgTemp.append(
+    svgEl('line', { x1: PAD.esq, x2: W - PAD.dir, y1: chao, y2: chao, stroke: 'var(--grade)', 'stroke-width': 1 }),
+    svgEl('path', { d: `${caminho} L${ultimo.x.toFixed(1)} ${chao} L${primeiro.x.toFixed(1)} ${chao} Z`,
+                    fill: 'var(--serie)', 'fill-opacity': 0.1, stroke: 'none' }),
+    svgEl('path', { d: caminho, fill: 'none', stroke: 'var(--serie)', 'stroke-width': 2,
+                    'stroke-linejoin': 'round', 'stroke-linecap': 'round' }),
+    svgEl('circle', { cx: ultimo.x, cy: ultimo.y, r: 4, fill: 'var(--serie)', stroke: 'var(--superficie)', 'stroke-width': 2 }),
+  );
+  miraLinha = svgEl('line', { x1: 0, x2: 0, y1: PAD.topo - 4, y2: chao, stroke: 'var(--ink-3)', 'stroke-width': 1, visibility: 'hidden' });
+  miraPonto = svgEl('circle', { r: 5, fill: 'var(--serie)', stroke: 'var(--superficie)', 'stroke-width': 2, visibility: 'hidden' });
+  svgTemp.append(miraLinha, miraPonto);
+}
+
+let indiceMira = -1;
+function mostrarMira(i) {
+  if (!pontosSpark.length || !miraLinha) return;
+  indiceMira = Math.max(0, Math.min(pontosSpark.length - 1, i));
+  const p = pontosSpark[indiceMira];
+  miraLinha.setAttribute('x1', p.x); miraLinha.setAttribute('x2', p.x); miraLinha.setAttribute('visibility', 'visible');
+  miraPonto.setAttribute('cx', p.x); miraPonto.setAttribute('cy', p.y); miraPonto.setAttribute('visibility', 'visible');
+  const forte = document.createElement('b');
+  forte.textContent = `${fmtNum(p.valor, 1)} °C`;
+  dicaTemp.replaceChildren(forte, fmtHora(p.hora));
+  dicaTemp.style.left = `${p.x}px`; dicaTemp.style.top = `${p.y}px`; dicaTemp.style.display = 'block';
+}
+function esconderMira() {
+  indiceMira = -1;
+  dicaTemp.style.display = 'none';
+  if (miraLinha) { miraLinha.setAttribute('visibility', 'hidden'); miraPonto.setAttribute('visibility', 'hidden'); }
+}
+svgTemp.addEventListener('pointermove', (ev) => {
+  if (!pontosSpark.length) return;
+  const px = ev.clientX - svgTemp.getBoundingClientRect().left;
+  let melhor = 0;                                   // ponto mais próximo no eixo X (mira "gruda" na leitura)
+  pontosSpark.forEach((p, i) => { if (Math.abs(p.x - px) < Math.abs(pontosSpark[melhor].x - px)) melhor = i; });
+  mostrarMira(melhor);
+});
+svgTemp.addEventListener('pointerleave', esconderMira);
+svgTemp.addEventListener('focus', () => mostrarMira(pontosSpark.length - 1));
+svgTemp.addEventListener('blur', esconderMira);
+svgTemp.addEventListener('keydown', (ev) => {
+  if (ev.key === 'ArrowLeft')  { mostrarMira(indiceMira - 1); ev.preventDefault(); }
+  if (ev.key === 'ArrowRight') { mostrarMira(indiceMira + 1); ev.preventDefault(); }
+});
+
+/* Vista em tabela: o mesmo histórico da sparkline, legível sem depender do gráfico. */
+function desenharTabelaTemperatura() {
+  const hist = estado.temperatura.historico;
+  const tabela = document.createElement('table');
+  const cab = tabela.createTHead().insertRow();
+  for (const titulo of ['Hora', '°C']) { const th = document.createElement('th'); th.textContent = titulo; cab.append(th); }
+  const corpo = tabela.createTBody();
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const linha = corpo.insertRow();
+    linha.insertCell().textContent = fmtHora(hist[i].hora);
+    linha.insertCell().textContent = fmtNum(hist[i].valor, 1);
+  }
+  $('#tabela-temperatura').replaceChildren(tabela);
+}
+
+function alternarTabelaTemperatura() {
+  const caixa = $('#spark-caixa'), botao = $('#btn-tabela-temp');
+  const mostrarTabela = !caixa.classList.contains('spark--tabela');
+  caixa.classList.toggle('spark--tabela', mostrarTabela);
+  botao.setAttribute('aria-pressed', String(mostrarTabela));
+  botao.textContent = mostrarTabela ? 'ver gráfico' : 'ver tabela';
+  $('#spark-vazio').style.display = (mostrarTabela || estado.temperatura.historico.length >= 2) ? 'none' : 'flex';
+  if (!mostrarTabela) desenharSparkline();
+}
+
+/* =============================================================================
+   9. LOG DE MENSAGENS E CONTADORES
+   ========================================================================== */
+function registrarLog(topico, sensor, meta, valido) {
+  estado.log.unshift({ topico, sensor, hora: meta.hora, qos: meta.qos, retido: meta.retido, texto: meta.texto, valido });
+  if (estado.log.length > LOG_MAX) estado.log.length = LOG_MAX;
+}
+
+function renderizarLog() {
+  const corpo = $('#log-corpo');
+  corpo.replaceChildren();
+  if (!estado.log.length) {
+    const linha = corpo.insertRow(); const td = linha.insertCell();
+    td.className = 'vazio'; td.colSpan = 5;
+    td.textContent = 'As mensagens aparecem aqui assim que o painel se conectar ao broker.';
+  }
+  for (const m of estado.log) {
+    const linha = corpo.insertRow();
+    if (m.sensor === 'queda' && !m.retido) linha.className = 'linha--queda';
+    if (!m.valido && m.sensor !== 'status') linha.className += ' linha--invalida';
+    const hora = linha.insertCell(); hora.className = 'hora'; hora.textContent = fmtHora(m.hora);
+    const topico = linha.insertCell(); topico.className = 'topico'; topico.textContent = m.topico;
+    const qos = linha.insertCell(); qos.className = 'centro'; qos.textContent = m.qos;
+    const retido = linha.insertCell(); retido.className = 'centro'; retido.textContent = m.retido ? 'sim' : '—';
+    const payload = linha.insertCell(); payload.className = 'payload';
+    payload.textContent = m.texto + (!m.valido && m.sensor !== 'status' ? '   ← JSON inválido' : '');
+  }
+  const total = Object.values(estado.contadores).reduce((a, b) => a + b, 0);
+  const porTopico = Object.entries(estado.contadores).map(([k, v]) => `${k} ${v}`).join(' · ');
+  $('#contadores').textContent = total ? `Mensagens recebidas: ${total} · ${porTopico}` : 'Nenhuma mensagem ainda.';
+}
+
+function limparLog() {
+  estado.log = [];
+  renderizarLog();
+}
+
+/* =============================================================================
+   10. INICIALIZAÇÃO: configuração salva, tema, eventos e relógio
+   ========================================================================== */
+function carregarConfig() {
+  // Prioridade: parâmetros na URL (dashboard.html?host=192.168.0.10&port=9001) > último valor salvo > padrão.
+  const url = new URLSearchParams(location.search);
+  $('#host').value = url.get('host') || lerGuardado('painel.host') || 'localhost';
+  $('#porta').value = url.get('port') || url.get('porta') || lerGuardado('painel.porta') || '9001';
+  $('#som').checked = lerGuardado('painel.som') !== 'nao';
+}
+
+function aplicarTema(tema) {
+  document.documentElement.dataset.theme = tema;
+  $('#btn-tema').textContent = tema === 'dark' ? '☀️' : '🌙';
+  guardar('painel.tema', tema);
+  desenharSparkline();
+}
+
+function ligarEventos() {
+  $('#btn-conectar').addEventListener('click', conectar);
+  $('#btn-desconectar').addEventListener('click', desconectar);
+  $('#btn-reconhecer').addEventListener('click', reconhecerAlerta);
+  $('#btn-limpar').addEventListener('click', limparLog);
+  $('#btn-tabela-temp').addEventListener('click', alternarTabelaTemperatura);
+  $('#btn-testar-som').addEventListener('click', () => { desbloquearAudio(); if (audioCtx) cicloSirene(); });
+  $('#som').addEventListener('change', (ev) => { guardar('painel.som', ev.target.checked ? 'sim' : 'nao'); if (!ev.target.checked) pararAlarme(); });
+  $('#btn-tema').addEventListener('click', () => aplicarTema(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+  // Enter nos campos de configuração = Conectar.
+  for (const id of ['#host', '#porta']) $(id).addEventListener('keydown', (ev) => { if (ev.key === 'Enter') conectar(); });
+  window.addEventListener('resize', () => desenharSparkline());
+  window.addEventListener('beforeunload', () => { if (cliente) cliente.end(true); });  // DISCONNECT limpo ao fechar a aba
+}
+
+/* Relógio de 1 s: atualiza os "há X s", o estado "presença recente" e pisca o título na queda. */
+function tique() {
+  if (estado.queda.total)   renderizarQueda();
+  if (estado.porta.estado)  renderizarPorta();
+  if (estado.presenca.total) renderizarPresenca();
+  if (estado.temperatura.valor !== null) {
+    $('#hora-temperatura').textContent = $('#hora-temperatura').textContent.replace(/\(há [^)]*\)/, `(${tempoDesde(estado.temperatura.hora)})`);
+  }
+  if (estado.queda.ativo) {
+    document.title = document.title === TITULO_PADRAO ? '🚨 QUEDA — Quarto 101' : TITULO_PADRAO;
+  } else if (document.title !== TITULO_PADRAO) {
+    document.title = TITULO_PADRAO;
+  }
+}
+
+carregarConfig();
+aplicarTema(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+ligarEventos();
+renderizarTudo();
+setInterval(tique, 1000);
+
+if (typeof mqtt === 'undefined') {
+  setConexao('erro', 'Biblioteca MQTT.js não carregada — sem internet? Baixe mqtt.min.js para esta pasta (README, seção 3) e recarregue a página.');
+}
+</script>
+</body>
+</html>
