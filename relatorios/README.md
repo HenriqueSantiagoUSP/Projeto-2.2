@@ -147,6 +147,18 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
   grupo: capa, contracapa e pastas `figuras/`, `imagens/` e `tabelas/`.
   - Tabelas e figuras são geradas por `modelo/experimentos/08_relatorio_latex.py`.
   - Compila com `pdflatex main.tex`, duas vezes.
-- Rascunhos em Markdown: [`Q1/relatorio.md`](<Semestre 2/Projeto 3/Q1/relatorio.md>) e
-  [`Q1/roteiro-apresentacao.md`](<Semestre 2/Projeto 3/Q1/roteiro-apresentacao.md>).
-- Os números saem de `modelo/resultados/resumo.md`.
+- **Apresentação em LaTeX Beamer** (16:9, 26 slides, 15–20 min):
+  [`Q1/apresentacao/main.tex`](<Semestre 2/Projeto 3/Q1/apresentacao/main.tex>), com o PDF em
+  [`Q1/apresentacao/main.pdf`](<Semestre 2/Projeto 3/Q1/apresentacao/main.pdf>).
+  - Conteúdo:
+    - objetivo e dados;
+    - o pipeline, com um sinal antes e depois do filtro;
+    - visão geral dos métodos e resultados;
+    - o Random Forest a fundo: árvore, Gini, floresta, votos e por que foi escolhido;
+    - a versão que foi para o vestível.
+  - Figuras, tabelas e números (`numeros.tex`) são gerados por `modelo/experimentos/10_figuras_apresentacao.py`,
+    em tamanho de slide.
+  - Compila com `pdflatex main.tex`, duas vezes. A fala, slide a slide, fica em
+    [`Q1/roteiro-apresentacao.md`](<Semestre 2/Projeto 3/Q1/roteiro-apresentacao.md>).
+- Rascunho do relatório em Markdown: [`Q1/relatorio.md`](<Semestre 2/Projeto 3/Q1/relatorio.md>).
+- Os números saem de `modelo/resultados/resumo.md` e, para o vestível, de `modelo/resultados/vestivel.json`.

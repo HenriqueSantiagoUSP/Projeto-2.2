@@ -62,6 +62,10 @@ uv run python experimentos/08_relatorio_latex.py
 uv run python experimentos/09_exportar_vestivel.py
 ```
 
+```bash
+uv run python experimentos/10_figuras_apresentacao.py
+```
+
 A ordem importa:
 1. `02_gatilho.py` escolhe o L_on, que os outros scripts leem.
 2. `05_figuras.py` e `06_resumo.py` só leem as tabelas.
@@ -76,6 +80,11 @@ A ordem importa:
    duas vezes.
 5. `09_exportar_vestivel.py` é independente dos outros, exceto pelo L_on do `02`. Ele gera o que vai para o
    vestível (seção [No vestível](#no-vestível)) e leva ~1 min.
+6. `10_figuras_apresentacao.py` vem por último: lê os resultados do `03`, do `04` e do `09`.
+   - Gera as figuras da apresentação do Q1 em tamanho de slide (`resultados/ap_*.png`).
+   - Escreve as tabelas e os números em `relatorios/Semestre 2/Projeto 3/Q1/apresentacao/`.
+   - Confere que o Random Forest que ele explica é o do vestível (limiar e vetores de teste).
+   - Depois, compile lá com `pdflatex main.tex`, duas vezes.
 
 A primeira leitura da SisFall leva ~1 min e fica em cache em `dados/cache/`. A comparação completa, com as
 duas CNNs, leva ~3 min por cenário.
@@ -110,6 +119,8 @@ duas CNNs, leva ~3 min por cenário.
 | `experimentos/07_figuras_explicativas.py` | 11 figuras para a apresentação e o relatório, e `ensaios_com_alarme_A.csv` (% de ensaios de cada atividade com alarme: limiar atual × Random Forest) |
 | `experimentos/08_relatorio_latex.py` | figuras e tabelas (`.tex`) do relatório LaTeX do Q1, geradas dos resultados |
 | `experimentos/09_exportar_vestivel.py` | treina os classificadores do vestível com o gatilho causal e gera `fall_model.h`/`.c`, os vetores de teste de paridade e `resultados/vestivel.json` |
+| `experimentos/10_figuras_apresentacao.py` | figuras em tamanho de slide (`ap_*.png`), tabelas e números da apresentação Beamer do Q1. Inclui o sinal antes e depois do filtro, a árvore de decisão, a fronteira árvore × floresta e os votos das 60 árvores |
+| `experimentos/_estilo.py` | paleta, parâmetros do matplotlib e nomes dos atributos, comuns ao `07` e ao `10` |
 
 ## Principais resultados
 

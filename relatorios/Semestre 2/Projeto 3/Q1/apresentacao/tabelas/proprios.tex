@@ -1,0 +1,16 @@
+\begin{tabular}{@{}l c c c@{}}
+\toprule
+Método & \makecell{Quedas\\detectadas} & \makecell{Alarmes\\falsos} & \makecell{Atividades\\com alarme} \\
+\midrule
+\textbf{Random Forest} & \textbf{7 de 10} & \textbf{0} & \textbf{0 de 8} \\
+SVM (RBF) & 8 de 10 & 0 & 0 de 8 \\
+Regressão logística & 7 de 10 & 0 & 0 de 8 \\
+kNN (Manhattan) & 8 de 10 & 1 & 1 de 8 \\
+Centroide (cosseno) & 8 de 10 & 4 & 3 de 8 \\
+Regras em cascata & 8 de 10 & 5 & 4 de 8 \\
+DTW & 10 de 10 & 8 & 6 de 8 \\
+Correlação com templates & 10 de 10 & 12 & 6 de 8 \\
+AR(12) como anomalia & 10 de 10 & 18 & 8 de 8 \\
+CNN 1D & 9 de 10 & 12 & 7 de 8 \\
+\bottomrule
+\end{tabular}
