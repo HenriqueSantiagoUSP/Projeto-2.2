@@ -1,0 +1,50 @@
+{
+  "cenario": "A",
+  "l_on_g": 2.0,
+  "gatilho_quedas_que_passam": 0.9922135706340378,
+  "gatilho_disparos_h": 752.5961005101186,
+  "janelas": 12723,
+  "impactos": 1784,
+  "pessoas": 38,
+  "atributos": [
+    "a_mean",
+    "a_rms",
+    "a_std",
+    "a_min",
+    "a_max",
+    "a_crest",
+    "a_curtose",
+    "a_assimetria",
+    "a_zcr",
+    "a_pico_a_pico",
+    "sma",
+    "queda_livre_min",
+    "queda_livre_ate_impacto_s",
+    "pos_std",
+    "pos_media",
+    "inclinacao_graus",
+    "corr_xy",
+    "corr_xz",
+    "corr_yz",
+    "w_mean",
+    "w_rms",
+    "w_max",
+    "w_rotacao_graus"
+  ],
+  "lr": {
+    "auc": 0.9984296836472292,
+    "sens_ensaio": 0.942714126807564,
+    "alarmes_h": 0.6191941589351008,
+    "sens_1alarme_h": 0.9493882091212458,
+    "limiar_prob": 0.9635608961334806
+  },
+  "rf": {
+    "auc": 0.9989690331258094,
+    "sens_ensaio": 0.942714126807564,
+    "alarmes_h": 0.5503948079423118,
+    "sens_1alarme_h": 0.9505005561735261,
+    "limiar_prob": 0.7301680832117512,
+    "nos": 8854,
+    "bytes_flash": 106248
+  }
+}

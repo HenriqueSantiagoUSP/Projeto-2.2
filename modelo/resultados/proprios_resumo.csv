@@ -1,0 +1,12 @@
+metodo,quedas_detectadas,quedas,alarmes_falsos,ensaios_adl_com_alarme
+"limiar_do_firmware (2,5 g)",10,10,8,
+regras_cascata,8,10,5,4.0
+corr_normalizada,10,10,12,6.0
+dtw,10,10,8,6.0
+ar12_anomalia,10,10,18,8.0
+centroide_cosseno,8,10,4,3.0
+knn_manhattan,8,10,1,1.0
+regressao_logistica,7,10,0,0.0
+svm_rbf,8,10,0,0.0
+random_forest,7,10,0,0.0
+cnn_1d,9,10,12,7.0

@@ -1,0 +1,20 @@
+codigo,atividade,limiar_atual_pct,random_forest_pct
+D01,andar devagar,2.6,0.0
+D02,andar rápido,34.2,0.0
+D03,correr devagar,97.4,0.0
+D04,correr rápido,100.0,0.0
+D05,escada devagar,15.3,0.0
+D06,escada rápido,100.0,0.0
+D07,sentar devagar (cadeira média),0.0,0.0
+D08,sentar rápido (cadeira média),39.5,0.0
+D09,sentar devagar (cadeira baixa),7.6,0.0
+D10,sentar rápido (cadeira baixa),27.6,0.0
+D11,tentar levantar e desabar na cadeira,82.1,1.6
+D12,deitar devagar,0.5,0.0
+D13,deitar rápido,5.0,0.0
+D14,virar de lado deitado,7.9,1.6
+D15,agachar dobrando os joelhos,0.0,0.0
+D16,curvar sem dobrar os joelhos,0.0,0.0
+D17,entrar e sair do carro,0.0,0.0
+D18,tropeçar andando,100.0,0.0
+D19,pular de leve,100.0,0.0
