@@ -35,7 +35,11 @@ vestivel.json e as probabilidades dos vetores de teste do firmware.
 
 import importlib.util
 import json
+import os
 import shutil
+import tempfile
+import time
+from pathlib import Path
 
 import _comum
 from _estilo import (AZUL, COR_ATIVIDADE, COR_BRUSCO, COR_QUEDA, EIXO, MUDO, R, TINTA, TINTA2, VERDE_AGUA, VIOLETA,
@@ -52,7 +56,8 @@ from sklearn.tree import DecisionTreeClassifier
 
 from queda import atributos, avaliacao
 from queda.dados import ATIVIDADES_SISFALL, FS, saturar
-from queda.pipeline import CENARIOS, FC_PASSA_BAIXA, PRE_S, gatilho_causal, montar, passa_baixa
+from queda.pipeline import (CENARIOS, FC_PASSA_BAIXA, PRE_S, coeficientes_passa_baixa, gatilho_causal, montar,
+                            passa_baixa)
 
 RAIZ = _comum.RAIZ_MODELO.parent
 Q1 = RAIZ / "relatorios" / "Semestre 2" / "Projeto 3" / "Q1"
@@ -211,7 +216,7 @@ def fig_filtro(e):
     a1.set_title("O impacto de perto")
     a1.legend(loc="upper left", fontsize=9)
 
-    b, a = signal.butter(2, FC_PASSA_BAIXA / (FS / 2))
+    b, a = coeficientes_passa_baixa()       # o mesmo filtro do treino e do firmware
     f_h, h = signal.freqz(b, a, worN=1024, fs=FS)
     f_p, p_bruto = signal.welch(a_bruto - a_bruto.mean(), fs=FS, nperseg=256)
     _, p_filt = signal.welch(a_filt - a_filt.mean(), fs=FS, nperseg=256)
@@ -658,7 +663,8 @@ def escrever_tabelas(comp_a, comp_b, prop, tab):
         celulas = [br(a.alarmes_h, 2), br(b.alarmes_h, 2), f"{br(100 * a.sens_1alarme_h)}\\,\\%",
                    f"{br(100 * b.sens_1alarme_h)}\\,\\%", tamanho(a.bytes_modelo), milhar(a.ops_janela)]
         if chave == "random_forest":
-            nome = f"\\textbf{{{nome}}}"
+            # The comparison forest (150 x 12), not the wearable one: main.tex explains the asterisk
+            nome = f"\\textbf{{{nome}}}$^{{*}}$"
             celulas = [f"\\textbf{{{c}}}" for c in celulas]
         linhas.append(" & ".join([nome] + celulas) + " \\\\")
     linhas += ["\\bottomrule", "\\end{tabular}"]
@@ -674,7 +680,7 @@ def escrever_tabelas(comp_a, comp_b, prop, tab):
     for chave in ordem:
         p = prop.loc[chave]
         celulas = [f"{int(p.quedas_detectadas)} de {int(p.quedas)}", f"{int(p.alarmes_falsos)}",
-                   f"{int(p.ensaios_adl_com_alarme)} de 8"]
+                   f"{int(p.ensaios_adl_com_alarme)} de {int(p.ensaios_adl)}"]
         nome = nomes[chave]
         if chave == "random_forest":
             nome = f"\\textbf{{{nome}}}"
@@ -699,7 +705,19 @@ def escrever_numeros(n, destino):
 
 # ---------------------------------------------------------------------------------------------------------
 
+def instalar(origem: Path, destino: Path):
+    """Copia para um temporário ao lado do destino e troca de uma vez: quem compila nunca vê meio arquivo."""
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    temporario = destino.with_name(destino.name + ".tmp")
+    shutil.copy2(origem, temporario)
+    os.replace(temporario, destino)
+
+
 def main():
+    # Falta de arquivo de entrada para aqui, antes de qualquer trabalho e de mexer na apresentação.
+    if not LOGO.exists():
+        raise SystemExit(f"logo não encontrado: {LOGO}")
+    inicio = time.time()
     sisfall, proprios = _comum.carregar()
     vestivel = json.loads((R / "vestivel.json").read_text())
     l_on = vestivel["l_on_g"]
@@ -708,7 +726,7 @@ def main():
     prop = pd.read_csv(R / "proprios_resumo.csv").set_index("metodo")
 
     # O conjunto e o modelo do vestível (09), conferidos
-    conj = montar(sisfall, "A", l_on, causal=True)
+    conj = montar(sisfall, "A", l_on, causal=True, distancia_s=M09.DISTANCIA_S)
     F, nomes = atributos.calcular(conj.janelas, PRE, grupos=("tempo",))
     dobra = avaliacao.dobras(conj)
     s_rf, _, _ = avaliacao.escores_fora_da_dobra(M09.RandomForestVestivel, conj, F, dobra)
@@ -769,7 +787,7 @@ def main():
         "rfVestAlarmes": br(vestivel["rf"]["alarmes_h"], 2),
         "rfVestSens": br(100 * vestivel["rf"]["sens_1alarme_h"]),
         "rfVestLimiar": br(vestivel["rf"]["limiar_prob"], 2),
-        "rfVestNos": milhar(vestivel["rf"]["nos"]), "rfVestKB": f"{vestivel['rf']['bytes_flash'] / 1024:.0f}",
+        "rfVestNos": milhar(vestivel["rf"]["nos"]), "rfVestKB": f"{vestivel['rf']['bytes_flash'] / 1e3:.0f}",
         "lrVestAlarmes": br(vestivel["lr"]["alarmes_h"], 2),
         "nVetores": len(esperado), "nTrechos": esperado.arquivo.nunique(),
         "funilDetectadas": milhar(n["funilDetectadas"]),
@@ -791,17 +809,23 @@ def main():
         "votoDificilNome": n["votoDificilNome"],
     }
 
-    figuras, tabelas = APRESENTACAO / "figuras", APRESENTACAO / "tabelas"
-    for pasta in (figuras, tabelas, APRESENTACAO / "imagens"):
-        pasta.mkdir(parents=True, exist_ok=True)
+    # Tudo gerado: só agora a apresentação muda. Tabelas e números são escritos numa pasta de preparo, e só
+    # as figuras desta rodada vão (um ap_*.png antigo esquecido em resultados/ não entra nos slides).
+    figuras = APRESENTACAO / "figuras"
+    novas = sorted(f for f in R.glob("ap_*.png") if f.stat().st_mtime >= inicio - 1)
+    with tempfile.TemporaryDirectory(dir=R) as preparo:
+        preparo = Path(preparo)
+        escrever_tabelas(comp_a, comp_b, prop, preparo)
+        escrever_numeros(numeros, preparo / "numeros.tex")
+        for f in novas:
+            instalar(f, figuras / f.name)
+        instalar(LOGO, APRESENTACAO / "imagens" / LOGO.name)
+        for tabela in preparo.glob("*.tex"):
+            destino = APRESENTACAO / ("numeros.tex" if tabela.name == "numeros.tex" else f"tabelas/{tabela.name}")
+            instalar(tabela, destino)
     for antiga in figuras.glob("*.png"):
-        antiga.unlink()
-    novas = sorted(R.glob("ap_*.png"))
-    for f in novas:
-        shutil.copy2(f, figuras / f.name)
-    shutil.copy2(LOGO, APRESENTACAO / "imagens" / LOGO.name)
-    escrever_tabelas(comp_a, comp_b, prop, tabelas)
-    escrever_numeros(numeros, APRESENTACAO / "numeros.tex")
+        if antiga.name not in {f.name for f in novas}:
+            antiga.unlink()
     print(f"apresentação: {len(novas)} figuras, 3 tabelas e {len(numeros)} números em {APRESENTACAO}")
 
 
