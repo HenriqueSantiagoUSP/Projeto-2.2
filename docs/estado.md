@@ -67,6 +67,110 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-13 — erros não tratados: revisão de código e correções
+
+- **Pedido:** revisar o firmware, a interface e os scripts do `modelo/` em busca de erros não tratados e
+  corrigir tudo, na ordem do relatório.
+- **Feito:** os 32 achados e os 6 menores. O que mudou de comportamento e por quê está em
+  [`decisoes.md`](decisoes.md) (2026-11-13), e o contrato em [`protocolo.md`](protocolo.md) §3.
+  - **Quedas que se perdiam:**
+    - a regra do hub reconhece a queda por `seq` e `uptime_ms`;
+    - o `seq` do vestível começa aleatório;
+    - a FALL não entregue é reenviada até passar;
+    - o MPU que reinicia ou o barramento I²C preso deixam de esconder a falta de detecção;
+    - o notificador (sessão persistente, envio que insiste, alerta esquisito vira texto).
+  - **Configuração errada:** chaves e MAC com tamanho errado falham o build; ESP-NOW e MQTT que não sobem dão um
+    erro e a placa segue.
+  - **Scripts do modelo:** o formato da coleta no pulso, a validação dos dados, o cache, a exportação que só grava
+    no fim e uma fonte só para o gatilho e o filtro.
+- **Ficou para decidir:** tirar do treino as janelas que passam da borda dos ensaios (item 19). O efeito medido
+  e o que precisaria ser regenerado estão em [`pendencias.md`](pendencias.md) (Firmware).
+- **Verificado:** builds sem avisos (vestível padrão, demo e completo; hub), o build falhando com um MAC
+  malformado, todos os testes de host e de Python (com casos novos para cada correção testável no PC). O `09`, o
+  `04` e o `08` dão os mesmos resultados.
+- **Não verificado:** nada em placa. A lista do que conferir está em [`pendencias.md`](pendencias.md).
+
+### 2026-11-13 — demo na bancada: o gráfico congelava quando a USB piscava
+
+- **Pedido:** a janela do `demo_vestivel.py` parou de mostrar pontos novos depois de um tempo. Era o Python ou a
+  ESP?
+- **Investigado (com a janela travada):**
+  - a COM3 abriu, então o script já tinha soltado a porta;
+  - a placa seguia mandando CSV a 200 Hz, com o tempo contínuo (~16 min, sem reinício);
+  - o `Traceback` no terminal: `SerialException: GetOverlappedResult failed (Acesso negado)` no
+    `conexao.readline()`. O link USB do conversor CH343 piscou, e a thread de leitura morreu sem avisar a janela;
+  - descartados: a tarefa da ESP parar, o modo de seleção do terminal (sem `--mqtt-host` não há `print`) e a porta
+    sumir num reinício (a placa não reiniciou).
+- **Encontrado no caminho:**
+  - uma linha CSV com um tempo absurdo (bytes perdidos) fazia o sinal do gráfico crescer sem limite;
+  - uma linha de boot emendada derrubava a leitura (`ValueError`), achada num teste com 200 mil linhas estragadas.
+- **Corrigido:**
+  - a leitura reabre a porta sozinha, sem resetar a placa, e o título mostra a perda;
+  - linhas com erro são ignoradas;
+  - o sinal do gráfico tem um teto em pontos.
+- **Verificado:**
+  - 5 testes novos, que falhavam antes da correção (14 no total, todos passam);
+  - estresse de 30 min simulados e o teste com linhas estragadas;
+  - a leitura da placa real na COM3.
+  - A reconexão com a placa real não foi testada: falta puxar o cabo.
+- **Primeiro dado de bancada do firmware:** 200 Hz contínuos e \|a\| ≈ 1 g parado (≈ 4 077 contagens a 4 096/g,
+  a faixa de ±8 g).
+
+### 2026-11-13 — apresentação do Q1 enxugada (22 slides)
+
+- **Pedido:** tirar a explicação do filtro (ele fica só no slide do pipeline), a impureza de Gini, o tópico
+  "Paridade C × Python" e deixar o último slide só com "Obrigado".
+- **Feito:**
+  - saíram os 3 slides do filtro e o slide "como a árvore escolhe as perguntas" (Gini e pesos das classes);
+  - os slides do Random Forest passaram a ser numerados de 1/5 a 5/5;
+  - o `main.tex` passou para LF.
+  - O roteiro foi renumerado e o guia dos modelos aponta os novos números. O Gini continua no guia, para o caso
+    de perguntarem.
+  - O `main.pdf` versionado foi atualizado: até aqui ele era o anterior às mudanças do dia (sem a nota da
+    floresta da comparação e com "104 KB").
+- **Verificado:** `pdflatex` sem erros nem *overfull*; 22 slides; os slides 5, 12, 20 e 22 conferidos na imagem.
+
+### 2026-11-13 — guia dos modelos para a apresentação
+
+- **Pedido:** um arquivo que explique como funciona cada modelo testado, para preparar a apresentação.
+- **Feito:** [`relatorios/Semestre 2/Projeto 3/Q1/explicacao-modelos.md`](../relatorios/Semestre%202/Projeto%203/Q1/explicacao-modelos.md)
+  (indexado em `relatorios/README.md`):
+  - o que todos os métodos têm em comum (pipeline, atributos, como medimos);
+  - cada um dos 11 métodos da tabela do slide 12: ideia, como foi montado, resultado e por que deu esse
+    resultado;
+  - o Random Forest a fundo, perguntas prováveis com respostas e um glossário.
+- O roteiro dizia "60 árvores (104 KB)" no slide 24; passou a 106 kB, como os slides.
+- **Verificado:** os parâmetros contra `modelo/queda/modelos.py` e `cnn.py`; os números contra
+  `resultados/resumo.md`, `vestivel.json`, `svm_vestivel.json` e o `numeros.tex` da apresentação.
+
+### 2026-11-13 — SVM na configuração do vestível; tamanho do Random Forest nos slides
+
+- **Pedido:**
+  - conferir os 252 kB do Random Forest nos slides;
+  - explicar por que não o SVM, que foi melhor nos nossos ensaios e é mais leve, rodando-o na configuração do
+    vestível.
+- **Encontrado:**
+  - os slides misturavam duas florestas. A da comparação (150 árvores de profundidade 12) ocupa 252 kB. A do
+    vestível (60 × 10) ocupa 106 kB, medidos no `gadget.elf` (`fall_rf_nodes`: 106 248 bytes, mais 120 das
+    raízes) e mostrados no slide como "104 KB", em outra unidade;
+  - o SVM nunca tinha rodado na configuração do vestível, e o `decisoes.md` não dizia por que ele ficou de fora.
+- **Feito:**
+  - nota na tabela "Por que escolhemos o Random Forest" e kB nos dois slides (gerador `10` e `main.tex`);
+  - `modelo/experimentos/11_svm_vestivel.py` e `resultados/svm_vestivel.json`;
+  - [`decisoes.md`](decisoes.md) (2026-11-13), `modelo/README.md` e [`pendencias.md`](pendencias.md) (item do
+    retreino).
+- **Resultado (SisFall, ±8 g, gatilho causal, 23 atributos):**
+  - Random Forest 60 × 10: 0,55 alarme/h, 95,1 % das quedas com ≤ 1 alarme/h;
+  - SVM com todas as janelas: 0,69 alarme/h e 96,2 %, com 34 kB, mas ~24 mil operações e 348 exponenciais por
+    janela;
+  - regressão logística: 0,62 alarme/h e 94,9 %;
+  - no bootstrap por pessoa, todos os intervalos de 95 % das diferenças passam pelo zero: os três empatam;
+  - nos nossos ensaios, a vantagem do SVM (8 contra 7 de 10 quedas) é uma queda de joelhos.
+- **Verificado:**
+  - o `11` reproduz o limiar do Random Forest do `09`;
+  - o `10` gerou as 15 figuras idênticas byte a byte; só mudaram a tabela e o número do vestível;
+  - `pdflatex` da apresentação sem erros nem *overfull*; os slides 21 e 24 conferidos na imagem.
+
 ### 2026-11-11 — demonstração com uma placa e peças ausentes sem erro
 
 - **Pedidos:**

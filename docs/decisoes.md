@@ -200,6 +200,47 @@ seguir funcionando sem CAN, sem um sensor ou sem rede, com um aviso em vez de er
 | **Hub: menu "Room hub: sensors"** (`HUB_PIR_FITTED`, `HUB_LM35_FITTED`, `HUB_DOORS_ABSENT`); sem PIR, a inatividade e a saída noturna ficam suspensas | PIR e portas soltos não dão para detectar (leem "ninguém" e "aberta") e gerariam alertas falsos. No `menuconfig`, como escolheu o usuário; pela config MQTT mexeria no contrato |
 | LM35 solto: aviso uma vez, sem publicar | já era descartado por estar fora da faixa, mas com um W a cada leitura |
 
+## SVM na configuração do vestível (2026-11-13)
+
+O SVM tinha ficado fora da escolha de 2026-11-09 sem uma razão registrada, e só tinha sido avaliado na
+configuração da comparação (todos os atributos, gatilho por picos). `modelo/experimentos/11_svm_vestivel.py` o
+avaliou na configuração do vestível (gatilho causal, 23 atributos no tempo, ±8 g, as mesmas dobras e o mesmo
+limiar do `09`), com um bootstrap por pessoa. Números em
+[`modelo/resultados/svm_vestivel.json`](../modelo/resultados/svm_vestivel.json).
+
+| Decisão | Por quê |
+|---|---|
+| **Fica o Random Forest**; o SVM entra na comparação do retreino com os dados do pulso | empate estatístico. Random Forest 60 × 10: 0,55 alarme falso/h e 95,1 % das quedas com ≤ 1 alarme/h. SVM com todas as janelas: 0,69/h e 96,2 %. Regressão logística: 0,62/h e 94,9 %. Os intervalos de 95 % das diferenças passam pelo zero (SVM − RF: −0,42 a +0,80 alarme/h; −4,3 a +2,9 pontos nas quedas). Trocar custaria outro classificador em C e outros testes de paridade, sem ganho medido |
+| O tamanho não decide | o SVM ocupa 34 kB (348 vetores de suporte) e o Random Forest 106 kB, mas o SVM faz ~24 mil operações e 348 exponenciais por janela, contra ≤ 600 comparações. As duas coisas cabem com folga no ESP32-S3, e o classificador só roda quando o gatilho dispara |
+| A vantagem do SVM nos nossos ensaios (8 de 10 quedas contra 7 de 10) não pesa | é uma queda de joelhos, de uma pessoa só; na SisFall são 38 pessoas e ~1 800 quedas |
+| A favor do Random Forest no retreino | não precisa padronizar os atributos nem ajustar C e gamma de novo; a P(queda) que vai no alerta é a fração de votos, sem calibrar; mostra a importância dos atributos |
+
+## Erros não tratados: revisão de código (2026-11-13)
+
+Revisão de `firmware/`, `interface/` e `modelo/` em busca de erros não tratados: 32 achados e 6 menores, todos
+corrigidos (o item 19, as janelas de borda, espera decisão: ver `pendencias.md`). As decisões que mudam
+comportamento:
+
+| Decisão | Por quê |
+|---|---|
+| **Hub:** uma FALL é a mesma queda só com o mesmo `seq` **e** o mesmo `uptime_ms` | só pelo `seq`, a queda nova de um vestível que reiniciou (o `seq` recomeça) era descartada como repetida, sem alerta |
+| **Vestível:** o `seq` começa num valor aleatório a cada reinício que não seja despertar do sono profundo | o `id` do alerta é `<vestível>-<seq>`; repetido, a central descarta a queda nova como duplicata |
+| **Vestível:** FALL ou FALL_CANCEL que não chegou a lugar nenhum é guardado e reenviado igual (2 s, dobrando até 30 s, e na hora em que um heartbeat passa) | antes ficava só num `ESP_LOGE`: a queda se perdia se o hub estivesse reiniciando ou fora de alcance por alguns segundos |
+| **Vestível:** 10 leituras seguidas sem amostra = sensor perdido; o overflow da FIFO deixou de ser um código de erro | um MPU que reinicia volta dormindo com a FIFO desligada (lê "OK, 0 amostras" para sempre), e o barramento I²C preso devolvia o mesmo código do overflow. Os dois deixavam a detecção morta com o LED verde |
+| **Vestível:** falha no meio da rajada reinicia a FIFO; amostras perdidas reiniciam o pipeline (com um cabeçalho CSV novo) | a FIFO desalinhada dava amostras com bytes trocados, e uma janela podia juntar trechos dos dois lados de uma lacuna |
+| **As duas placas:** PMK, LMK e MAC com o tamanho errado **falham o build** (`_Static_assert`); o MAC precisa ser exatamente `aa:bb:cc:dd:ee:ff` | uma chave curta era lida além do fim da string, diferente em cada placa: o hub não decifrava, mas o ACK MAC fazia o vestível achar que entregou |
+| **Hub:** com um vestível pareado, quadros de outro MAC são ignorados (um aviso); um MAC malformado dá um erro claro no boot | qualquer ESP32 por perto podia mandar uma FALL não cifrada; o MAC malformado caía calado no modo "aceita qualquer um" |
+| **As duas placas:** ESP-NOW e MQTT que não sobem viram `ESP_LOGE` e a placa segue (sem `ESP_ERROR_CHECK`); URI do broker vazia = MQTT desligado com um aviso | a regra "nada opcional derruba a placa" valia para sensores, mas não para esses dois: uma URI apagada no `menuconfig` reiniciava o hub em laço |
+| **Hub:** `a2` e `prob` fora da faixa saem do JSON do alerta (a queda vai sem eles) | `%.2f` de um NaN escreve `nan`, que não é JSON: a central descartava o alerta inteiro |
+| **mqtt_link e net:** um `esp_mqtt_client_start` ou `esp_wifi_connect` recusado é tentado de novo por timer | as novas tentativas dependiam de um evento que, nesses casos, não vem: a placa ficava sem rede até reiniciar |
+| **CAN:** "connected again" só depois que um quadro sai de fato (ERROR_ACTIVE e TEC = 0) | toda recuperação termina em ERROR_ACTIVE, com barramento ou sem: sem transceptor, o par W/I se repetia a cada quadro e a espera nunca crescia |
+| **Eventos que não podem se perder** (MQTT conectado nas duas placas, botão do vestível) viram uma marca atômica conferida pela tarefa | com a fila cheia o evento sumia: o "offline" retido do Last Will continuava valendo |
+| **ESP-NOW:** a confirmação atrasada de um envio que estourou o tempo é descartada, com um limite de uma espera de ACK | ela era lida como o ACK do envio seguinte, que podia ser uma FALL que o hub não recebeu |
+| **Notificador:** sessão MQTT persistente; o alerta que o Telegram não aceitou espera e vai de novo até passar (só um 400 é descartado); dado inesperado vira texto simples | antes, um erro HTTP fora de `OSError` matava a thread de envio, três falhas seguidas descartavam o alerta, um alerta esquisito derrubava o processo e os alertas publicados com ele fora do ar se perdiam |
+| **Demo:** a porta ocupada no início entra no mesmo laço de reconexão | o `sys.exit` dentro da thread sumia sem mensagem, e a janela abria vazia |
+| **modelo/:** o leitor dos ensaios próprios aceita o formato do protocolo de coleta (`p03_queda_frente_2.csv`, em contagens) e avisa o que ignora | a coleta no pulso seria descartada em silêncio ou lida como se as contagens fossem g |
+| **modelo/:** `DISTANCIA_S` e o biquad vêm do `pipeline.py` para o treino e para o `09`; o `09` e o `10` só gravam depois de calcular tudo; limiar infinito ou uma classe só param a exportação | o modelo exportado podia não corresponder ao gatilho ou ao filtro do firmware, sem aviso, e uma falha no meio deixava os artefatos de rodadas diferentes |
+
 ## O que foi bom ter mudado
 
 | De → para | Por quê |
