@@ -112,6 +112,9 @@ Lembre do serviço Mosquitto do Windows: use o IP da máquina, não `localhost` 
 Para ensaiar sem a placa, `--gravar sessao.log` guarda o que chega da serial, e `--reproduzir sessao.log` toca a
 sessão de novo no mesmo ritmo.
 
+Se o link USB piscar (no Windows aparece `GetOverlappedResult failed`), o título da janela mostra "PERDIDA,
+reabrindo…" e a leitura volta sozinha quando a porta reaparece, sem resetar a placa.
+
 ## 3. Telegram
 
 1. Crie um bot com o [@BotFather](https://t.me/BotFather) e copie o token.

@@ -91,6 +91,10 @@ Para mostrar o modelo funcionando só com a ESP e o MPU-6050, ligada ao computad
    `idf.py -B build/demo -p COMx monitor`. No boot devem aparecer `+-8 g, +-500 dps`,
    `fall pipeline: trigger 2.00 g, random forest…` e o aviso `no hub configured … stand-alone`.
 
+   O `-B build/demo` também vale para o monitor: sem ele, o `idf.py monitor` usa o build do dia a dia e abre a
+   115200. Aí só as linhas da ROM (`ESP-ROM…`, `load:…`) saem legíveis, e o resto, a 921600, vira lixo. Feche o
+   monitor (Ctrl+]) antes de abrir o `demo_vestivel.py`, porque os dois não usam a porta ao mesmo tempo.
+
 **Na frente do professor:**
 1. **Andar ou balançar a placa:** o gatilho dispara, mas a P(queda) fica perto de 0 e não há alarme.
 2. **Simular uma queda:** segure a placa de pé, solte-a sobre uma almofada e deixe-a deitada. Isso dá queda livre,

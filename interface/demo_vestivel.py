@@ -26,6 +26,7 @@ Na janela: c = "estou bem" (cancela a última queda na central); q = sai.
 """
 
 import argparse
+import importlib.util
 import json
 import math
 import os
@@ -42,6 +43,7 @@ LSB_POR_G = 4096.0              # ±8 g
 FC_HZ = 20.0                    # o passa-baixa do pipeline (modelo/queda/pipeline.py, FC_PASSA_BAIXA)
 INTERVALO_VESTIVEL_S = 30.0     # como o heartbeat do vestível
 FAIXA_QUEDA_S = 4.0             # quanto tempo a faixa "QUEDA DETECTADA" fica na tela
+REABRIR_S = 1.0                 # intervalo entre as tentativas de reabrir a porta quando ela cai
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 LOG_ESP = re.compile(r"^([IWE]) \((\d+)\) ([\w.-]+): (.*)$")
@@ -96,15 +98,22 @@ def interpretar_linha(linha):
                 return None
         if "pico" not in dados or "prob" not in dados:
             return None
-        dados["pico"] = int(dados["pico"])
-        dados["queda"] = int(dados.get("queda", 0))
+        try:
+            dados["pico"] = int(dados["pico"])
+            dados["queda"] = int(dados.get("queda", 0))
+        except (ValueError, OverflowError):      # inf ou nan numa linha estragada
+            return None
         return ("janela", dados)
     m = VESTIVEL.search(linha)
     if m:
         return ("vestivel", m.group(1))
     m = MODELO.search(linha)
     if m:
-        return ("modelo", {"l_on": float(m.group(1)), "classificador": m.group(2), "limiar": float(m.group(3))})
+        try:
+            return ("modelo", {"l_on": float(m.group(1)), "classificador": m.group(2),
+                               "limiar": float(m.group(3))})
+        except ValueError:                       # números emendados por bytes perdidos ("0.732.5123")
+            return None
     m = LOG_ESP.match(linha)
     if m and m.group(1) in "WE" and not m.group(4).startswith("FALL ("):
         return ("aviso", m.group(4))
@@ -177,6 +186,11 @@ class Estado:
     ativ_soma: float = 0.0                                # para a atividade (RMS de |a| bruto − 1 g)
     ativ_n: int = 0
     n_quedas: int = 0
+    serial_perdida: bool = False                          # a porta caiu e a leitura tenta reabri-la
+
+    def __post_init__(self):
+        # Teto em pontos, além do corte por tempo: um tempo absurdo numa linha estragada não faz o sinal crescer.
+        self.sinal = deque(self.sinal, maxlen=int((self.janela_s + 2.0) * FS_HZ))
 
 
 class Leitor:
@@ -235,37 +249,83 @@ class Leitor:
 # Fontes: a porta serial ou uma sessão gravada
 # ---------------------------------------------------------------------------------------------------------
 
-def ler_serial(porta, baud, leitor, gravar, parar, reiniciar=True):
-    try:
-        import serial
-    except ImportError:
-        sys.exit("Biblioteca pyserial não encontrada. Instale com:  pip install -r requirements-demo.txt")
+def abrir_serial(serial, porta, baud):
     conexao = serial.Serial()
     conexao.port, conexao.baudrate, conexao.timeout = porta, baud, 0.2
     # DTR e RTS desligados ao abrir: com eles ligados, a placa pode ficar em reset ou no modo de gravação.
     conexao.dtr = False
     conexao.rts = False
+    conexao.open()
+    return conexao
+
+
+def reabrir_serial(serial, conexao, porta, baud, estado, parar, erro):
+    """
+    A porta caiu (no Windows: "GetOverlappedResult failed", quando o link USB pisca). A placa continua rodando, então
+    a leitura tenta reabrir a mesma porta a cada REABRIR_S, sem o pulso de reset, até conseguir ou a janela fechar.
+    """
+    with estado.trava:
+        estado.serial_perdida = True
+    print(f"Serial {porta} perdida ({erro}); tentando reabrir a cada {REABRIR_S:g} s.", file=sys.stderr)
+    if conexao is not None:
+        try:
+            conexao.close()
+        except (serial.SerialException, OSError):
+            pass
+    while not parar.is_set():
+        parar.wait(REABRIR_S)
+        try:
+            nova = abrir_serial(serial, porta, baud)
+        except (serial.SerialException, OSError):
+            continue
+        with estado.trava:
+            estado.serial_perdida = False
+        print(f"Serial {porta} de volta.", file=sys.stderr)
+        return nova
+    return None
+
+
+def ler_serial(porta, baud, leitor, gravar, parar, reiniciar=True):
+    # Roda numa thread: um sys.exit aqui sumiria sem mensagem (o main confere o pyserial antes).
+    import serial
     try:
-        conexao.open()
-    except serial.SerialException as erro:
-        sys.exit(f"Não foi possível abrir {porta}: {erro}")
+        conexao = abrir_serial(serial, porta, baud)
+    except (serial.SerialException, OSError) as erro:
+        # Porta ocupada (o idf.py monitor, por exemplo) ou ainda não ligada: a janela mostra e espera.
+        conexao = reabrir_serial(serial, None, porta, baud, leitor.e, parar, erro)
+        if conexao is None:
+            return
     if reiniciar:
         # Um pulso no EN (RTS), como o idf.py monitor: a placa reinicia e o log de boot diz o id e o modelo.
         conexao.rts = True
         time.sleep(0.1)
         conexao.rts = False
     arquivo = open(gravar, "w", encoding="utf-8", newline="\n") if gravar else None
+    ja_avisados = set()
     try:
         while not parar.is_set():
-            bruta = conexao.readline()
+            try:
+                bruta = conexao.readline()
+            except (serial.SerialException, OSError) as erro:
+                conexao = reabrir_serial(serial, conexao, porta, baud, leitor.e, parar, erro)
+                if conexao is None:
+                    break
+                continue
             if not bruta:
                 continue
             texto = bruta.decode("utf-8", errors="replace")
             if arquivo:
                 arquivo.write(texto if texto.endswith("\n") else texto + "\n")
-            leitor.linha(texto)
+            try:
+                leitor.linha(texto)
+            except Exception as erro:  # noqa: BLE001 — uma linha estranha não pode parar a leitura
+                tipo = type(erro).__name__
+                if tipo not in ja_avisados:
+                    ja_avisados.add(tipo)
+                    print(f"Linha ignorada ({tipo}: {erro}): {texto.strip()[:120]}", file=sys.stderr)
     finally:
-        conexao.close()
+        if conexao is not None:
+            conexao.close()
         if arquivo:
             arquivo.close()
 
@@ -427,6 +487,7 @@ def janela(estado, ponte, args, parar):
             vestivel = estado.vestivel
             mostrar_faixa = t_fim < estado.faixa_ate
             avisos = list(estado.avisos)
+            serial_perdida = estado.serial_perdida
         if pontos:
             linha.set_data([t - t_fim for t, _ in pontos], [a for _, a in pontos])
             topo = max(4.0, max(a for _, a in pontos) * 1.15)
@@ -442,6 +503,8 @@ def janela(estado, ponte, args, parar):
                                   va="bottom"))
 
         fonte = f"reproduzindo {os.path.basename(args.reproduzir)}" if args.reproduzir else f"porta {args.porta}"
+        if serial_perdida:
+            fonte += " PERDIDA, reabrindo…"
         central = "sem central" if ponte is None else ("central: conectado" if ponte.conectado else
                                                        "central: desconectado")
         titulo.set_text(f"Vestível {vestivel} — {modelo['classificador']}, queda quando P ≥ "
@@ -522,6 +585,9 @@ def main():
         args.porta = porta_unica()
         if args.porta is None:
             sys.exit("Informe a porta com --porta (ou use --reproduzir).")
+
+    if not args.reproduzir and importlib.util.find_spec("serial") is None:
+        sys.exit("Biblioteca pyserial não encontrada. Instale com:  pip install -r requirements-demo.txt")
 
     estado = Estado(janela_s=args.janela_s)
     ponte = Ponte(args, estado) if args.mqtt_host else None
