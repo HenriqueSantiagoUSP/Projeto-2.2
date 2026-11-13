@@ -213,30 +213,6 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{1. Filtro: um sinal de exemplo, como sai do sensor}
-  \figura{ap_filtro_bruto.png}
-  \vspace{-0.3cm}
-  \nota{Queda para a frente num escorregão (F01), da SisFall. Em cima, os 3 eixos; embaixo, o módulo
-        $\amag = \sqrt{a_x^2 + a_y^2 + a_z^2}$. A faixa cinza é o trecho ampliado adiante.}
-\end{frame}
-
-\begin{frame}{1. Filtro: o mesmo sinal depois do passa-baixa de 20\,Hz}
-  \figura{ap_filtro_filtrado.png}
-  \vspace{-0.3cm}
-  \nota{Em cinza, o sinal bruto. O filtro mantém a forma do movimento e tira o serrilhado: o pico de $\amag$ passa de
-        \picoBruto\,g para \picoFiltrado\,g.}
-\end{frame}
-
-\begin{frame}{1. Filtro: por que 20\,Hz}
-  \figura{ap_filtro_detalhe.png}
-  \vspace{-0.3cm}
-  \begin{itemize}
-    \item O movimento do corpo e o impacto ficam abaixo de $\sim$20\,Hz; acima é ruído e vibração, que só atrapalham
-          os atributos.
-    \item Butterworth de 2ª ordem: um biquad do ESP-DSP (\texttt{dsps\_biquad\_f32}) por eixo, com $-$3\,dB em 20\,Hz.
-  \end{itemize}
-\end{frame}
-
 \begin{frame}{2. Gatilho: o limiar vira um passo do pipeline}
   \begin{columns}[T,onlytextwidth]
     \begin{column}{0.5\textwidth}
@@ -329,7 +305,7 @@
 % ============================================================
 %  Random Forest
 % ============================================================
-\begin{frame}{Random Forest (1/6): a peça básica é a árvore de decisão}
+\begin{frame}{Random Forest (1/5): a peça básica é a árvore de decisão}
   \figura{ap_arvore.png}
   \vspace{-0.35cm}
   \begin{itemize}
@@ -339,46 +315,7 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Random Forest (2/6): como a árvore escolhe as perguntas}
-  \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.53\textwidth}
-      \begin{itemize}
-        \item Em cada nó, testa os atributos e os limiares possíveis e fica com a divisão que deixa os dois lados
-              \textbf{mais puros}.
-        \item A pureza é medida pela \textbf{impureza de Gini}, com $p$ a fração (ponderada) de quedas no nó:
-              \[ G = 1 - p^2 - (1-p)^2 \]
-              \nota{$G = 0$: uma classe só. $G = 0{,}5$: metade de cada.}
-        \item O \textbf{ganho} de uma divisão em esquerda ($e$) e direita ($d$):
-              \[ \Delta G = G_{\text{pai}} - \tfrac{n_e}{n}\, G_e - \tfrac{n_d}{n}\, G_d \]
-        \item Repete em cada lado até a profundidade 10, ou até a folha ter 2 janelas.
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.44\textwidth}
-      \begin{block}{A 1ª pergunta da árvore do slide anterior}
-        \footnotesize
-        ``\giniAtributo{} $\le$ \giniLimiar\giniUnidade?''\\[0.12cm]
-        \begin{tabular}{@{}lrr@{}}
-          & janelas (Q / A) & Gini \\
-          \midrule
-          antes & \nImpactos{} / \nJanelasAtividade & \giniPai \\
-          lado ``sim'' & \giniQuedasEsq{} / \giniAtivEsq & \giniEsq \\
-          lado ``não'' & \giniQuedasDir{} / \giniAtivDir & \giniDir \\
-          \midrule
-          \textbf{ganho} & & \textbf{\giniGanho} \\
-        \end{tabular}\\[0.08cm]
-        \nota{Q/A: janelas de queda/atividade. Uma pergunta já separa quase tudo.}
-      \end{block}
-      \vspace{0.05cm}
-      \begin{block}{Classes desbalanceadas}
-        \footnotesize
-        Só \nImpactos{} das \nJanelas{} janelas são quedas: cada queda pesa \pesoQueda{} e cada atividade,
-        \pesoAtividade, para as duas classes pesarem o mesmo.
-      \end{block}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Random Forest (3/6): de uma árvore para a floresta}
+\begin{frame}{Random Forest (2/5): de uma árvore para a floresta}
   \centering
   \begin{tikzpicture}[
       dado/.style={draw=uspblue, fill=lightblue, rounded corners=2pt, minimum width=1.9cm, minimum height=0.6cm,
@@ -423,7 +360,7 @@
   \end{columns}
 \end{frame}
 
-\begin{frame}{Random Forest (4/6): árvore sozinha $\times$ floresta}
+\begin{frame}{Random Forest (3/5): árvore sozinha $\times$ floresta}
   \figura{ap_fronteira.png}
   \vspace{-0.3cm}
   \begin{itemize}
@@ -432,7 +369,7 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Random Forest (5/6): decidindo uma janela}
+\begin{frame}{Random Forest (4/5): decidindo uma janela}
   \figura{ap_votos.png}
   \vspace{-0.3cm}
   \begin{itemize}
@@ -442,7 +379,7 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{Random Forest (6/6): o que a floresta olha}
+\begin{frame}{Random Forest (5/5): o que a floresta olha}
   \begin{columns}[T,onlytextwidth]
     \begin{column}{0.58\textwidth}
       \includegraphics[width=\linewidth]{figuras/ap_importancia.png}
@@ -465,7 +402,9 @@
 
 \begin{frame}{Por que escolhemos o Random Forest}
   \centering
-  {\scriptsize\input{tabelas/porque_rf.tex}}\\[0.25cm]
+  {\scriptsize\input{tabelas/porque_rf.tex}}\\[0.05cm]
+  {\tiny $^{*}$ Floresta da comparação: 150 árvores de profundidade $\le$ 12. A do vestível tem 60 árvores de
+   profundidade $\le$ 10 e ocupa \rfVestKB\,kB.}\\[0.2cm]
   \begin{columns}[T,onlytextwidth]
     \begin{column}{0.49\textwidth}
       \begin{itemize}\small
@@ -526,10 +465,8 @@
         \item \textbf{Gatilho causal}: decide amostra a amostra, sem olhar o futuro. Passam as mesmas
               \gatilhoPassam\,\% das quedas, com menos disparos (\disparosCausal{} contra \disparosPicos{} por hora).
         \item \textbf{Só os \nAtributos{} atributos no tempo}: sem FFT nem AR no C, perdendo pouco.
-        \item \textbf{60 árvores de profundidade $\le$ 10}: \rfVestNos{} nós e \rfVestKB\,KB de flash;
+        \item \textbf{60 árvores de profundidade $\le$ 10}: \rfVestNos{} nós e \rfVestKB\,kB de flash;
               \rfVestAlarmes{} alarme falso/h e \rfVestSens\,\% das quedas com $\le$ 1 alarme/h.
-        \item \textbf{Paridade C $\times$ Python}: o firmware reproduz picos, atributos e $P(\text{queda})$ do Python
-              em \nVetores{} janelas de \nTrechos{} ensaios.
       \end{itemize}
     \end{column}
     \begin{column}{0.46\textwidth}
@@ -574,11 +511,8 @@
 
 \begin{frame}[plain]
   \centering
-  \vspace{1.8cm}
-  {\Huge\bfseries\color{uspblue} Obrigado}\\[0.5cm]
-  {\large Perguntas?}\\[1.3cm]
-  {\footnotesize\color{tinta2} Código e resultados: \texttt{modelo/} (Python) e
-   \texttt{firmware/gadget/components/fall\_pipeline} (C)}
+  \vspace{3.2cm}
+  {\Huge\bfseries\color{uspblue} Obrigado}
 \end{frame}
 
 \end{document}
