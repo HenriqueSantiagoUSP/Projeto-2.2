@@ -157,8 +157,12 @@ Pegadinhas dos firmwares:
 - **Peça ausente = um aviso, não erro:** sensor, CAN, Wi-Fi ou broker que faltam dão **um** `ESP_LOGW` quando
   percebidos e um `ESP_LOGI` quando voltam; as novas tentativas ficam em `ESP_LOGD`, com espera crescente. `E`
   só para falha de verdade (configuração recusada, queda perdida). Nada opcional pode derrubar a placa: nada de
-  `ESP_ERROR_CHECK` no que pode faltar. No hub, PIR, LM35 e portas não instalados são declarados em "Room hub:
-  sensors", porque soltos geram alertas falsos.
+  `ESP_ERROR_CHECK` no que pode faltar, ESP-NOW e MQTT incluídos (URI do broker vazia = MQTT desligado, com um
+  aviso). No hub, PIR, LM35 e portas não instalados são declarados em "Room hub: sensors", porque soltos geram
+  alertas falsos.
+- **Chaves e MACs do ESP-NOW com o tamanho errado falham o build** (`_Static_assert`): PMK e LMK com 16
+  caracteres, MAC vazio ou exatamente `aa:bb:cc:dd:ee:ff`. Uma queda que não chegou a lugar nenhum é guardada e
+  reenviada igual até entregar ([`docs/protocolo.md`](docs/protocolo.md) §3).
 - `sdkconfig` e `build/` são ignorados pelo git; o que precisa valer para todos vai em `sdkconfig.defaults`
   (watchdog de 30 s com pânico, partição de app grande, usuário MQTT `vestivel` no vestível). O
   `sdkconfig.defaults` vale para opções que o `sdkconfig` ainda não tem; uma opção que já está nele não muda.
@@ -198,6 +202,7 @@ uv run python experimentos/07_figuras_explicativas.py     # figuras que explicam
 uv run python experimentos/08_relatorio_latex.py          # figuras e tabelas do relatório LaTeX do Q1 (relatorios/.../Q1/latex)
 uv run python experimentos/09_exportar_vestivel.py        # modelo do vestível (fall_model.c) + vetores de paridade
 uv run python experimentos/10_figuras_apresentacao.py     # figuras, tabelas e números da apresentação Beamer do Q1
+uv run python experimentos/11_svm_vestivel.py             # SVM × Random Forest × logística na configuração do vestível
 ```
 
 Os dados ficam em `dados/` (fora do git): a SisFall em `dados/publicos/` e os ensaios próprios em

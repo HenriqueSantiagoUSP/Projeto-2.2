@@ -27,6 +27,13 @@ Tudo isto já está no código e compila; falta rodar na placa.
     - PIR, LM35 e uma porta declarados ausentes no menu "Room hub: sensors": nenhum alerta falso de inatividade
       nem de saída noturna.
 - [ ] **Ensaio da demonstração com uma placa** (antes da aula; é o primeiro teste do firmware em placa).
+  - **2026-11-13, na bancada (COM3, conversor CH343):**
+    - a placa com o perfil demo mandou CSV a 200 Hz sem parar por 16 min;
+    - parada, \|a\| bruto ≈ 4 077 contagens, ~1 g na escala de ±8 g;
+    - o `demo_vestivel.py` parou de atualizar quando o link USB piscou (`SerialException`), e foi corrigido.
+  - Ainda falta: conferir as linhas de boot, os disparos ao balançar, a queda na almofada e o Grafana.
+  - **Puxar o cabo USB por 2 s com a janela aberta:** o título deve mostrar "PERDIDA, reabrindo…" e o gráfico
+    voltar sozinho. A placa reinicia, porque perde a alimentação.
   - Gravar o perfil demo ([`firmware/gadget/README.md`](../firmware/gadget/README.md), "Demonstração com uma placa
     só"). No boot devem aparecer:
     - `+-8 g, +-500 dps`;
@@ -64,6 +71,19 @@ Tudo isto já está no código e compila; falta rodar na placa.
 - [ ] **MQTT do vestível**
   - com o hub desligado, uma queda simulada chega ao Telegram "enviada pela própria pulseira";
   - com o hub ligado, chega uma só notificação.
+- [ ] **As correções de erros não tratados (2026-11-13), na bancada** (só compilaram e passaram nos testes de PC):
+  - **FALL atrasada:** hub desligado, queda simulada, hub religado em ~20 s. O alerta chega uma vez só, com o
+    log "FALL seq … delivered late";
+  - **queda depois de reinício:** queda sem "estou bem", vestível desligado e religado, queda de novo. Chegam
+    dois alertas, com `id` diferentes;
+  - **MPU que reinicia:** cortar só o VCC do MPU por 1 s. Deve aparecer "MPU-6050 stopped sending samples" e,
+    depois, "connected";
+  - **CAN sem transceptor e sem autoteste:** um aviso só, sem pares "not connected"/"connected again" a cada
+    quadro;
+  - **remetente estranho:** um segundo ESP32 mandando ESP-NOW ao hub pareado. Um aviso e nenhum alerta;
+  - **URI do broker vazia no hub:** um aviso "MQTT off" e o resto funcionando;
+  - **notificador:** derrubar a internet por 1 min com um alerta no meio. Ele chega quando a rede volta;
+    reiniciar o container com um alerta publicado nesse intervalo, e ele também chega.
 - [ ] **Bot do Telegram**
   - criar pelo @BotFather e preencher `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID` no `interface/.env`;
   - medir a latência alerta → celular (meta ≤ 5 s, [`requisitos.md`](requisitos.md)).
@@ -120,14 +140,26 @@ Tudo isto já está no código e compila; falta rodar na placa.
 - [ ] **Hub sem internet:** apontar `APP_SNTP_SERVER` para o NTP local quando ele existir (ver Central).
 - [ ] **CAN de outros grupos da sala no MQTT:** hoje só vai para o log; falta definir os tópicos em
   [`protocolo.md`](protocolo.md) §4.
+- [ ] **Decidir: tirar do treino as janelas que passam da borda do ensaio** (item 19 da revisão de 2026-11-13).
+  - Hoje o `montar` completa a janela repetindo a última amostra, o que imita "corpo parado". O firmware nunca vê
+    isso, porque o sinal não acaba.
+  - São 55 de 10 939 janelas de atividade do vestível (0,5 %) e 134 de 12 472 na comparação; nenhuma de queda.
+  - Medido sem elas: Random Forest de 0,55 para 0,48 alarme/h (95,1 → 95,9 % das quedas); regressão logística
+    de 0,62 para 0,41 alarme/h (94,9 → 95,7 %), passando o Random Forest.
+  - Corrigir exige regenerar o modelo do vestível, os vetores, os números da apresentação, os resultados (03, 04,
+    06, 07, 11) e as conclusões que citam esses números.
 - [ ] **Retreinar o pipeline de queda com os dados do pulso** (depende da coleta, em "Dados e avaliação").
   - O modelo no vestível foi treinado na SisFall (cintura, ±8 g): é provisório.
   - Com os dados do pulso:
     - refazer a varredura do gatilho (`02_gatilho.py`) e ajustar `GADGET_FALL_TRIGGER_CG`;
     - rodar `09_exportar_vestivel.py`, que gera o modelo e os vetores de teste juntos;
-    - rodar os testes de host do `fall_pipeline`.
-  - Avaliar no pulso se os atributos de frequência voltam (no cintura eles levam o Random Forest de 0,55 para
-    0,34 alarme/h, mas exigem FFT no C).
+    - rodar os testes de host do `fall_pipeline`;
+    - comparar de novo Random Forest, SVM e regressão logística (`11_svm_vestivel.py`). Na SisFall os três
+      empatam (ver [`decisoes.md`](decisoes.md), 2026-11-13); o SVM só entra no firmware se ganhar com folga,
+      porque precisa de outro classificador em C.
+  - Avaliar no pulso se os atributos de frequência voltam. Na cintura, os de FFT e de AR juntos levam o Random
+    Forest do vestível de 0,55 para 0,34 alarme/h; na comparação, só os de FFT o levam de 0,76 para 0,48, com as
+    mesmas ~95,5 % das quedas. Exigem FFT no C e testes de paridade dela.
   - **A decidir com os dados do pulso** (teste rápido de 2026-11-10 na SisFall, cenário A, script só no
     scratchpad):
     - **janela de +2 s depois do pico:** na regressão logística, quedas com ≤ 1 alarme/h passam de 92,8 % para
@@ -212,6 +244,57 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-13 — Erros não tratados: 32 achados da revisão de código e 6 menores corrigidos.**
+  - O que mudou e por quê está em [`decisoes.md`](decisoes.md) (2026-11-13). Os pontos de contrato (`seq`
+    aleatório no boot, a FALL reenviada até entregar, a queda reconhecida por `seq` e `uptime_ms`) estão em
+    [`protocolo.md`](protocolo.md) §3.
+  - Testes novos:
+    - regras: queda nova depois de o vestível reiniciar;
+    - notificador: alerta com dados inesperados, erro HTTP fora de `OSError`, mensagem recusada, espera pela
+      internet, sessão persistente;
+    - demo: porta ocupada no início;
+    - modelo: os dois formatos de ensaio próprio, `nan`, tempo que recomeça, arquivo desconhecido, pasta
+      ausente, cache da SisFall, classe única, limiar infinito, gatilho sem 99 %.
+  - Verificado:
+    - build sem avisos: vestível padrão, demo e completo (MAC, MQTT, CAN, coleta); hub;
+    - um MAC malformado ("aa:bb:cc:dd:ee") falha o build com a mensagem certa;
+    - testes de host: regras 62, `hub_config` 60, `fall_pipeline` 885, `signal_proc` 25; notificador 19;
+      demo 15; `pytest` do modelo 30;
+    - o `09` reorganizado gera o mesmo modelo e os mesmos vetores (só a data do cabeçalho mudou);
+    - os ensaios próprios saem idênticos pelo leitor novo;
+    - o `04` dá os mesmos resultados, com a coluna `ensaios_adl` nova;
+    - o `08`, rodado numa pasta temporária, dá as mesmas legendas (o relatório entregue não foi regenerado).
+  - Não verificado: nada em placa (ver "As correções de erros não tratados" em "Agora: verificação em bancada").
+  - Pendente: a decisão sobre as janelas de borda (Firmware).
+- [x] **2026-11-13 — `demo_vestivel.py` não congela mais quando a USB pisca.** Na bancada, o gráfico parou
+  depois de ~16 min. A placa continuava mandando dados (conferido abrindo a COM3), mas a thread de leitura tinha
+  morrido com `SerialException: GetOverlappedResult failed (Acesso negado)`.
+  - A leitura agora reabre a porta a cada 1 s, sem o pulso de reset, e o título mostra "PERDIDA, reabrindo…".
+  - Uma linha que dá erro é ignorada (e avisada uma vez no terminal), em vez de parar a leitura.
+  - Linhas estragadas (números emendados, `inf`) são descartadas.
+  - O sinal do gráfico tem um teto em pontos, para um tempo absurdo não fazê-lo crescer.
+  - Verificado:
+    - 5 testes novos em `test_demo_vestivel.py` (14 no total), que falhavam antes da correção, um deles na
+      mesma linha do `Traceback`;
+    - 30 min simulados, com uma linha absurda: no máximo 2 400 pontos;
+    - 200 mil linhas estragadas, sem nenhuma exceção;
+    - leitura da placa real na COM3.
+  - Não verificado: a reconexão com a placa real (falta puxar o cabo).
+- [x] **2026-11-13 — Apresentação do Q1 enxugada para 22 slides:** sem os slides do filtro e do Gini, sem o
+  tópico "Paridade C × Python" e com o último slide só com "Obrigado". Roteiro e guia renumerados; `main.pdf`
+  atualizado. Verificado: `pdflatex` sem erros nem *overfull* e os slides alterados conferidos na imagem.
+- [x] **2026-11-13 — Guia dos modelos para a apresentação do Q1**
+  (`relatorios/Semestre 2/Projeto 3/Q1/explicacao-modelos.md`): cada método testado, o Random Forest a fundo e
+  perguntas prováveis. Verificado contra o código dos modelos e os arquivos de resultados.
+- [x] **2026-11-13 — SVM na configuração do vestível e tamanho do Random Forest nos slides.**
+  - `modelo/experimentos/11_svm_vestivel.py`: o SVM ao lado do Random Forest 60 × 10 e da regressão logística,
+    com bootstrap por pessoa. Empate estatístico; o Random Forest fica (ver [`decisoes.md`](decisoes.md)).
+  - Apresentação do Q1: a tabela "Por que escolhemos o Random Forest" ganhou uma nota dizendo que é a floresta
+    da comparação (150 × 12, 252 kB) e que a do vestível ocupa 106 kB; o slide "No vestível" passou a usar kB,
+    como a tabela (antes, "104 KB").
+  - Verificado: o tamanho real no `gadget.elf` (`fall_rf_nodes`, 106 248 bytes); o `11` reproduz o limiar do
+    `09`; as 15 figuras da apresentação saíram idênticas byte a byte; `pdflatex` sem erros nem *overfull*, e
+    os slides 21 e 24 renderizados e conferidos.
 - [x] **2026-11-11 — Demonstração com uma placa e peças ausentes sem erro.**
   - **Vestível:**
     - sem hub (MAC vazio) não liga o ESP-NOW;
