@@ -3,11 +3,16 @@
     python -m unittest test_demo_vestivel          (de dentro de interface/)
 """
 
+import contextlib
+import io
 import json
 import re
 import sys
+import threading
+import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import demo_vestivel as demo
 
@@ -102,6 +107,118 @@ class TestLeitor(unittest.TestCase):
         self.assertTrue(estado.disparos[-1].queda)
         self.assertAlmostEqual(estado.disparos[-1].t, 2.0, places=6)
         self.assertEqual(estado.n_quedas, 1)
+
+    def test_sinal_limitado_depois_de_um_tempo_absurdo(self):
+        # Bytes perdidos na serial podem juntar dois tempos numa linha só ("CSV:1234" + "123455,...").
+        estado = demo.Estado(janela_s=10.0)
+        leitor = demo.Leitor(estado)
+        leitor.linha("CSV:t_ms,ax,ay,az,gx,gy,gz")
+        for i in range(2000):
+            leitor.linha(f"CSV:{i * 5},0,0,4096,0,0,0")
+        leitor.linha("CSV:1234123455,0,0,4096,0,0,0")
+        for i in range(2000, 8000):
+            leitor.linha(f"CSV:{i * 5},0,0,4096,0,0,0")
+        self.assertLessEqual(len(estado.sinal), int((estado.janela_s + 2.0) * demo.FS_HZ))
+        self.assertAlmostEqual(estado.sinal[-1][0], 7999 * 0.005, places=6)
+
+
+class TestLinhasEstragadas(unittest.TestCase):
+    def test_modelo_com_numeros_emendados_e_ignorado(self):
+        linha = "I (350) main: fall pipeline: trigger 2.00 g, random forest, fall when P >= 0.732.5123"
+        self.assertIsNone(demo.interpretar_linha(linha))
+
+    def test_feat_com_pico_infinito_e_ignorado(self):
+        self.assertIsNone(demo.interpretar_linha("FEAT:pico=inf,a_pico=2.5,prob=0.10,queda=0"))
+
+
+class SerialFalsa:
+    """Imita o pyserial: cada abertura segue um plano, uma lista de linhas (bytes ou exceção) ou "falha"."""
+
+    planos = []
+    abertas = []
+    parar = None
+
+    def __init__(self):
+        self.port = self.baudrate = self.timeout = None
+        self.dtr = self.rts = False
+        self.rts_ligado = False
+        self.linhas = []
+
+    def __setattr__(self, nome, valor):
+        if nome == "rts" and valor:
+            object.__setattr__(self, "rts_ligado", True)
+        object.__setattr__(self, nome, valor)
+
+    def open(self):
+        plano = SerialFalsa.planos.pop(0)
+        SerialFalsa.abertas.append(self)
+        if plano == "falha":
+            raise ErroSerialFalso("a porta ainda não voltou")
+        self.linhas = list(plano)
+
+    def readline(self):
+        if not self.linhas:
+            SerialFalsa.parar.set()
+            return b""
+        item = self.linhas.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    def close(self):
+        pass
+
+
+class ErroSerialFalso(Exception):
+    pass
+
+
+class TestLeituraSerial(unittest.TestCase):
+    def ler(self, planos, leitor, reiniciar=False):
+        SerialFalsa.planos, SerialFalsa.abertas = list(planos), []
+        SerialFalsa.parar = threading.Event()
+        falso = types.SimpleNamespace(Serial=SerialFalsa, SerialException=ErroSerialFalso)
+        with mock.patch.dict(sys.modules, {"serial": falso}), \
+                mock.patch.object(demo, "REABRIR_S", 0.0, create=True), \
+                contextlib.redirect_stderr(io.StringIO()):
+            demo.ler_serial("COM9", 921600, leitor, None, SerialFalsa.parar, reiniciar)
+
+    def test_a_porta_cai_e_volta_sem_reiniciar_a_placa(self):
+        # O que aconteceu na bancada: GetOverlappedResult failed (Acesso negado) no meio da leitura.
+        estado = demo.Estado(janela_s=10.0)
+        planos = [[b"CSV:t_ms,ax,ay,az,gx,gy,gz\n", b"CSV:0,0,0,4096,0,0,0\n", b"CSV:5,0,0,4096,0,0,0\n",
+                   ErroSerialFalso("GetOverlappedResult failed (Acesso negado)")],
+                  "falha",
+                  [b"CSV:10,0,0,4096,0,0,0\n", b"CSV:15,0,0,4096,0,0,0\n"]]
+        self.ler(planos, demo.Leitor(estado), reiniciar=True)
+        self.assertEqual(len(estado.sinal), 4)
+        self.assertEqual(len(SerialFalsa.abertas), 3)
+        self.assertTrue(SerialFalsa.abertas[0].rts_ligado)                 # o reset só na primeira abertura
+        self.assertFalse(any(s.rts_ligado for s in SerialFalsa.abertas[1:]))
+        self.assertFalse(estado.serial_perdida)
+
+    def test_porta_ocupada_no_inicio_espera_ficar_livre(self):
+        # A COM está com o idf.py monitor: a janela mostra a perda e conecta quando a porta for solta.
+        estado = demo.Estado(janela_s=10.0)
+        planos = ["falha", "falha", [b"CSV:t_ms,ax,ay,az,gx,gy,gz\n", b"CSV:0,0,0,4096,0,0,0\n"]]
+        self.ler(planos, demo.Leitor(estado), reiniciar=True)
+        self.assertEqual(len(estado.sinal), 1)
+        self.assertEqual(len(SerialFalsa.abertas), 3)
+        self.assertTrue(SerialFalsa.abertas[2].rts_ligado)     # o reset vai na abertura que deu certo
+        self.assertFalse(estado.serial_perdida)
+
+    def test_uma_linha_que_da_erro_nao_para_a_leitura(self):
+        class LeitorFragil(demo.Leitor):
+            def linha(self, texto):
+                if texto.startswith("BOOM"):
+                    raise RuntimeError("linha inesperada")
+                super().linha(texto)
+
+        estado = demo.Estado(janela_s=10.0)
+        planos = [[b"CSV:t_ms,ax,ay,az,gx,gy,gz\n", b"CSV:0,0,0,4096,0,0,0\n", b"BOOM\n",
+                   b"CSV:5,0,0,4096,0,0,0\n"]]
+        self.ler(planos, LeitorFragil(estado))
+        self.assertEqual(len(estado.sinal), 2)
 
 
 if __name__ == "__main__":
