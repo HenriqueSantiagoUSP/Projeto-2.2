@@ -103,8 +103,9 @@ esp_err_t mpu6050_init(mpu6050_t *mpu, i2c_master_bus_handle_t bus, uint8_t addr
     return err;
 }
 
-esp_err_t mpu6050_fifo_read(mpu6050_t *mpu, mpu6050_sample_t *out, size_t max, size_t *count){
+esp_err_t mpu6050_fifo_read(mpu6050_t *mpu, mpu6050_sample_t *out, size_t max, size_t *count, bool *overflow){
     *count = 0;
+    *overflow = false;
 
     uint8_t status;
     esp_err_t err = read_regs(mpu, REG_INT_STATUS, &status, 1);
@@ -117,8 +118,10 @@ esp_err_t mpu6050_fifo_read(mpu6050_t *mpu, mpu6050_sample_t *out, size_t max, s
 
     /* Once it overflows, the FIFO no longer starts on a sample boundary: start over. */
     if ((status & INT_FIFO_OFLOW) || bytes >= FIFO_SIZE - SAMPLE_BYTES + 1) {
-        fifo_reset(mpu);
-        return ESP_ERR_INVALID_STATE;
+        err = fifo_reset(mpu);
+        if (err != ESP_OK) return err;   /* could not even reset it: a bus problem, not an overflow */
+        *overflow = true;
+        return ESP_OK;
     }
 
     size_t available = bytes / SAMPLE_BYTES;
@@ -133,7 +136,15 @@ esp_err_t mpu6050_fifo_read(mpu6050_t *mpu, mpu6050_sample_t *out, size_t max, s
             n = BURST_SAMPLES;
         }
         err = read_regs(mpu, REG_FIFO_R_W, burst, n * SAMPLE_BYTES);
-        if (err != ESP_OK) return err;
+        if (err != ESP_OK) {
+            /*
+             * The sensor may have sent part of the burst, moving its FIFO pointer: the next read
+             * would start in the middle of a sample. Start the FIFO over (if the bus lets us).
+             */
+            fifo_reset(mpu);
+            *count = 0;
+            return err;
+        }
 
         for (size_t i = 0; i < n; i++) {
             const uint8_t *p = &burst[i * SAMPLE_BYTES];

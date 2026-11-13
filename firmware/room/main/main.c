@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,7 +57,6 @@ typedef enum {
     HUB_EV_SENSOR,
     HUB_EV_ESPNOW,
     HUB_EV_CONFIG,
-    HUB_EV_MQTT_UP,
     HUB_EV_NET,
 } hub_event_kind_t;
 
@@ -98,6 +98,7 @@ static size_t s_door_count = 0;
 static hub_state_t s_state;
 static wearable_cache_t s_wearables[RULES_MAX_WEARABLES];
 static bool s_reported_time_valid = false;
+static atomic_bool s_mqtt_up_pending = false;   /* set by the MQTT task, taken by hub_task */
 
 /* ---------------------------------------------------------------------------
  * Time
@@ -192,7 +193,21 @@ static void publish_alert(const rules_alert_t *alert){
     switch (alert->type) {
         case ALERT_FALL:
             if (alert->state == ALERT_ACTIVE) {
-                snprintf(detail, sizeof(detail), "\"a2\":%.2f,\"prob\":%.2f", alert->a2, alert->prob);
+                /*
+                 * The values come over the air. A NaN or Inf would print as "nan"/"inf", which is not
+                 * JSON: the central would drop the whole alert. A fall is still a fall: leave the bad
+                 * field out instead.
+                 */
+                bool a2_ok = isfinite(alert->a2) && alert->a2 >= 0.0f;
+                bool prob_ok = isfinite(alert->prob) && alert->prob >= 0.0f && alert->prob <= 1.0f;
+                int used = 0;
+                if (a2_ok) {
+                    used = snprintf(detail, sizeof(detail), "\"a2\":%.2f", alert->a2);
+                }
+                if (prob_ok && used >= 0 && (size_t) used < sizeof(detail)) {
+                    snprintf(detail + used, sizeof(detail) - (size_t) used, "%s\"prob\":%.2f", a2_ok ? "," : "",
+                             alert->prob);
+                }
             }
             break;
         case ALERT_NIGHT_EXIT:
@@ -357,7 +372,11 @@ static void handle_espnow(const espnow_rx_msg_t *msg, const rules_clock_t *now){
         case ESPNOW_MSG_FALL:
             ESP_LOGW(TAG, "FALL from %s, a2 = %.2f g2, P = %u %%", msg->wearable, msg->fall.a2_peak,
                      msg->fall.prob_pct);
-            rules_on_fall(&s_rules, msg->wearable, msg->seq, msg->fall.a2_peak, msg->fall.prob_pct / 100.0f, now);
+            if (!isfinite(msg->fall.a2_peak) || msg->fall.a2_peak < 0.0f || msg->fall.prob_pct > 100) {
+                ESP_LOGW(TAG, "FALL from %s with values out of range: the alert goes without them", msg->wearable);
+            }
+            rules_on_fall(&s_rules, msg->wearable, msg->seq, msg->uptime_ms, msg->fall.a2_peak,
+                          msg->fall.prob_pct / 100.0f, now);
             break;
         case ESPNOW_MSG_FALL_CANCEL:
             ESP_LOGI(TAG, "FALL_CANCEL from %s for seq %u", msg->wearable, msg->fall_cancel.fall_seq);
@@ -446,13 +465,15 @@ static void hub_task(void *arg){
                 case HUB_EV_SENSOR:  handle_reading(&ev.reading, &now);           break;
                 case HUB_EV_ESPNOW:  handle_espnow(&ev.espnow, &now);             break;
                 case HUB_EV_CONFIG:  handle_config(ev.config.json, ev.config.len); break;
-                case HUB_EV_MQTT_UP: handle_mqtt_up();                            break;
                 case HUB_EV_NET:
                     ESP_LOGI(TAG, "network %s", ev.net_up ? "up" : "down");
                     break;
             }
         }
 
+        if (atomic_exchange(&s_mqtt_up_pending, false)) {
+            handle_mqtt_up();
+        }
         hub_clock(&now);
         rules_tick(&s_rules, &now);
         if (now.time_valid != s_reported_time_valid) {
@@ -489,10 +510,14 @@ static void on_espnow(const espnow_rx_msg_t *msg, void *ctx){
     post(&ev);
 }
 
+/*
+ * Runs in the MQTT task. A flag, not a queued event: with the queue full the event was lost,
+ * and the retained "offline" from the Last Will stayed on the broker. hub_task sees the flag
+ * on its next pass (at most HUB_TICK_MS later).
+ */
 static void on_mqtt_connected(void *ctx){
     (void) ctx;
-    hub_event_t ev = { .kind = HUB_EV_MQTT_UP };
-    post(&ev);
+    atomic_store(&s_mqtt_up_pending, true);
 }
 
 static void on_mqtt_config(const char *json, size_t len, void *ctx){
@@ -670,7 +695,11 @@ void app_main(void){
         .on_change = on_net,
     };
     ESP_ERROR_CHECK(net_init(&net_config));
-    ESP_ERROR_CHECK(espnow_link_init(on_espnow, NULL));
+    err = espnow_link_init(on_espnow, NULL);
+    if (err != ESP_OK) {
+        /* Doors, presence and temperature carry on; the wearable it expects will be reported offline. */
+        ESP_LOGE(TAG, "ESP-NOW off (%s): the wearable is not heard", esp_err_to_name(err));
+    }
     char wearable[ESPNOW_WEARABLE_ID_LEN];
     if (espnow_link_paired_wearable(wearable)) {
         /* Expected from boot: a wearable that never shows up is reported offline. */
@@ -685,7 +714,11 @@ void app_main(void){
         .on_connected = on_mqtt_connected,
         .on_message = on_mqtt_config,
     };
-    ESP_ERROR_CHECK(mqtt_link_start(&mqtt_config));
+    err = mqtt_link_start(&mqtt_config);
+    if (err != ESP_OK) {
+        /* mqtt_link said why; the rules, the LED and CAN still work without the central. */
+        ESP_LOGE(TAG, "MQTT off: %s", esp_err_to_name(err));
+    }
 
     /* Core 0, with the radio and the protocols it feeds: core 1 stays with the inputs. */
     ESP_ERROR_CHECK(esp_err_from_pdpass(xTaskCreatePinnedToCore(hub_task, "hub_task", STACK_LARGE, NULL,

@@ -2,5 +2,5 @@
 idf_component_register(
     SRCS "mqtt_link.c"
     INCLUDE_DIRS "include"
-    PRIV_REQUIRES "protocol" "sys_events" "net" "esp_event" "esp_netif"
+    PRIV_REQUIRES "protocol" "sys_events" "net" "esp_event" "esp_netif" "esp_timer"
 )

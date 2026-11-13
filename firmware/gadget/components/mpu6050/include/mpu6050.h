@@ -9,6 +9,7 @@
  * before that.
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -42,7 +43,11 @@ typedef struct {
 esp_err_t mpu6050_init(mpu6050_t *mpu, i2c_master_bus_handle_t bus, uint8_t addr);
 
 /*
- * Reads up to max complete samples from the FIFO into out. On overflow the FIFO
- * is reset, *count is 0 and ESP_ERR_INVALID_STATE tells the caller samples were lost.
+ * Reads up to max complete samples from the FIFO into out.
+ * - On overflow the FIFO is reset, *count is 0, *overflow is true and the call returns ESP_OK:
+ *   samples were lost, the bus is fine. (Not an error code: the I2C driver returns
+ *   ESP_ERR_INVALID_STATE itself when the bus is stuck, and the two must not be confused.)
+ * - Any error is a bus problem. If a burst read fails half way, the FIFO is reset too,
+ *   so the next read starts on a sample boundary; samples were lost either way.
  */
-esp_err_t mpu6050_fifo_read(mpu6050_t *mpu, mpu6050_sample_t *out, size_t max, size_t *count);
+esp_err_t mpu6050_fifo_read(mpu6050_t *mpu, mpu6050_sample_t *out, size_t max, size_t *count, bool *overflow);

@@ -264,7 +264,7 @@ Estrutura empacotada (`packed`), little endian. Cabeçalho de 8 bytes em toda me
 |---|---|---|
 | `version` | `uint8` | versão do formato, começa em `1`; o hub descarta versão desconhecida |
 | `type` | `uint8` | tipo da mensagem (tabela abaixo) |
-| `seq` | `uint16` | contador do vestível, +1 a cada mensagem nova; um reenvio repete o `seq` |
+| `seq` | `uint16` | contador do vestível, +1 a cada mensagem nova; um reenvio repete o `seq`. Começa num valor aleatório a cada reinício que não seja despertar do sono profundo, para o `id` da queda (`<vestível>-<seq>`) não repetir o de uma queda anterior |
 | `uptime_ms` | `uint32` | uptime do vestível |
 
 | `type` | Valor | Payload após o cabeçalho | Quando |
@@ -287,10 +287,18 @@ diferente do esperado para o tipo.
 - `FALL` e `FALL_CANCEL`: até 10 tentativas, 50 ms entre elas, mesmo `seq`. Se todas falharem, o vestível
   refaz a varredura de canal e tenta de novo. Se ainda assim falhar e o MQTT do vestível estiver ligado, ele
   publica o alerta direto no broker (§1, *Vestível com MQTT*).
+- Se nem assim a mensagem chegar a lugar nenhum, o vestível guarda o quadro e o reenvia **igual** (mesmo
+  `seq` e mesmo `uptime_ms`, então o hub vê uma só queda): 2 s depois, com a espera dobrando até 30 s, e na
+  hora em que um heartbeat volta a ser entregue. Repete até entregar (pelo hub ou pelo MQTT). Uma queda nova
+  substitui a anterior na espera; um `FALL_CANCEL` tira a queda da espera e é enviado mesmo assim, porque o
+  quadro pode ter chegado ao hub com o ACK perdido.
 - `HEARTBEAT` e `PING`: sem reenvio.
 - Duplicatas: o hub guarda o último (`seq`, `uptime_ms`) de cada vestível e descarta a mensagem que repete os
   dois. Um reenvio repete o quadro inteiro, uptime incluído; comparar o uptime evita confundir com reenvio a
   primeira mensagem de um vestível que reiniciou e recomeçou o `seq`.
+- As regras do hub fazem a mesma comparação para a queda: uma `FALL` com o `seq` **e** o `uptime_ms` da queda
+  aberta é a mesma queda (um reenvio que chegou depois de outra mensagem). Com outro `uptime_ms`, é uma queda
+  nova de um vestível que reiniciou, e vira outro alerta.
 - Valores de tentativas e intervalos são iniciais; ajustar nos testes.
 
 ### Varredura de canal

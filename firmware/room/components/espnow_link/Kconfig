@@ -5,8 +5,9 @@ menu "Room hub: ESP-NOW"
         default ""
         help
             "aa:bb:cc:dd:ee:ff". The hub expects it from boot, so silence counts as
-            offline, and registers it as an encrypted peer. Empty: accept any wearable,
-            unencrypted (bench only).
+            offline, registers it as an encrypted peer and ignores frames from any
+            other sender. Empty: accept any wearable, unencrypted (bench only). A
+            value of the wrong length fails the build.
 
     config HUB_ESPNOW_ENCRYPT
         bool "Encrypt ESP-NOW (PMK + LMK)"
@@ -17,9 +18,13 @@ menu "Room hub: ESP-NOW"
     config HUB_ESPNOW_PMK
         string "Primary master key (16 characters)"
         default "pmk-change-me-16"
+        help
+            Exactly 16 characters, the same on the wearable; another length fails the build.
 
     config HUB_ESPNOW_LMK
         string "Local master key of the wearable (16 characters)"
         default "lmk-change-me-16"
+        help
+            Exactly 16 characters, the same on the wearable; another length fails the build.
 
 endmenu

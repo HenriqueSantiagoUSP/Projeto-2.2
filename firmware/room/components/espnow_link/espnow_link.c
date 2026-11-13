@@ -44,9 +44,27 @@ static void wearable_id(const uint8_t *mac, char id[ESPNOW_WEARABLE_ID_LEN]){
     snprintf(id, ESPNOW_WEARABLE_ID_LEN, "%02x%02x%02x", mac[3], mac[4], mac[5]);
 }
 
+/*
+ * A wrong length here is a key the two boards would read differently (past the end of the
+ * string), or a MAC that pairs with nobody: refuse to build rather than fail silently on air.
+ */
+#ifdef CONFIG_HUB_ESPNOW_ENCRYPT
+_Static_assert(sizeof(CONFIG_HUB_ESPNOW_PMK) - 1 == ESP_NOW_KEY_LEN,
+               "menuconfig > Room hub: ESP-NOW > the PMK must have exactly 16 characters");
+_Static_assert(sizeof(CONFIG_HUB_ESPNOW_LMK) - 1 == ESP_NOW_KEY_LEN,
+               "menuconfig > Room hub: ESP-NOW > the LMK must have exactly 16 characters");
+#endif
+_Static_assert(sizeof(CONFIG_HUB_WEARABLE_MAC) == 1 || sizeof(CONFIG_HUB_WEARABLE_MAC) == 18,
+               "menuconfig > Room hub: ESP-NOW > the wearable MAC must be empty or aa:bb:cc:dd:ee:ff");
+
+/* Exactly "aa:bb:cc:dd:ee:ff": two hex digits per byte and nothing after. */
 static bool parse_mac(const char *text, uint8_t mac[ESP_NOW_ETH_ALEN]){
     unsigned b[ESP_NOW_ETH_ALEN];
-    if (sscanf(text, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != ESP_NOW_ETH_ALEN) {
+    int used = 0;
+    if (text == NULL ||
+        sscanf(text, "%2x:%2x:%2x:%2x:%2x:%2x%n", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5], &used)
+            != ESP_NOW_ETH_ALEN ||
+        used != 17 || text[used] != '\0') {
         return false;
     }
     for (int i = 0; i < ESP_NOW_ETH_ALEN; i++) {
@@ -54,6 +72,10 @@ static bool parse_mac(const char *text, uint8_t mac[ESP_NOW_ETH_ALEN]){
     }
     return true;
 }
+
+/* The paired wearable: with one configured, frames from anyone else are dropped. */
+static bool s_paired = false;
+static uint8_t s_paired_mac[ESP_NOW_ETH_ALEN];
 
 /* Runs in the Wi-Fi task: copy and get out. */
 static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int len){
@@ -122,6 +144,16 @@ static void espnow_task(void *arg){
                      MAC2STR(frame.mac), frame.len);
             continue;
         }
+        if (s_paired && memcmp(frame.mac, s_paired_mac, ESP_NOW_ETH_ALEN) != 0) {
+            /* Not our wearable: it could raise a false fall or fill the tables. Said once. */
+            static bool warned = false;
+            if (!warned) {
+                warned = true;
+                ESP_LOGW(TAG, "frames from " MACSTR " ignored: only the paired wearable is accepted",
+                         MAC2STR(frame.mac));
+            }
+            continue;
+        }
         const espnow_header_t *hdr = (const espnow_header_t *) frame.data;
         if (is_duplicate(&frame, hdr)) {
             continue;
@@ -130,6 +162,7 @@ static void espnow_task(void *arg){
         espnow_rx_msg_t msg = {
             .type = hdr->type,
             .seq = hdr->seq,
+            .uptime_ms = hdr->uptime_ms,
             .rssi = frame.rssi,
         };
         wearable_id(frame.mac, msg.wearable);
@@ -187,6 +220,13 @@ esp_err_t espnow_link_init(espnow_rx_cb_t cb, void *ctx){
 
     uint8_t mac[ESP_NOW_ETH_ALEN];
     bool paired = parse_mac(CONFIG_HUB_WEARABLE_MAC, mac);
+    if (!paired && CONFIG_HUB_WEARABLE_MAC[0] != '\0') {
+        /* Configured but unreadable: say it loudly, the wearable will not be heard as expected. */
+        ESP_LOGE(TAG, "wearable MAC \"%s\" is not aa:bb:cc:dd:ee:ff (menuconfig > Room hub: ESP-NOW): no "
+                 "wearable paired", CONFIG_HUB_WEARABLE_MAC);
+    }
+    s_paired = paired;
+    memcpy(s_paired_mac, mac, ESP_NOW_ETH_ALEN);
 
 #ifdef CONFIG_HUB_ESPNOW_ENCRYPT
     if (paired) {
