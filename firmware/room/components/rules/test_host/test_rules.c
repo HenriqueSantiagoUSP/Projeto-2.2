@@ -317,14 +317,14 @@ static void test_temperature_brief_spike_ignored(void){
 static void test_fall_and_cancel(void){
     rules_t r;
     setup(&r, 3, 0);
-    rules_on_fall(&r, "a1b2c3", 42, 7.88f, 0.97f, &s_clock);
+    rules_on_fall(&r, "a1b2c3", 42, 120000, 7.88f, 0.97f, &s_clock);
     CHECK(count(ALERT_FALL, ALERT_ACTIVE) == 1);
     CHECK(strcmp(last()->id, "a1b2c3-42") == 0);
     CHECK(strcmp(last()->origin, "vestivel/a1b2c3") == 0);
     CHECK(last()->a2 == 7.88f);
     CHECK(last()->prob == 0.97f);
 
-    rules_on_fall(&r, "a1b2c3", 42, 7.88f, 0.97f, &s_clock);   /* duplicate */
+    rules_on_fall(&r, "a1b2c3", 42, 120000, 7.88f, 0.97f, &s_clock);   /* a resend: same seq, same uptime */
     CHECK(count(ALERT_FALL, ALERT_ACTIVE) == 1);
 
     rules_on_fall_cancel(&r, "a1b2c3", 41, &s_clock);   /* wrong seq */
@@ -334,6 +334,17 @@ static void test_fall_and_cancel(void){
     CHECK(strcmp(last()->id, "a1b2c3-42") == 0);
     rules_on_fall_cancel(&r, "a1b2c3", 42, &s_clock);   /* late duplicate */
     CHECK(count(ALERT_FALL, ALERT_CANCELLED) == 1);
+}
+
+static void test_new_fall_after_the_wearable_restarts(void){
+    rules_t r;
+    setup(&r, 3, 0);
+    rules_on_fall(&r, "a1b2c3", 3, 95000, 7.88f, 0.97f, &s_clock);
+    CHECK(count(ALERT_FALL, ALERT_ACTIVE) == 1);
+    /* Nobody pressed "I'm fine"; the wearable restarts and falls again with the same seq. */
+    rules_on_fall(&r, "a1b2c3", 3, 4200, 6.10f, 0.91f, &s_clock);
+    CHECK(count(ALERT_FALL, ALERT_ACTIVE) == 2);
+    CHECK(last()->a2 == 6.10f);
 }
 
 static void test_wearable_offline_and_back(void){
@@ -394,6 +405,7 @@ int main(void){
         { "temperature persistence/hysteresis",    test_temperature_persistence_and_hysteresis },
         { "temperature brief spike ignored",       test_temperature_brief_spike_ignored },
         { "fall and cancel",                       test_fall_and_cancel },
+        { "new fall after the wearable restarts",  test_new_fall_after_the_wearable_restarts },
         { "wearable offline and back",             test_wearable_offline_and_back },
         { "low battery hysteresis",                test_low_battery_hysteresis },
         { "episode ids without clock",             test_episode_ids_without_clock },

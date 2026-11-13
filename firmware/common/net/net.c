@@ -15,6 +15,7 @@ static const char *TAG = "net";
 
 #define NET_BACKOFF_MIN_MS   1000
 #define NET_BACKOFF_MAX_MS   60000
+#define NET_RETRY_AFTER_ERROR_MS 5000   /* connect() itself refused: no event will come, try again */
 
 /* Set once by net_init(), then only read. */
 static net_event_cb_t s_cb = NULL;
@@ -30,9 +31,26 @@ static bool ssid_configured(void){
     return CONFIG_APP_WIFI_SSID[0] != '\0';
 }
 
+/*
+ * A refused connect() (the driver busy with a scan, say) raises no DISCONNECTED event, and the
+ * retries hang on that event: without this the board would stay off the network until it
+ * restarts. Retry on a timer instead; already connected, there is nothing to do.
+ */
+static void connect_or_retry(void){
+    if (sys_events_all(SYS_EV_NET_CONNECTED)) {
+        return;
+    }
+    esp_err_t err = esp_wifi_connect();
+    if (err != ESP_OK) {
+        ESP_LOGD(TAG, "connect refused (%s), trying again in %d s", esp_err_to_name(err), NET_RETRY_AFTER_ERROR_MS / 1000);
+        esp_timer_start_once(s_reconnect_timer, (uint64_t) NET_RETRY_AFTER_ERROR_MS * 1000);
+    }
+}
+
+/* Runs in the esp_timer task. */
 static void reconnect_cb(void *arg){
     (void) arg;
-    esp_wifi_connect();
+    connect_or_retry();
 }
 
 /* Runs in the SNTP task. */
@@ -67,7 +85,7 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data){
 
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         if (s_joins_ap) {
-            esp_wifi_connect();
+            connect_or_retry();
         }
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         if (!s_joins_ap) {

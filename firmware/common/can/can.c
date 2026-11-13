@@ -34,8 +34,9 @@ static const char *TAG = "can";
  * recovery attempt. Only can_tx touches it.
  */
 typedef struct {
-    bool     no_bus;              /* bus-off reported: quiet until the node is back */
+    bool     no_bus;              /* bus-off reported: quiet until a frame really goes out again */
     bool     no_ack;              /* error passive, nobody acknowledges: reported once */
+    bool     confirming;          /* recovered from bus-off, waiting for a frame to prove the bus */
     uint32_t recover_delay_ms;
 } can_link_t;
 
@@ -92,6 +93,10 @@ static bool IRAM_ATTR on_rx_done(twai_node_handle_t handle, const twai_rx_done_e
     };
 
     if (twai_node_receive_from_isr(handle, &rx_frame) != ESP_OK) {
+        return false;
+    }
+    /* A remote request carries a DLC but no data: the buffer was never written. Nobody here asks for one. */
+    if (rx_frame.header.rtr) {
         return false;
     }
 
@@ -217,6 +222,7 @@ static int64_t handle_state_change(int64_t recover_at_us, can_link_t *link){
         case TWAI_ERROR_BUS_OFF: {
             sys_events_clear(SYS_EV_CAN_RUNNING);
             sys_events_set(SYS_EV_CAN_BUS_OFF);
+            link->confirming = false;
             if (!link->no_bus) {
                 ESP_LOGW(TAG, "CAN bus not connected (no transceiver, cable or other node?): carrying on "
                          "without CAN, retrying every %d s at most", CAN_RECOVER_MAX_MS / 1000);
@@ -232,14 +238,22 @@ static int64_t handle_state_change(int64_t recover_at_us, can_link_t *link){
         }
 
         case TWAI_ERROR_ACTIVE:
-            if (link->no_bus || link->no_ack) {
-                ESP_LOGI(TAG, "CAN bus connected again");
-            }
-            link->no_bus = false;
-            link->no_ack = false;
-            link->recover_delay_ms = CAN_RECOVER_MIN_MS;
             sys_events_clear(SYS_EV_CAN_BUS_OFF);
             sys_events_set(SYS_EV_CAN_RUNNING);
+            if (link->no_bus) {
+                /*
+                 * A recovery always ends here, bus or no bus: without a transceiver the next frame
+                 * goes bus-off again. Stay quiet, keep the growing pause, and let can_tx_task call
+                 * it connected once a frame really goes out (confirm_bus).
+                 */
+                link->confirming = true;
+                return 0;
+            }
+            if (link->no_ack) {
+                ESP_LOGI(TAG, "CAN bus connected again");
+            }
+            link->no_ack = false;
+            link->recover_delay_ms = CAN_RECOVER_MIN_MS;
             return 0;
 
         case TWAI_ERROR_PASSIVE:
@@ -255,6 +269,27 @@ static int64_t handle_state_change(int64_t recover_at_us, can_link_t *link){
             ESP_LOGD(TAG, "%s (TEC %u, REC %u)", state_name(status.state), status.tx_error_count,
                      status.rx_error_count);
             return recover_at_us;
+    }
+}
+
+/*
+ * After a bus-off recovery: once the frames just sent are done, the node still error active
+ * with no transmit errors means they went out and the bus is really back.
+ */
+static void confirm_bus(can_link_t *link){
+    if (twai_node_transmit_wait_all_done(s_node, CAN_TX_DONE_MS) != ESP_OK) {
+        return;
+    }
+    twai_node_status_t status;
+    if (twai_node_get_info(s_node, &status, NULL) != ESP_OK) {
+        return;
+    }
+    if (status.state == TWAI_ERROR_ACTIVE && status.tx_error_count == 0) {
+        ESP_LOGI(TAG, "CAN bus connected again");
+        link->no_bus = false;
+        link->no_ack = false;
+        link->confirming = false;
+        link->recover_delay_ms = CAN_RECOVER_MIN_MS;
     }
 }
 
@@ -311,10 +346,16 @@ static void can_tx_task(void *arg){
         }
 
         can_tx_item_t item;
+        bool sent = false;
         while (xQueueReceive(s_tx_queue, &item, 0) == pdTRUE) {
-            if (!send_one(&item)) {
+            if (send_one(&item)) {
+                sent = true;
+            } else {
                 dropped++;
             }
+        }
+        if (sent && link.confirming) {
+            confirm_bus(&link);
         }
 
         /* Drops without a known reason are worth a line; with the bus missing they are expected. */

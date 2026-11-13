@@ -358,14 +358,14 @@ void rules_on_battery(rules_t *rules, const char *wearable, uint16_t battery_mv,
     }
 }
 
-void rules_on_fall(rules_t *rules, const char *wearable, uint16_t seq, float a2, float prob,
+void rules_on_fall(rules_t *rules, const char *wearable, uint16_t seq, uint32_t uptime_ms, float a2, float prob,
                    const rules_clock_t *now){
     rules_wearable_t *w = wearable_find(rules, wearable, true, now);
     if (w == NULL) {
         return;
     }
-    if (w->fall_open && w->fall_seq == seq) {
-        return;   /* the same FALL again */
+    if (w->fall_open && w->fall_seq == seq && w->fall_uptime_ms == uptime_ms) {
+        return;   /* the same FALL again (a resend that reached us after another message) */
     }
 
     /*
@@ -374,6 +374,7 @@ void rules_on_fall(rules_t *rules, const char *wearable, uint16_t seq, float a2,
      */
     w->fall_open = true;
     w->fall_seq = seq;
+    w->fall_uptime_ms = uptime_ms;
 
     rules_alert_t alert;
     wearable_alert(w, ALERT_FALL, &alert);

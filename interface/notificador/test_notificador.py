@@ -3,10 +3,15 @@
     python -m unittest discover -s interface/notificador
 """
 
+import http.client
 import json
+import types
 import unittest
+import urllib.error
+from unittest import mock
 
-from notificador import Deduplicador, formatar, interpretar
+import notificador
+from notificador import Deduplicador, formatar, interpretar, processar
 
 
 def alerta_json(**campos):
@@ -91,6 +96,74 @@ class TestDeduplicador(unittest.TestCase):
         cancelado = interpretar("idoso/butanta/quarto101/alerta", alerta_json(estado="cancelado"))
         self.assertTrue(d.novo(ativo))
         self.assertTrue(d.novo(cancelado))
+
+
+class TestAlertaEsquisito(unittest.TestCase):
+    """JSON válido com tipos inesperados: o alerta chega ao cuidador mesmo assim, nada derruba o processo."""
+
+    def test_detalhe_com_tipos_inesperados(self):
+        casos = [alerta_json(tipo="temperatura", detalhe={"valor": 29, "limite": None}),
+                 alerta_json(detalhe={"a2": "7.9", "prob": "alta"}),
+                 alerta_json(ts=10 ** 20),
+                 alerta_json(ts=-10 ** 20),
+                 alerta_json(detalhe=[1, 2, 3])]
+        for payload in casos:
+            texto = formatar(interpretar("idoso/butanta/quarto101/alerta", payload), recebido_em=1792497600)
+            self.assertIn("Quarto quarto101 (butanta)", texto)
+
+    def test_temperatura_sem_limite(self):
+        a = interpretar("idoso/butanta/quarto101/alerta",
+                        alerta_json(tipo="temperatura", detalhe={"valor": 29, "limite": None}))
+        self.assertIn("29.0 °C", formatar(a))
+
+    def test_processar_nunca_levanta(self):
+        d = Deduplicador()
+        self.assertIsNone(processar("idoso/butanta/quarto101/alerta", b"\xff\xfe", d, -3))
+        texto = processar("idoso/butanta/quarto101/alerta", alerta_json(ts="ontem"), d, -3)
+        self.assertIn("Queda detectada", texto)
+        self.assertIsNone(processar("idoso/butanta/quarto101/alerta", alerta_json(ts="ontem"), d, -3))  # repetido
+
+
+class TestEnvio(unittest.TestCase):
+    def test_erro_http_inesperado_nao_derruba_o_envio(self):
+        def urlopen(*_a, **_k):
+            raise http.client.IncompleteRead(b"")
+        with mock.patch.object(notificador.urllib.request, "urlopen", urlopen):
+            self.assertEqual(notificador.enviar_telegram("t", "c", "oi", tentativas=1, espera_s=0),
+                             notificador.TENTAR_DE_NOVO)
+
+    def test_mensagem_recusada_nao_trava_a_fila(self):
+        def urlopen(*_a, **_k):
+            raise urllib.error.HTTPError("u", 400, "Bad Request", {}, None)
+        with mock.patch.object(notificador.urllib.request, "urlopen", urlopen):
+            self.assertEqual(notificador.enviar_telegram("t", "c", "oi", tentativas=1, espera_s=0),
+                             notificador.RECUSADA)
+
+    def test_alerta_espera_a_internet_voltar(self):
+        respostas = [http.client.IncompleteRead(b""), notificador.TENTAR_DE_NOVO, notificador.ENVIADA]
+        esperas = []
+
+        def enviar(*_a, **_k):
+            r = respostas.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+        self.assertTrue(notificador.entregar("oi", "t", "c", enviar=enviar, dormir=esperas.append))
+        self.assertEqual(respostas, [])
+        self.assertEqual(len(esperas), 2)
+        self.assertLess(esperas[0], esperas[1])
+
+    def test_sessao_persistente(self):
+        criados = []
+
+        class ClienteFalso:
+            def __init__(self, *args, **kwargs):
+                criados.append(kwargs)
+
+        falso = types.SimpleNamespace(Client=ClienteFalso, CallbackAPIVersion=types.SimpleNamespace(VERSION2=2))
+        notificador.novo_cliente(falso)
+        self.assertEqual(criados[0]["client_id"], "notificador")
+        self.assertFalse(criados[0]["clean_session"])
 
 
 if __name__ == "__main__":

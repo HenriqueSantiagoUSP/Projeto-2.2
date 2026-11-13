@@ -10,6 +10,8 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_now.h"
+#include "esp_random.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 
@@ -31,17 +33,38 @@ static bool s_hub_missing = false;
 static RTC_DATA_ATTR uint16_t s_seq;
 static RTC_DATA_ATTR uint8_t s_channel;
 
+/*
+ * Sends whose completion never came in time. Callbacks arrive in send order, so the late
+ * completion of a timed-out send shows up before the next send's own: skip that many, or a
+ * late SUCCESS would be taken as the ACK of a FALL the hub never got.
+ */
+static portMUX_TYPE s_stale_lock = portMUX_INITIALIZER_UNLOCKED;
+static int s_stale_completions = 0;
+
 /* Runs in the Wi-Fi task: the status is written before the give, read after the take. */
 static void on_sent(const esp_now_send_info_t *info, esp_now_send_status_t status){
     (void) info;
+    taskENTER_CRITICAL(&s_stale_lock);
+    bool stale = s_stale_completions > 0;
+    if (stale) {
+        s_stale_completions--;
+    }
+    taskEXIT_CRITICAL(&s_stale_lock);
+    if (stale) {
+        return;
+    }
     s_last_status = status;
     xSemaphoreGive(s_sent);
 }
 
+/* Exactly "aa:bb:cc:dd:ee:ff": two hex digits per byte and nothing after. */
 static bool parse_mac(const char *text, uint8_t mac[ESP_NOW_ETH_ALEN]){
     unsigned b[ESP_NOW_ETH_ALEN];
+    int used = 0;
     if (text == NULL ||
-        sscanf(text, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != ESP_NOW_ETH_ALEN) {
+        sscanf(text, "%2x:%2x:%2x:%2x:%2x:%2x%n", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5], &used)
+            != ESP_NOW_ETH_ALEN ||
+        used != 17 || text[used] != '\0') {
         return false;
     }
     for (int i = 0; i < ESP_NOW_ETH_ALEN; i++) {
@@ -50,13 +73,34 @@ static bool parse_mac(const char *text, uint8_t mac[ESP_NOW_ETH_ALEN]){
     return true;
 }
 
+static int stale_pending(void){
+    taskENTER_CRITICAL(&s_stale_lock);
+    int n = s_stale_completions;
+    taskEXIT_CRITICAL(&s_stale_lock);
+    return n;
+}
+
 static esp_err_t send_once(const void *msg, size_t len){
+    /*
+     * Give a late completion one more ACK time to arrive and be dropped. If it never comes, forget
+     * it: otherwise it would eat this send's real completion, and every send after it would fail.
+     */
+    for (int i = 0; i < 10 && stale_pending() > 0; i++) {
+        vTaskDelay(pdMS_TO_TICKS(ESPNOW_ACK_TIMEOUT_MS / 10));
+    }
+    taskENTER_CRITICAL(&s_stale_lock);
+    s_stale_completions = 0;
+    taskEXIT_CRITICAL(&s_stale_lock);
     xSemaphoreTake(s_sent, 0);   /* drop a completion left over from a timed out send */
     esp_err_t err = esp_now_send(s_hub, msg, len);
     if (err != ESP_OK) {
         return err;
     }
     if (xSemaphoreTake(s_sent, pdMS_TO_TICKS(ESPNOW_ACK_TIMEOUT_MS)) != pdTRUE) {
+        /* Its completion may still come: on_sent drops it instead of crediting the next send. */
+        taskENTER_CRITICAL(&s_stale_lock);
+        s_stale_completions++;
+        taskEXIT_CRITICAL(&s_stale_lock);
         return ESP_ERR_TIMEOUT;
     }
     return s_last_status == ESP_NOW_SEND_SUCCESS ? ESP_OK : ESP_FAIL;
@@ -164,10 +208,26 @@ esp_err_t espnow_tx_init(const espnow_tx_config_t *config){
         ESP_LOGE(TAG, "hub MAC \"%s\" is not aa:bb:cc:dd:ee:ff", config->hub_mac ? config->hub_mac : "");
         return ESP_ERR_INVALID_ARG;
     }
+    /* A shorter key would be read past its end: different bytes on each board, frames nobody can decrypt. */
+    if (config->encrypt && (config->pmk == NULL || strlen(config->pmk) != ESP_NOW_KEY_LEN ||
+                            config->lmk == NULL || strlen(config->lmk) != ESP_NOW_KEY_LEN)) {
+        ESP_LOGE(TAG, "the PMK and the LMK must have exactly %d characters", ESP_NOW_KEY_LEN);
+        return ESP_ERR_INVALID_ARG;
+    }
 
     s_sent = xSemaphoreCreateBinary();
     if (s_sent == NULL) {
         return ESP_ERR_NO_MEM;
+    }
+
+    /*
+     * RTC memory only survives a deep-sleep wake-up: after a panic, the watchdog or a power cut the
+     * seq would start at 0 again, repeating the seq (and the alert id) of a fall that may still be
+     * open on the hub and at the central. Start from a random value instead (the radio is on, so
+     * esp_random is a true random number).
+     */
+    if (esp_reset_reason() != ESP_RST_DEEPSLEEP) {
+        s_seq = (uint16_t) esp_random();
     }
 
     s_fixed_channel = config->fixed_channel;

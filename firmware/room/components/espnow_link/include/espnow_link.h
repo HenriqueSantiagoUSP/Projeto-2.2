@@ -20,6 +20,7 @@ typedef struct {
     char    wearable[ESPNOW_WEARABLE_ID_LEN];
     uint8_t type;        /* espnow_msg_type_t */
     uint16_t seq;
+    uint32_t uptime_ms;  /* sender uptime: a resend repeats it, a restarted wearable does not */
     int8_t  rssi;        /* dBm, as the hub heard it */
     union {
         struct { uint16_t battery_mv; uint16_t activity_mg; } heartbeat;

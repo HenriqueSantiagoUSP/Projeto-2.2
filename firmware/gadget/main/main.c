@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
@@ -47,6 +48,19 @@ static const char *TAG = "main";
 #define NET_WAIT_MS         10000   /* with MQTT on: how long the first contact waits for the AP */
 #define IMU_RETRY_MS        5000    /* without the MPU-6050, look for it again this often */
 #define IMU_LOST_AFTER      10      /* consecutive failed FIFO reads (0.5 s) before the sensor counts as gone */
+/* A wrong length is a key or MAC the two boards would read differently: refuse to build. */
+#ifdef CONFIG_GADGET_ESPNOW_ENCRYPT
+_Static_assert(sizeof(CONFIG_GADGET_ESPNOW_PMK) - 1 == 16,
+               "menuconfig > Wearable > the PMK must have exactly 16 characters");
+_Static_assert(sizeof(CONFIG_GADGET_ESPNOW_LMK) - 1 == 16,
+               "menuconfig > Wearable > the LMK must have exactly 16 characters");
+#endif
+_Static_assert(sizeof(CONFIG_GADGET_HUB_MAC) == 1 || sizeof(CONFIG_GADGET_HUB_MAC) == 18,
+               "menuconfig > Wearable > the hub MAC must be empty or aa:bb:cc:dd:ee:ff");
+
+#define RETRY_FIRST_MS      2000    /* an undelivered FALL / FALL_CANCEL is tried again after this... */
+#define RETRY_MAX_MS        30000   /* ...doubling up to this, until it gets through */
+#define RETRY_SCAN_EVERY    3       /* every 3rd retry looks for the hub on every channel first */
 
 #define WEARABLE_ID_LEN     7       /* last 3 MAC bytes in hex, as the hub names this wearable */
 #define JSON_MAX            256
@@ -60,7 +74,6 @@ typedef enum {
     COMM_EV_FALL,       /* sampling_task: the classifier said fall (outside the cooldown) */
     COMM_EV_WINDOW,     /* sampling_task: every classified window, for the log */
     COMM_EV_BUTTON,     /* button ISR */
-    COMM_EV_MQTT_UP,    /* mqtt_link: (re)connected */
 } comm_event_kind_t;
 
 typedef struct {
@@ -85,6 +98,20 @@ typedef struct {
     int64_t  cancel_deadline_ms;
     int64_t  last_button_ms;
     int64_t  next_heartbeat_ms;
+
+    /*
+     * A FALL (or FALL_CANCEL) that reached nobody is kept and resent unchanged (same seq and
+     * uptime, so the hub sees one fall) until it is delivered: at the backoff below, and at
+     * once when a heartbeat gets through again.
+     */
+    bool                 fall_undelivered;
+    espnow_fall_t        fall_frame;
+    fall_info_t          fall_info;
+    bool                 cancel_undelivered;
+    espnow_fall_cancel_t cancel_frame;
+    int64_t              retry_at_ms;
+    int64_t              retry_delay_ms;
+    unsigned             retries;
 } comm_state_t;
 
 static QueueHandle_t s_comm_queue = NULL;
@@ -97,7 +124,10 @@ static fp_classifier_t s_classifier;              /* written once at boot */
  * GADGET_HUB_MAC empty: no hub to talk to (a bench or a demo with one board). ESP-NOW
  * is never started, and falls go to the log (and to MQTT and CAN when they are on).
  */
-static bool s_has_hub = false;                    /* written once at boot */
+static bool s_has_hub = false;                    /* written at boot, before the tasks start */
+/* Set where a queued event could be lost (MQTT task, button ISR), taken by comm_task. */
+static atomic_bool s_mqtt_up_pending = false;
+static atomic_bool s_button_missed = false;
 
 /* Activity between heartbeats: sampling_task merges each batch, comm_task takes the average. */
 static sp_activity_t s_activity;
@@ -158,17 +188,21 @@ static void classify_window(void){
  * Brings the MPU-6050 up and restarts the pipeline from a clean state, so a window
  * never mixes samples from before and after a gap. sampling_task only.
  */
-static bool imu_start(void){
-    if (mpu6050_init(&s_mpu, s_i2c_bus, MPU6050_ADDR_DEFAULT) != ESP_OK) {
-        return false;
-    }
+static void pipeline_restart(void){
     fall_pipeline_init(&s_pipeline, CONFIG_GADGET_FALL_TRIGGER_CG / 100.0f, s_classifier);
-    sys_events_set(SYS_EV_IMU_OK);
 #ifdef CONFIG_GADGET_COLLECT_MODE
     /* A header starts every run of samples: the sample count (t_ms, pico) restarts here. */
     printf("CSV:t_ms,ax,ay,az,gx,gy,gz  (raw counts; %.0f LSB/g, %.1f LSB/dps, %d Hz)\n",
            MPU6050_ACCEL_LSB_PER_G, MPU6050_GYRO_LSB_PER_DPS, MPU6050_SAMPLE_RATE_HZ);
 #endif
+}
+
+static bool imu_start(void){
+    if (mpu6050_init(&s_mpu, s_i2c_bus, MPU6050_ADDR_DEFAULT) != ESP_OK) {
+        return false;
+    }
+    pipeline_restart();
+    sys_events_set(SYS_EV_IMU_OK);
     return true;
 }
 
@@ -187,6 +221,8 @@ static void sampling_task(void *arg){
      */
     bool imu_ok = imu_start();
     int failures = 0;
+    int empty_reads = 0;
+    bool samples_lost = false;
     int64_t next_try_ms = 0;
     if (!imu_ok) {
         ESP_LOGW(TAG, "MPU-6050 not connected (I2C SDA GPIO%d, SCL GPIO%d): no fall detection, looking for it "
@@ -210,6 +246,8 @@ static void sampling_task(void *arg){
             }
             ESP_LOGI(TAG, "MPU-6050 connected: fall detection on");
             failures = 0;
+            empty_reads = 0;
+            samples_lost = false;   /* imu_start already restarted the pipeline */
 #ifdef CONFIG_GADGET_COLLECT_MODE
             sample_index = 0;
 #endif
@@ -218,24 +256,48 @@ static void sampling_task(void *arg){
         }
 
         size_t n = 0;
-        esp_err_t err = mpu6050_fifo_read(&s_mpu, batch, FIFO_BATCH_MAX, &n);
-        if (err == ESP_ERR_INVALID_STATE) {
+        bool overflow = false;
+        esp_err_t err = mpu6050_fifo_read(&s_mpu, batch, FIFO_BATCH_MAX, &n, &overflow);
+        if (err == ESP_OK && overflow) {
             ESP_LOGW(TAG, "FIFO overflow: samples lost");
+            samples_lost = true;
             failures = 0;
+            empty_reads = 0;
             continue;
         }
+        /*
+         * A sensor that reset itself (a dip in its supply) comes back asleep with the FIFO off:
+         * every read then succeeds with no samples. A run of empty reads is a lost sensor too,
+         * and the retry below configures it again. At 200 Hz each read should bring ~10.
+         */
+        if (err == ESP_OK && n == 0 && ++empty_reads >= IMU_LOST_AFTER) {
+            err = ESP_ERR_INVALID_RESPONSE;
+        }
         if (err != ESP_OK) {
+            samples_lost = true;
             /* One bad read is noise on the bus; a run of them is a sensor that came loose. */
-            if (++failures >= IMU_LOST_AFTER) {
+            if (err == ESP_ERR_INVALID_RESPONSE || ++failures >= IMU_LOST_AFTER) {
                 imu_ok = false;
                 sys_events_clear(SYS_EV_IMU_OK);
-                ESP_LOGW(TAG, "MPU-6050 stopped answering (%s): no fall detection, looking for it every %d s",
-                         esp_err_to_name(err), IMU_RETRY_MS / 1000);
+                ESP_LOGW(TAG, "MPU-6050 stopped %s (%s): no fall detection, looking for it every %d s",
+                         err == ESP_ERR_INVALID_RESPONSE ? "sending samples" : "answering", esp_err_to_name(err),
+                         IMU_RETRY_MS / 1000);
                 next_try_ms = now_ms() + IMU_RETRY_MS;
             }
             continue;
         }
         failures = 0;
+        if (n > 0) {
+            empty_reads = 0;
+        }
+        if (samples_lost && n > 0) {
+            /* A window must not join samples from both sides of a gap. */
+            pipeline_restart();
+#ifdef CONFIG_GADGET_COLLECT_MODE
+            sample_index = 0;
+#endif
+            samples_lost = false;
+        }
 
         sp_activity_t batch_activity = { 0 };
         for (size_t i = 0; i < n; i++) {
@@ -333,11 +395,13 @@ static bool publish_fall_alert(uint16_t seq, const fall_info_t *fall, bool activ
     return mqtt_link_publish(MQTT_TOPIC_ALERT, json, 1, false) == ESP_OK;
 }
 
-/* Runs in the MQTT task: only queue. */
+/*
+ * Runs in the MQTT task. A flag, not a queued event: with the queue full the event was lost
+ * and the retained "offline" from the Last Will stayed. comm_task takes it on its next pass.
+ */
 static void on_mqtt_connected(void *ctx){
     (void) ctx;
-    comm_event_t ev = { .kind = COMM_EV_MQTT_UP };
-    xQueueSend(s_comm_queue, &ev, 0);
+    atomic_store(&s_mqtt_up_pending, true);
 }
 
 static esp_err_t start_mqtt(void){
@@ -435,6 +499,8 @@ static void send_fall(comm_state_t *st, const fall_info_t *info){
 
     st->fall_seq = fall.hdr.seq;
     st->fall_via_mqtt = false;
+    st->fall_undelivered = false;
+    st->cancel_undelivered = false;   /* a new fall supersedes an older cancel still waiting */
     if (!delivered) {
 #ifdef CONFIG_GADGET_MQTT
         st->fall_via_mqtt = publish_fall_alert(fall.hdr.seq, info, true);
@@ -442,22 +508,35 @@ static void send_fall(comm_state_t *st, const fall_info_t *info){
         if (st->fall_via_mqtt) {
             ESP_LOGW(TAG, "%s: alert published over MQTT", s_has_hub ? "hub did not ACK the FALL" : "no hub");
         } else if (s_has_hub) {
-            /* A fall that reached nobody: the one real error here. The LED is the only alarm left. */
-            ESP_LOGE(TAG, "FALL not delivered to the hub");
+            /* A fall that reached nobody: the one real error here. Kept and resent until it gets through. */
+            ESP_LOGE(TAG, "FALL not delivered to the hub: trying again from %d s on", RETRY_FIRST_MS / 1000);
+            st->fall_undelivered = true;
+            st->fall_frame = fall;
+            st->fall_info = *info;
+            st->retry_delay_ms = RETRY_FIRST_MS;
+            st->retry_at_ms = now_ms() + RETRY_FIRST_MS;
+            st->retries = 0;
         }
         /* Stand-alone without MQTT: the FALL line above and the serial are where it goes. */
     }
 }
 
-static void send_fall_cancel(const comm_state_t *st){
+static void send_fall_cancel(comm_state_t *st){
     espnow_fall_cancel_t cancel;
     espnow_tx_header(&cancel.hdr, ESPNOW_MSG_FALL_CANCEL);
     cancel.fall_seq = st->fall_seq;
 
     ESP_LOGI(TAG, "FALL_CANCEL for seq %u", st->fall_seq);
+    /* The FALL may have reached the hub with its ACK lost: cancel there too, even if it is still queued here. */
+    st->fall_undelivered = false;
     bool delivered = s_has_hub && espnow_tx_send(&cancel, sizeof(cancel), ESPNOW_TX_RETRIES) == ESP_OK;
     if (s_has_hub && !delivered) {
-        ESP_LOGE(TAG, "FALL_CANCEL not delivered to the hub");
+        ESP_LOGW(TAG, "FALL_CANCEL not delivered to the hub: trying again from %d s on", RETRY_FIRST_MS / 1000);
+        st->cancel_undelivered = true;
+        st->cancel_frame = cancel;
+        st->retry_delay_ms = RETRY_FIRST_MS;
+        st->retry_at_ms = now_ms() + RETRY_FIRST_MS;
+        st->retries = 0;
     }
 #ifdef CONFIG_GADGET_MQTT
     /* Cancel where the alert went: over MQTT if the hub never had it. */
@@ -465,6 +544,42 @@ static void send_fall_cancel(const comm_state_t *st){
         publish_fall_alert(st->fall_seq, NULL, false);
     }
 #endif
+}
+
+/* One more try for a FALL or FALL_CANCEL that reached nobody; the frame goes out unchanged. */
+static void retry_undelivered(comm_state_t *st){
+    if (!st->fall_undelivered && !st->cancel_undelivered) {
+        return;
+    }
+    st->retries++;
+    if (st->retries % RETRY_SCAN_EVERY == 0) {
+        espnow_tx_scan();
+    }
+    bool delivered;
+    if (st->fall_undelivered) {
+        delivered = espnow_tx_send(&st->fall_frame, sizeof(st->fall_frame), ESPNOW_TX_RETRIES) == ESP_OK;
+#ifdef CONFIG_GADGET_MQTT
+        if (!delivered && publish_fall_alert(st->fall_frame.hdr.seq, &st->fall_info, true)) {
+            st->fall_via_mqtt = true;
+            delivered = true;
+        }
+#endif
+        if (delivered) {
+            ESP_LOGW(TAG, "FALL seq %u delivered late, after %u retries", st->fall_frame.hdr.seq, st->retries);
+            st->fall_undelivered = false;
+        }
+    } else {
+        delivered = espnow_tx_send(&st->cancel_frame, sizeof(st->cancel_frame), ESPNOW_TX_RETRIES) == ESP_OK;
+        if (delivered) {
+            ESP_LOGI(TAG, "FALL_CANCEL for seq %u delivered late", st->cancel_frame.fall_seq);
+            st->cancel_undelivered = false;
+        }
+    }
+    if (!delivered) {
+        ESP_LOGD(TAG, "still undelivered after %u retries", st->retries);
+        st->retry_delay_ms = st->retry_delay_ms * 2 > RETRY_MAX_MS ? RETRY_MAX_MS : st->retry_delay_ms * 2;
+        st->retry_at_ms = now_ms() + st->retry_delay_ms;
+    }
 }
 
 static void log_window(const fp_result_t *r, uint32_t cycles, bool reported){
@@ -496,12 +611,6 @@ static void handle_event(comm_state_t *st, comm_event_t *ev){
 
         case COMM_EV_WINDOW:
             log_window(&ev->window.r, ev->window.cycles, ev->window.reported);
-            return;
-
-        case COMM_EV_MQTT_UP:
-#ifdef CONFIG_GADGET_MQTT
-            publish_link_online();
-#endif
             return;
 
         case COMM_EV_BUTTON:
@@ -552,6 +661,15 @@ static void comm_task(void *arg){
         if (xQueueReceive(s_comm_queue, &ev, pdMS_TO_TICKS(COMM_MAX_WAIT_MS)) == pdTRUE) {
             handle_event(&st, &ev);
         }
+        if (atomic_exchange(&s_button_missed, false)) {
+            comm_event_t button = { .kind = COMM_EV_BUTTON };
+            handle_event(&st, &button);
+        }
+        if (atomic_exchange(&s_mqtt_up_pending, false)) {
+#ifdef CONFIG_GADGET_MQTT
+            publish_link_online();
+#endif
+        }
 
         int64_t now = now_ms();
         if (st.fall_pending && now >= st.cancel_deadline_ms) {
@@ -562,8 +680,14 @@ static void comm_task(void *arg){
             /* No sensor, no heartbeat: a wearable that cannot detect falls must not look healthy. */
             if (imu_ok) {
                 st.link_ok = send_heartbeat();
+                if (st.link_ok) {
+                    st.retry_at_ms = now;   /* the hub answers again: an undelivered FALL goes now */
+                }
             }
             st.next_heartbeat_ms = now + ESPNOW_HEARTBEAT_PERIOD_MS;
+        }
+        if ((st.fall_undelivered || st.cancel_undelivered) && now >= st.retry_at_ms) {
+            retry_undelivered(&st);
         }
 
         if (st.fall_pending) {
@@ -587,7 +711,10 @@ static void IRAM_ATTR button_isr(void *arg){
     (void) arg;
     comm_event_t ev = { .kind = COMM_EV_BUTTON };
     BaseType_t hp_task_woken = pdFALSE;
-    xQueueSendFromISR(s_comm_queue, &ev, &hp_task_woken);
+    if (xQueueSendFromISR(s_comm_queue, &ev, &hp_task_woken) != pdTRUE) {
+        /* Queue full: an "I'm fine" press must not vanish. comm_task picks it up within COMM_MAX_WAIT_MS. */
+        atomic_store(&s_button_missed, true);
+    }
     portYIELD_FROM_ISR(hp_task_woken);
 }
 
@@ -705,14 +832,23 @@ void app_main(void){
             .lmk = CONFIG_GADGET_ESPNOW_LMK,
             .fixed_channel = net_joins_ap(),
         };
-        ESP_ERROR_CHECK(espnow_tx_init(&radio));
+        esp_err_t radio_err = espnow_tx_init(&radio);
+        if (radio_err != ESP_OK) {
+            /* Detection keeps running; falls go where a stand-alone wearable sends them. */
+            ESP_LOGE(TAG, "ESP-NOW off (%s): falls go to the serial log%s", esp_err_to_name(radio_err),
+                     wants_mqtt ? " and to MQTT" : "");
+            s_has_hub = false;
+        }
     } else {
         ESP_LOGW(TAG, "no hub configured (menu Wearable > MAC of the room hub): stand-alone, falls go to the "
                  "serial log%s", wants_mqtt ? " and to MQTT" : "");
     }
 
 #ifdef CONFIG_GADGET_MQTT
-    ESP_ERROR_CHECK(start_mqtt());
+    esp_err_t mqtt_err = start_mqtt();
+    if (mqtt_err != ESP_OK) {
+        ESP_LOGE(TAG, "MQTT off: %s", esp_err_to_name(mqtt_err));
+    }
 #endif
 
 #ifdef CONFIG_GADGET_CAN

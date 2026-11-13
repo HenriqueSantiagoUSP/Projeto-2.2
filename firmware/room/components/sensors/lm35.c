@@ -41,7 +41,12 @@ static void lm35_task(void *arg){
         float mv;
         esp_err_t err = read_mv(&mv);
         if (err != ESP_OK) {
-            ESP_LOGW(TAG, "ADC read failed: %s", esp_err_to_name(err));
+            /* A state, like the sensor coming loose: one warning, not one every period. */
+            if (!missing) {
+                ESP_LOGW(TAG, "temperature not read (ADC: %s): no temperature until it reads again",
+                         esp_err_to_name(err));
+                missing = true;
+            }
         } else {
             float celsius = (mv - LM35_CHAIN_OFFSET_MV) / LM35_CHAIN_SLOPE_MV_PER_C;
             if (celsius < LM35_MIN_VALID_C || celsius > LM35_MAX_VALID_C) {

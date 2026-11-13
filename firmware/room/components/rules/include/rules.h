@@ -108,6 +108,7 @@ typedef struct {
     uint64_t        last_seen_ms;
     bool            fall_open;
     uint16_t        fall_seq;
+    uint32_t        fall_uptime_ms;   /* with fall_seq, tells a resend from a new fall after a restart */
     rules_episode_t fall;
     rules_episode_t offline;
     rules_episode_t low_battery;
@@ -177,7 +178,12 @@ void rules_expect_wearable(rules_t *rules, const char *wearable, const rules_clo
 /* Any message from a wearable. */
 void rules_on_wearable_seen(rules_t *rules, const char *wearable, const rules_clock_t *now);
 void rules_on_battery(rules_t *rules, const char *wearable, uint16_t battery_mv, const rules_clock_t *now);
-void rules_on_fall(rules_t *rules, const char *wearable, uint16_t seq, float a2, float prob,
+/*
+ * A FALL message. A resend repeats the whole frame, so the same seq AND the same sender
+ * uptime is the same fall; a wearable that restarted sends a new fall with another uptime
+ * even if its seq coincides.
+ */
+void rules_on_fall(rules_t *rules, const char *wearable, uint16_t seq, uint32_t uptime_ms, float a2, float prob,
                    const rules_clock_t *now);
 void rules_on_fall_cancel(rules_t *rules, const char *wearable, uint16_t fall_seq, const rules_clock_t *now);
 

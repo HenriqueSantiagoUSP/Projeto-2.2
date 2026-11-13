@@ -10,6 +10,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 
 static const char *TAG = "mqtt_link";
 
@@ -51,8 +52,11 @@ static void on_mqtt_event(void *arg, esp_event_base_t base, int32_t id, void *da
             ESP_LOGI(TAG, "connected to %s", CONFIG_APP_MQTT_URI);
             s_outage_reported = false;
             sys_events_set(SYS_EV_MQTT_CONNECTED);
-            if (s_subscribe_topic[0] != '\0') {
-                esp_mqtt_client_subscribe_single(s_client, s_subscribe_topic, 1);
+            if (s_subscribe_topic[0] != '\0' &&
+                esp_mqtt_client_subscribe_single(s_client, s_subscribe_topic, 1) < 0) {
+                /* Only queued, not sent: the next reconnection subscribes again. */
+                ESP_LOGW(TAG, "could not subscribe to %s: settings arrive after the next reconnection",
+                         s_subscribe_topic);
             }
             if (s_on_connected != NULL) {
                 s_on_connected(s_cb_ctx);
@@ -103,8 +107,13 @@ static void on_mqtt_event(void *arg, esp_event_base_t base, int32_t id, void *da
     }
 }
 
-/* Starts the client the first time the network comes up, whoever gets there first. */
+/*
+ * Starts the client the first time the network comes up, whoever gets there first. If the
+ * start itself fails (no memory for its task, say), it is tried again every MQTT_RETRY_S,
+ * instead of leaving the board without MQTT until it restarts.
+ */
 static esp_event_handler_instance_t s_first_ip = NULL;
+static esp_timer_handle_t s_start_retry = NULL;
 static portMUX_TYPE s_start_lock = portMUX_INITIALIZER_UNLOCKED;
 static bool s_started = false;
 
@@ -113,12 +122,30 @@ static void start_once(void){
     bool start = !s_started;
     s_started = true;
     taskEXIT_CRITICAL(&s_start_lock);
-    if (start) {
-        esp_err_t err = esp_mqtt_client_start(s_client);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "client not started: %s", esp_err_to_name(err));
-        }
+    if (!start) {
+        return;
     }
+    esp_err_t err = esp_mqtt_client_start(s_client);
+    if (err == ESP_OK) {
+        return;
+    }
+    static bool warned = false;
+    if (!warned) {
+        warned = true;
+        ESP_LOGW(TAG, "client not started (%s): trying again every %d s", esp_err_to_name(err), MQTT_RETRY_S);
+    }
+    taskENTER_CRITICAL(&s_start_lock);
+    s_started = false;
+    taskEXIT_CRITICAL(&s_start_lock);
+    if (s_start_retry != NULL) {
+        esp_timer_start_once(s_start_retry, (uint64_t) MQTT_RETRY_S * 1000000);
+    }
+}
+
+/* Runs in the esp_timer task. */
+static void on_start_retry(void *arg){
+    (void) arg;
+    start_once();
 }
 
 /* Runs in the default event loop task. */
@@ -174,6 +201,11 @@ esp_err_t mqtt_link_start(const mqtt_link_config_t *config){
         ESP_LOGW(TAG, "MQTT off: no Wi-Fi network configured (menu \"Network (Wi-Fi)\")");
         return ESP_OK;
     }
+    if (CONFIG_APP_MQTT_URI[0] == '\0') {
+        s_disabled = true;
+        ESP_LOGW(TAG, "MQTT off: no broker URI configured (menu \"MQTT\")");
+        return ESP_OK;
+    }
 
     /*
      * The library logs every failed attempt as an error; a broker that is not there is a
@@ -186,9 +218,15 @@ esp_err_t mqtt_link_start(const mqtt_link_config_t *config){
 
     s_client = esp_mqtt_client_init(&client_config);
     if (s_client == NULL) {
-        return ESP_FAIL;
+        /* A wrong setting, not a missing broker: the one error here. The rest of the board carries on. */
+        s_disabled = true;
+        ESP_LOGE(TAG, "MQTT off: broker URI \"%s\" not accepted (menu \"MQTT\")", CONFIG_APP_MQTT_URI);
+        return ESP_ERR_INVALID_ARG;
     }
     esp_err_t err = esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, on_mqtt_event, NULL);
+    if (err != ESP_OK) return err;
+    const esp_timer_create_args_t retry_args = { .callback = on_start_retry, .name = "mqtt_start" };
+    err = esp_timer_create(&retry_args, &s_start_retry);
     if (err != ESP_OK) return err;
 
     /*
