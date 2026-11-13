@@ -65,7 +65,8 @@ def main():
                                                    for _, l in q.iterrows()) + ".",
                "Atividades com alarme falso: " + (", ".join(f"{l.codigo} ({int(l.alarmes_falsos)})"
                                                            for _, l in a.iterrows()) or "nenhuma") + "."]
-    (R / "resumo.md").write_text("\n".join(partes) + "\n", encoding="utf-8")
+    # newline="\n": sem ele o Windows grava CRLF, e o repositório usa LF (CLAUDE.md).
+    (R / "resumo.md").write_text("\n".join(partes) + "\n", encoding="utf-8", newline="\n")
     print("\n".join(partes))
 
 

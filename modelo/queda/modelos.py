@@ -256,6 +256,10 @@ class Sklearn:
 
     def ajustar(self, conj, F):
         y = conj.y
+        if len(np.unique(y)) < 2:
+            # O escore usa predict_proba[:, 1], que nem existe com uma classe: falha aqui, dizendo por quê.
+            raise ValueError(f"o treino de {self.nome} tem uma classe só ({len(y)} janelas): faltam quedas ou "
+                             "atividades nesta dobra")
         idx = np.arange(len(y))
         if self.max_negativos and (y == 0).sum() > self.max_negativos:
             rng = np.random.default_rng(SEMENTE)

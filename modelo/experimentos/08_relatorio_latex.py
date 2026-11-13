@@ -8,6 +8,7 @@ para latex/figuras/ e escreve as tabelas em latex/tabelas/ a partir dos CSVs. As
 O relatório é compilado com `pdflatex main.tex` (duas vezes, por causa do sumário) dentro de latex/.
 """
 
+import json
 import shutil
 
 import _comum
@@ -16,6 +17,10 @@ import pandas as pd
 from queda.dados import ATIVIDADES_SISFALL
 
 R = _comum.RESULTADOS
+
+
+def l_on_escolhido(cenario="A"):
+    return json.loads((R / "gatilho_escolhido.json").read_text(encoding="utf-8"))[cenario]
 LATEX = _comum.RAIZ_MODELO.parent / "relatorios" / "Semestre 2" / "Projeto 3" / "Q1" / "latex"
 FIGURAS = ["fig_sinais", "fig_saturacao", "fig_pipeline", "fig_gatilho", "fig_picos", "fig_funil", "fig_resumo",
            "fig_escores", "fig_roc_A", "fig_ordem_ar_A", "fig_ar_explicado", "fig_templates", "fig_fft",
@@ -112,8 +117,8 @@ def cenarios():
     tabela("cenarios_AB",
            "Efeito da faixa do sensor: os mesmos métodos no cenário A ($\\pm$8\\,g / $\\pm$500\\,°/s) e no B "
            "($\\pm$2\\,g / $\\pm$250\\,°/s, a faixa dos nossos ensaios), na SisFall saturada em cada faixa. Mesmas "
-           "métricas da Tabela~\\ref{tab:comparacao_A}. O limiar do firmware detecta 97,4\\,\\% das quedas em A e "
-           "90,0\\,\\% em B.",
+           "métricas da Tabela~\\ref{tab:comparacao_A}. O limiar do firmware detecta "
+           f"{pct(a.loc[escolhidos[0], 'sens_ensaio'])} das quedas em A e {pct(b.loc[escolhidos[0], 'sens_ensaio'])} em B.",
            "tab:cenarios_AB", "@{}lcccccc@{}",
            r" & \multicolumn{2}{c}{AUC} & \multicolumn{2}{c}{Alarmes por hora} & "
            r"\multicolumn{2}{c}{Quedas com $\le$1 alarme/h} \\" "\n"
@@ -129,7 +134,7 @@ def gatilho():
     tabela("gatilho",
            "Varredura do limiar $L_\\text{on}$ do gatilho no cenário A (SisFall): fração das quedas cujo impacto "
            "dispara o gatilho e disparos por hora de atividade, que viram janelas para o classificador. "
-           "Escolhido: 2,0\\,g.",
+           f"Escolhido: {num(l_on_escolhido(), 1)}\\,g.",
            "tab:gatilho", "ccc", ["$L_\\text{on}$ (g)", "Quedas que passam", "Disparos por hora"], linhas)
 
 
@@ -138,10 +143,12 @@ def ordem_ar():
     base = df.bic.iloc[0]
     linhas = [[f"{int(l.p)}", num(l.var_residuo, 3), num((l.aic - df.aic.iloc[0]) / 1e3, 1),
                num((l.bic - base) / 1e3, 1)] for _, l in df.iterrows()]
+    p_bic, p_max = int(df.loc[df.bic.idxmin(), "p"]), int(df.p.max())
+    final = (f"O BIC continua caindo até $p={p_max}$, o maior valor testado." if p_bic == p_max else
+             f"O BIC é mínimo em $p={p_bic}$.")
     tabela("ordem_ar",
            "Escolha da ordem do AR($p$) em $|a|$ a 50\\,Hz, ajustado por mínimos quadrados em todas as janelas de "
-           "atividade do cenário A: variância do resíduo e AIC e BIC em relação a $p=1$ (em milhares). O BIC "
-           "continua caindo até $p=12$, o maior valor testado.",
+           "atividade do cenário A: variância do resíduo e AIC e BIC em relação a $p=1$ (em milhares). " + final,
            "tab:ordem_ar", "cccc", ["$p$", "$\\sigma^2_e$ (g$^2$)", "$\\Delta$AIC ($\\times10^3$)",
                                     "$\\Delta$BIC ($\\times10^3$)"], linhas)
 
@@ -150,13 +157,14 @@ def proprios():
     df = pd.read_csv(R / "proprios_resumo.csv")
     linhas = []
     for _, l in df.iterrows():
-        adl = "8 de 8" if l.metodo.startswith("limiar") else f"{int(l.ensaios_adl_com_alarme)} de 8"
+        adl = f"{int(l.ensaios_adl_com_alarme)} de {int(l.ensaios_adl)}"
         linhas.append([NOMES[l.metodo], f"{int(l.quedas_detectadas)}/{int(l.quedas)}", f"{int(l.alarmes_falsos)}",
                        adl])
+    n_quedas, n_adl = int(df.quedas.iloc[0]), int(df.ensaios_adl.iloc[0])
     tabela("proprios",
-           "Teste externo nos nossos 18 ensaios (uma pessoa, cintura, $\\pm$2\\,g): modelos treinados só na "
-           "SisFall saturada no cenário B, com o limiar de operação tirado da SisFall. Alarmes falsos: disparos "
-           "classificados como queda nos 8 ensaios de andar e correr.",
+           f"Teste externo nos nossos {n_quedas + n_adl} ensaios (uma pessoa, cintura, $\\pm$2\\,g): modelos "
+           "treinados só na SisFall saturada no cenário B, com o limiar de operação tirado da SisFall. Alarmes "
+           f"falsos: disparos classificados como queda nos {n_adl} ensaios de atividade.",
            "tab:proprios", "@{}lccc@{}", ["Método", r"\makecell{Quedas\\detectadas}", r"\makecell{Alarmes\\falsos}",
                                           r"\makecell{Ensaios de atividade\\com alarme}"], linhas)
 
@@ -168,7 +176,8 @@ def erros_quedas():
                f"{int(l.perdidas)}", f"{int(l.perdidas_no_gatilho)}"] for _, l in rf.iterrows()]
     tabela("erros_quedas",
            "Quedas perdidas pelo Random Forest por tipo (cenário A, mesmo ponto de operação da "
-           "Tabela~\\ref{tab:comparacao_A}). ``No gatilho'': quedas cujo impacto não passou de 2,0\\,g.",
+           f"Tabela~\\ref{{tab:comparacao_A}}). ``No gatilho'': quedas cujo impacto não passou de "
+           f"{num(l_on_escolhido(), 1)}\\,g.",
            "tab:erros_quedas", "@{}llcccc@{}", ["Código", "Queda", "Ensaios", "Detectadas", "Perdidas",
                                                  "No gatilho"], linhas)
 

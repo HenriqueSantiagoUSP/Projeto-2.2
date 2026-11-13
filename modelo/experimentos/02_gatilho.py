@@ -45,20 +45,35 @@ def varrer(ensaios, cenario, limiares, tolerancia_s=0.5):
     return linhas
 
 
+CRITERIO = 0.99
+
+
+def escolher_l_on(s: pd.DataFrame, cenario: str) -> float:
+    """
+    O maior L_on da grade que deixa passar ≥ 99 % das quedas. Se nenhum deixa, para: o mínimo da grade
+    iria para o firmware (09) como se cumprisse o critério que os documentos afirmam.
+    """
+    ok = s[s.quedas_que_passam >= CRITERIO]
+    if ok.empty:
+        raise SystemExit(f"Cenário {cenario}: nenhum L_on de {s.l_on_g.min():g} a {s.l_on_g.max():g} g deixa passar "
+                         f"≥ {100 * CRITERIO:.0f} % das quedas (o melhor passa {100 * s.quedas_que_passam.max():.1f} %). "
+                         "Estenda LIMIARES para baixo; gatilho_escolhido.json não foi gravado.")
+    return float(ok.l_on_g.max())
+
+
 def main():
     sisfall, proprios = _comum.carregar()
     linhas = []
     for c in ("A", "B"):
         linhas += [dict(l, base="sisfall") for l in varrer(sisfall, c, LIMIARES[c])]
-    linhas += [dict(l, base="propria") for l in varrer(proprios, "B", LIMIARES["B"])]
+    if proprios:
+        linhas += [dict(l, base="propria") for l in varrer(proprios, "B", LIMIARES["B"])]
+    else:
+        print("Sem ensaios próprios: a varredura fica só com a SisFall.")
     df = pd.DataFrame(linhas)
     df.to_csv(_comum.RESULTADOS / "gatilho.csv", index=False, float_format="%.4f")
 
-    escolha = {}
-    for c in ("A", "B"):
-        s = df[(df.base == "sisfall") & (df.cenario == c)]
-        ok = s[s.quedas_que_passam >= 0.99]
-        escolha[c] = float(ok.l_on_g.max()) if len(ok) else float(s.l_on_g.min())
+    escolha = {c: escolher_l_on(df[(df.base == "sisfall") & (df.cenario == c)], c) for c in ("A", "B")}
     print(df.to_string(index=False))
     print("L_on escolhido (≥ 99 % das quedas da SisFall):", escolha)
 

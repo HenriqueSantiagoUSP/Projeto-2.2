@@ -31,6 +31,7 @@ PRE_S = 1.0
 POS_S = 0.8
 FC_PASSA_BAIXA = 20.0          # Hz: o impacto tem conteúdo até ~20 Hz; acima é ruído e vibração
 FS_REDUZIDA = 50.0             # Hz: versão reduzida da janela para templates, DTW e CNN
+DISTANCIA_S = 0.5              # s: um pico só vale depois desse tempo sem um valor maior (os dois gatilhos)
 
 # Faixas do sensor (por eixo): o cenário A é o vestível atual; o B, a configuração dos dados próprios.
 CENARIOS = {
@@ -39,9 +40,14 @@ CENARIOS = {
 }
 
 
+def coeficientes_passa_baixa(fc: float = FC_PASSA_BAIXA, fs: float = FS) -> tuple[np.ndarray, np.ndarray]:
+    """(b, a) do Butterworth de 2ª ordem: os mesmos no treino (passa_baixa) e no firmware (09 os exporta)."""
+    return signal.butter(2, fc / (fs / 2))
+
+
 def passa_baixa(x: np.ndarray, fc: float = FC_PASSA_BAIXA, fs: float = FS) -> np.ndarray:
     """Butterworth de 2ª ordem, causal (um biquad, como o dsps_biquad_f32 do ESP-DSP)."""
-    b, a = signal.butter(2, fc / (fs / 2))
+    b, a = coeficientes_passa_baixa(fc, fs)
     zi = signal.lfilter_zi(b, a)
     saida = np.empty_like(x, dtype=np.float32)
     for j in range(x.shape[1]):
@@ -49,7 +55,7 @@ def passa_baixa(x: np.ndarray, fc: float = FC_PASSA_BAIXA, fs: float = FS) -> np
     return saida
 
 
-def gatilho(a_mag: np.ndarray, l_on: float, distancia_s: float = 0.5, fs: float = FS) -> list[int]:
+def gatilho(a_mag: np.ndarray, l_on: float, distancia_s: float = DISTANCIA_S, fs: float = FS) -> list[int]:
     """
     Gatilho do pipeline: os picos de |a| acima de L_on, separados por pelo menos distancia_s (entre dois
     picos próximos fica o mais alto). O impacto, o maior pico de uma queda, nunca é escondido por um
@@ -62,7 +68,7 @@ def gatilho(a_mag: np.ndarray, l_on: float, distancia_s: float = 0.5, fs: float 
     return [int(p) for p in picos]
 
 
-def gatilho_causal(a_mag: np.ndarray, l_on: float, distancia_s: float = 0.5, fs: float = FS) -> list[int]:
+def gatilho_causal(a_mag: np.ndarray, l_on: float, distancia_s: float = DISTANCIA_S, fs: float = FS) -> list[int]:
     """
     O gatilho como ele roda no vestível (fall_pipeline.c), amostra a amostra e sem olhar o futuro:
     - começa a acompanhar um pico quando |a| sobe (|a|[n] > |a|[n-1]) e chega a L_on;
@@ -136,10 +142,11 @@ class Conjunto:
 
 
 def montar(ensaios: list[Ensaio], cenario: str, l_on: float, pre_s: float = PRE_S, pos_s: float = POS_S,
-           tolerancia_s: float = 0.5, causal: bool = False) -> Conjunto:
+           tolerancia_s: float = 0.5, causal: bool = False, distancia_s: float = DISTANCIA_S) -> Conjunto:
     """
     Aplica saturação do cenário, filtro e gatilho a cada ensaio e recorta as janelas. `causal` usa o gatilho do
     vestível (gatilho_causal) no lugar do find_peaks: é o que treina o modelo exportado para o firmware.
+    `distancia_s` é a do gatilho; o 09 passa a mesma que grava no firmware (FALL_MODEL_TRIGGER_GAP).
     """
     acionar = gatilho_causal if causal else gatilho
     faixa = CENARIOS[cenario]
@@ -150,7 +157,7 @@ def montar(ensaios: list[Ensaio], cenario: str, l_on: float, pre_s: float = PRE_
         acc, gyr = saturar(e.acc, e.gyr, faixa["g_max"], faixa["dps_max"])
         x = passa_baixa(np.hstack([acc, gyr]))
         a_mag = np.linalg.norm(x[:, 0:3], axis=1)
-        picos = acionar(a_mag, l_on)
+        picos = acionar(a_mag, l_on, distancia_s)
         if e.queda:
             impacto = int(np.argmax(a_mag))
             perto = [p for p in picos if abs(p - impacto) <= tolerancia_s * FS]

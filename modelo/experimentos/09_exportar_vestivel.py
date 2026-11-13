@@ -18,21 +18,23 @@ Gera (não edite à mão; rode de novo este script):
     uv run python experimentos/09_exportar_vestivel.py
 """
 
+import io
 import json
+import os
 from datetime import date
+from pathlib import Path
 
 import _comum
 import numpy as np
-from scipy import signal
 from sklearn.ensemble import RandomForestClassifier
 
 from queda import atributos, avaliacao, modelos
 from queda.dados import FS, saturar
-from queda.pipeline import CENARIOS, FC_PASSA_BAIXA, POS_S, PRE_S, gatilho_causal, montar, passa_baixa, recortar
+from queda.pipeline import (CENARIOS, DISTANCIA_S, POS_S, PRE_S, coeficientes_passa_baixa, gatilho_causal,
+                            montar, passa_baixa, recortar)
 
 CENARIO = "A"
 RF_ARVORES, RF_PROFUNDIDADE = 60, 10
-DISTANCIA_S = 0.5
 COMPONENTE = _comum.RAIZ_MODELO.parent / "firmware" / "gadget" / "components" / "fall_pipeline"
 VETORES = COMPONENTE / "test_host" / "vetores"
 
@@ -43,7 +45,7 @@ TRECHOS_ATIVIDADE = [("D04", 2.0, 10.0), ("D06", 2.0, 10.0), ("D10", 0.0, 8.0), 
 
 
 class RandomForestVestivel(modelos.Sklearn):
-    """O Random Forest de modelos.Sklearn, menor: 60 árvores de profundidade ≤ 10 (~80 KB na flash)."""
+    """O Random Forest de modelos.Sklearn, menor: 60 árvores de profundidade ≤ 10 (~106 kB na flash)."""
 
     def __init__(self):
         super().__init__("random_forest")
@@ -73,6 +75,9 @@ def f32_abaixo(t: float) -> np.float32:
 
 def c_float(x) -> str:
     """Literal float do C que reproduz o float32 exato (9 dígitos), sempre com ponto ou expoente."""
+    if not np.isfinite(np.float32(x)):
+        # "inf.0f" nem compila, e um limiar infinito desligaria a detecção: melhor parar a exportação aqui.
+        raise ValueError(f"valor não finito a exportar para o firmware: {x}")
     s = f"{float(np.float32(x)):.9g}"
     if not any(ch in s for ch in ".e"):
         s += ".0"
@@ -98,7 +103,8 @@ def nos_da_floresta(rf: RandomForestClassifier):
     return nos, raizes
 
 
-def escrever_modelo(nomes, b, a, lr, rf, limiar_lr, limiar_rf, l_on, resumo):
+def gerar_modelo(nomes, b, a, lr, rf, limiar_lr, limiar_rf, l_on, resumo):
+    """O texto de fall_model.h e fall_model.c ({caminho: texto}) e o número de nós da floresta."""
     escala, logistica = lr.modelo[0], lr.modelo[-1]
     nos, raizes = nos_da_floresta(rf.modelo)
     pre, pos = int(PRE_S * FS), int(POS_S * FS)
@@ -174,12 +180,7 @@ def escrever_modelo(nomes, b, a, lr, rf, limiar_lr, limiar_rf, l_on, resumo):
     c += [f"    {{ {f}, {l}, {r}, {c_float(v)} }}," for f, l, r, v in nos] + ["};", ""]
     c += [f"const float fall_rf_threshold = {c_float(limiar_rf)};", ""]
 
-    (COMPONENTE / "include").mkdir(parents=True, exist_ok=True)
-    with open(COMPONENTE / "include" / "fall_model.h", "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(h))
-    with open(COMPONENTE / "fall_model.c", "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(c))
-    return len(nos)
+    return {COMPONENTE / "include" / "fall_model.h": "\n".join(h), COMPONENTE / "fall_model.c": "\n".join(c)}, len(nos)
 
 
 def escolher_trechos(sisfall):
@@ -203,20 +204,17 @@ def escolher_trechos(sisfall):
     return trechos
 
 
-def escrever_vetores(trechos, nomes, lr, rf, l_on):
-    VETORES.mkdir(parents=True, exist_ok=True)
-    for antigo in VETORES.glob("*.csv"):
-        antigo.unlink()
+def gerar_vetores(trechos, nomes, lr, rf, l_on):
+    """Os CSVs dos vetores de paridade ({caminho: texto}) e o número de janelas, sem tocar no disco."""
     pre, pos = int(PRE_S * FS), int(POS_S * FS)
     linhas = ["arquivo,pico,a_pico," + ",".join(nomes) + ",lr_prob,rf_prob"]
+    arquivos = {}
     total = 0
     for nome, bruto in trechos:
-        with open(VETORES / f"{nome}.csv", "w", encoding="utf-8", newline="\n") as f:
-            f.write("ax,ay,az,gx,gy,gz\n")
-            for amostra in bruto:
-                f.write(",".join(f"{v:.6f}" for v in amostra) + "\n")
-        # Releitura do que foi gravado (6 casas): o C lê exatamente esses valores.
-        lido = np.loadtxt(VETORES / f"{nome}.csv", delimiter=",", skiprows=1, dtype=np.float32)
+        texto = "ax,ay,az,gx,gy,gz\n" + "".join(",".join(f"{v:.6f}" for v in amostra) + "\n" for amostra in bruto)
+        arquivos[VETORES / f"{nome}.csv"] = texto
+        # Releitura do texto gravado (6 casas): o C lê exatamente esses valores.
+        lido = np.loadtxt(io.StringIO(texto), delimiter=",", skiprows=1, dtype=np.float32)
         x = passa_baixa(lido)
         a = np.linalg.norm(x[:, 0:3], axis=1)
         for p in gatilho_causal(a, l_on, DISTANCIA_S):
@@ -228,16 +226,32 @@ def escrever_vetores(trechos, nomes, lr, rf, l_on):
             linha += [f"{prob_lr(lr.modelo, F)[0]:.6f}", f"{prob_rf(rf.modelo, F)[0]:.6f}"]
             linhas.append(",".join(linha))
             total += 1
-    with open(VETORES / "esperado.csv", "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(linhas) + "\n")
-    return total
+    arquivos[VETORES / "esperado.csv"] = "\n".join(linhas) + "\n"
+    return arquivos, total
+
+
+def gravar(arquivos: dict[Path, str]):
+    """
+    Grava cada arquivo num temporário e o troca de uma vez (os.replace): quem lê nunca vê um arquivo pela
+    metade. Os vetores que não fazem mais parte do conjunto só são apagados depois.
+    """
+    for caminho, texto in arquivos.items():
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        temporario = caminho.with_name(caminho.name + ".tmp")
+        with open(temporario, "w", encoding="utf-8", newline="\n") as f:
+            f.write(texto)
+        os.replace(temporario, caminho)
+    for velho in VETORES.glob("*.csv"):
+        if velho not in arquivos:
+            velho.unlink()
 
 
 def main():
     sisfall, _ = _comum.carregar()
     l_on = json.loads((_comum.RESULTADOS / "gatilho_escolhido.json").read_text())[CENARIO]
     pre = int(PRE_S * FS)
-    conj = montar(sisfall, CENARIO, l_on, causal=True)
+    # A mesma distância entre picos no treino, nos vetores e no firmware (FALL_MODEL_TRIGGER_GAP).
+    conj = montar(sisfall, CENARIO, l_on, causal=True, distancia_s=DISTANCIA_S)
     F, nomes = atributos.calcular(conj.janelas, pre, grupos=("tempo",))
     quedas = [e for e in conj.ensaios if e["queda"]]
     horas = sum(e["duracao_s"] for e in conj.ensaios if not e["queda"]) / 3600
@@ -262,16 +276,18 @@ def main():
         print(f"  {chave}: AUC {r.auc:.4f}, {100 * r.sens_ensaio:.1f} % das quedas, {r.alarmes_h:.2f} alarmes/h, "
               f"{100 * r.sens_1alarme_h:.1f} % com <= 1 alarme/h; limiar de probabilidade {limiar:.4f}")
 
-    b, a = signal.butter(2, FC_PASSA_BAIXA / (FS / 2))
-    n_nos = escrever_modelo(nomes, b, a, finais["lr"], finais["rf"], resumo["lr"]["limiar_prob"],
-                            resumo["rf"]["limiar_prob"], l_on, resumo)
+    # Tudo é calculado antes de gravar qualquer coisa: um erro no meio (um código que falta na SisFall, por
+    # exemplo) não deixa o firmware com o modelo novo e os vetores ou o vestivel.json do anterior.
+    b, a = coeficientes_passa_baixa()
+    arquivos, n_nos = gerar_modelo(nomes, b, a, finais["lr"], finais["rf"], resumo["lr"]["limiar_prob"],
+                                   resumo["rf"]["limiar_prob"], l_on, resumo)
     resumo["rf"]["nos"] = n_nos
     resumo["rf"]["bytes_flash"] = 12 * n_nos
-    janelas = escrever_vetores(escolher_trechos(sisfall), nomes, finais["lr"], finais["rf"], l_on)
-    print(f"modelo: {n_nos} nós no Random Forest (~{12 * n_nos / 1024:.0f} KB); vetores de teste: {janelas} janelas")
-    with open(_comum.RESULTADOS / "vestivel.json", "w", encoding="utf-8", newline="\n") as f:
-        json.dump(resumo, f, ensure_ascii=False, indent=2)
-        f.write("\n")
+    vetores, janelas = gerar_vetores(escolher_trechos(sisfall), nomes, finais["lr"], finais["rf"], l_on)
+    arquivos.update(vetores)
+    arquivos[_comum.RESULTADOS / "vestivel.json"] = json.dumps(resumo, ensure_ascii=False, indent=2) + "\n"
+    gravar(arquivos)
+    print(f"modelo: {n_nos} nós no Random Forest (~{12 * n_nos / 1e3:.0f} kB); vetores de teste: {janelas} janelas")
 
 
 if __name__ == "__main__":

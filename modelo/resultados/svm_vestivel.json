@@ -1,0 +1,110 @@
+{
+  "cenario": "A",
+  "l_on_g": 2.0,
+  "janelas": 12723,
+  "impactos": 1784,
+  "atributos": 23,
+  "modelos": {
+    "lr": {
+      "nome": "Regressão logística",
+      "auc": 0.9984296836472292,
+      "sens_ensaio": 0.942714126807564,
+      "alarmes_h": 0.6191941589351008,
+      "sens_1alarme_h": 0.9493882091212458,
+      "tempo_validacao_s": 0.7349436999938916,
+      "bytes": 284,
+      "ops": 69,
+      "exp": 1,
+      "vs_rf": {
+        "dif_alarmes_h": {
+          "media": 0.0639361901314365,
+          "ic95": [
+            -0.48325336006038994,
+            0.5413347293448196
+          ],
+          "p_rf_melhor": 0.5685
+        },
+        "dif_sens_1alarme_h_pp": {
+          "media": -0.12255034336124672,
+          "ic95": [
+            -1.813977011494253,
+            1.4494071146245007
+          ],
+          "p_rf_melhor": 0.548
+        }
+      }
+    },
+    "rf": {
+      "nome": "Random Forest 60 × 10",
+      "auc": 0.9989690331258094,
+      "sens_ensaio": 0.942714126807564,
+      "alarmes_h": 0.5503948079423118,
+      "sens_1alarme_h": 0.9505005561735261,
+      "tempo_validacao_s": 4.146996399998898,
+      "bytes": 106368,
+      "nos": 8854,
+      "ops": 600,
+      "exp": 0
+    },
+    "svm_6000": {
+      "nome": "SVM (RBF), 6000 atividades",
+      "auc": 0.9991725414108487,
+      "sens_ensaio": 0.942714126807564,
+      "alarmes_h": 0.7567928609206787,
+      "sens_1alarme_h": 0.9593993325917687,
+      "tempo_validacao_s": 1.5127258999855258,
+      "bytes": 28700,
+      "vetores_suporte": 297,
+      "ops": 20493,
+      "exp": 297,
+      "vs_rf": {
+        "dif_alarmes_h": {
+          "media": 0.19505933235459702,
+          "ic95": [
+            -0.34891302871221264,
+            0.8843123228096933
+          ],
+          "p_rf_melhor": 0.665
+        },
+        "dif_sens_1alarme_h_pp": {
+          "media": 0.10020978888991389,
+          "ic95": [
+            -9.57215628090999,
+            2.5800568422567456
+          ],
+          "p_rf_melhor": 0.3
+        }
+      }
+    },
+    "svm_todas": {
+      "nome": "SVM (RBF), todas as janelas",
+      "auc": 0.9991853007116103,
+      "sens_ensaio": 0.942714126807564,
+      "alarmes_h": 0.6879935099278898,
+      "sens_1alarme_h": 0.9621802002224694,
+      "tempo_validacao_s": 0.9614186999970116,
+      "bytes": 33596,
+      "vetores_suporte": 348,
+      "ops": 24012,
+      "exp": 348,
+      "vs_rf": {
+        "dif_alarmes_h": {
+          "media": 0.12494818160112327,
+          "ic95": [
+            -0.4152351431855116,
+            0.8014571657101291
+          ],
+          "p_rf_melhor": 0.585
+        },
+        "dif_sens_1alarme_h_pp": {
+          "media": 0.7790802627674862,
+          "ic95": [
+            -4.253082219522067,
+            2.8780847725380547
+          ],
+          "p_rf_melhor": 0.187
+        }
+      }
+    }
+  }
+}

@@ -28,7 +28,7 @@ from sklearn.metrics import roc_curve
 
 from queda import atributos, avaliacao, modelos
 from queda.dados import FS
-from queda.pipeline import CENARIOS, montar
+from queda.pipeline import CENARIOS, PRE_S, montar
 
 # Custo estimado de extrair os atributos de uma janela de 360 amostras (operações): momentos e demais
 # atributos no tempo (~40 por amostra), FFT de 512 pontos (~5·N·log2 N) e AR(4) por mínimos quadrados.
@@ -92,7 +92,8 @@ def main():
     sisfall, _ = _comum.carregar()
     l_on = json.loads((_comum.RESULTADOS / "gatilho_escolhido.json").read_text())[c]
     conj = montar(sisfall, c, l_on)
-    pre = int(round(conj.janelas.shape[1] * 1.0 / 1.8))
+    # a amostra do pico na janela: o mesmo PRE_S que recorta a janela (pipeline) e que o 09 exporta
+    pre = int(PRE_S * FS)
     print(f"cenário {c} ({CENARIOS[c]['descricao']}), L_on = {l_on} g: {len(conj.y)} janelas, "
           f"{int(conj.y.sum())} de impacto, {int((conj.y == 0).sum())} de atividade")
 
