@@ -66,6 +66,10 @@ uv run python experimentos/09_exportar_vestivel.py
 uv run python experimentos/10_figuras_apresentacao.py
 ```
 
+```bash
+uv run python experimentos/11_svm_vestivel.py
+```
+
 A ordem importa:
 1. `02_gatilho.py` escolhe o L_on, que os outros scripts leem.
 2. `05_figuras.py` e `06_resumo.py` só leem as tabelas.
@@ -85,6 +89,9 @@ A ordem importa:
    - Escreve as tabelas e os números em `relatorios/Semestre 2/Projeto 3/Q1/apresentacao/`.
    - Confere que o Random Forest que ele explica é o do vestível (limiar e vetores de teste).
    - Depois, compile lá com `pdflatex main.tex`, duas vezes.
+7. `11_svm_vestivel.py` roda depois do `09`. Ele avalia o SVM na configuração do vestível, ao lado do Random
+   Forest e da regressão logística, com intervalos de confiança por pessoa, e leva ~30 s. Não muda o modelo
+   exportado.
 
 A primeira leitura da SisFall leva ~1 min e fica em cache em `dados/cache/`. A comparação completa, com as
 duas CNNs, leva ~3 min por cenário.
@@ -119,6 +126,7 @@ duas CNNs, leva ~3 min por cenário.
 | `experimentos/07_figuras_explicativas.py` | 11 figuras para a apresentação e o relatório, e `ensaios_com_alarme_A.csv` (% de ensaios de cada atividade com alarme: limiar atual × Random Forest) |
 | `experimentos/08_relatorio_latex.py` | figuras e tabelas (`.tex`) do relatório LaTeX do Q1, geradas dos resultados |
 | `experimentos/09_exportar_vestivel.py` | treina os classificadores do vestível com o gatilho causal e gera `fall_model.h`/`.c`, os vetores de teste de paridade e `resultados/vestivel.json` |
+| `experimentos/11_svm_vestivel.py` | SVM (RBF) na configuração do vestível (gatilho causal, 23 atributos no tempo, ±8 g) contra o Random Forest 60 × 10 e a regressão logística: métricas, tamanho, operações por janela e bootstrap por pessoa. Grava `resultados/svm_vestivel.json` |
 | `experimentos/10_figuras_apresentacao.py` | figuras em tamanho de slide (`ap_*.png`), tabelas e números da apresentação Beamer do Q1. Inclui o sinal antes e depois do filtro, a árvore de decisão, a fronteira árvore × floresta e os votos das 60 árvores |
 | `experimentos/_estilo.py` | paleta, parâmetros do matplotlib e nomes dos atributos, comuns ao `07` e ao `10` |
 
@@ -149,7 +157,8 @@ Números de [`resultados/resumo.md`](resultados/resumo.md).
 - **Nos nossos ensaios** (treino na SisFall saturada em ±2 g):
   - Random Forest, regressão logística e SVM: **nenhum alarme falso**, com as 7 quedas de frente e de costas
     detectadas;
-  - as quedas de joelhos foram perdidas: são mais lentas, e os ensaios acabam ~1 s depois do impacto.
+  - as quedas de joelhos foram perdidas (o SVM pegou uma das três): são mais lentas, e os ensaios acabam ~1 s
+    depois do impacto.
 
 ## No vestível
 
@@ -161,7 +170,7 @@ sai de `experimentos/09_exportar_vestivel.py`, com os números em
   - acompanha o pico de \|a\| filtrado desde uma subida até 2,0 g e o emite depois de 0,5 s sem um valor maior;
   - deixa passar as mesmas 99,2 % das quedas que o `find_peaks` e dispara menos (753 contra 858 por hora).
 - **Só os 23 atributos no tempo:** sem FFT nem AR no C, perdendo pouco.
-- **Random Forest** de 60 árvores com profundidade ≤ 10 (~104 KB na flash), o padrão:
+- **Random Forest** de 60 árvores com profundidade ≤ 10 (106 kB na flash), o padrão:
   - 0,55 alarme falso/h;
   - 95,1 % das quedas com ≤ 1 alarme/h;
   - limiar P ≥ 0,73.
@@ -169,6 +178,14 @@ sai de `experimentos/09_exportar_vestivel.py`, com os números em
   - 0,62 alarme falso/h;
   - 94,9 % das quedas com ≤ 1 alarme/h;
   - limiar P ≥ 0,96.
+- **SVM (RBF)**, avaliado na mesma configuração por `11_svm_vestivel.py` ([`resultados/svm_vestivel.json`](resultados/svm_vestivel.json)), mas
+  não exportado:
+  - treinado com todas as janelas: 0,69 alarme falso/h e 96,2 % das quedas com ≤ 1 alarme/h;
+  - 34 kB na flash (348 vetores de suporte), mas ~24 mil operações e 348 exponenciais por janela, contra ≤ 600
+    comparações do Random Forest;
+  - **empate estatístico** com o Random Forest e a logística. No bootstrap por pessoa, todos os intervalos de 95 %
+    das diferenças passam pelo zero: para o SVM, alarmes/h de −0,42 a +0,80 e quedas com ≤ 1 alarme/h de −4,3 a
+    +2,9 pontos.
 
 O script gera `fall_model.h`/`fall_model.c`, com o filtro, as constantes e os dois modelos. Gera também os
 vetores de `test_host/vetores/`: 8 trechos da SisFall e o que o Python calcula neles. Os testes de host do C

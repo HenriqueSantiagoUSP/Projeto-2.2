@@ -48,9 +48,16 @@ ATIVIDADES_SISFALL = {
 }
 
 ATIVIDADES_PROPRIAS = {
+    # Ensaios de 2026 (cintura, ±2 g): <rotulo>_<n>.csv, valores em g e °/s
     "andando": "andar", "correndo": "correr",
     "caindo_costas": "queda de costas", "caindo_frente": "queda de frente", "caindo_joelho": "queda de joelhos",
+    # Protocolo de coleta no pulso (docs/coleta-de-dados.md): <pessoa>_<rotulo>_<n>.csv, valores brutos
+    "queda_frente": "queda para a frente", "queda_tras": "queda para trás", "queda_lado": "queda de lado",
+    "queda_joelhos": "queda ajoelhando", "andar": "andar", "sentar": "sentar e levantar",
+    "deitar": "deitar e levantar", "sentar_brusco": "sentar-se bruscamente", "palmas": "bater palmas",
+    "acenar": "acenar", "bater_mesa": "bater na mesa", "gesticular": "gesticular conversando",
 }
+PREFIXOS_QUEDA = ("caindo", "queda")
 
 
 @dataclass
@@ -107,22 +114,56 @@ def _arquivos_sisfall(raiz: Path) -> list[tuple[Path, str, str, int]]:
     return sorted(achados, key=lambda a: (a[1], a[2], a[3]))
 
 
-def carregar_sisfall(raiz: Path | None = None, usar_cache: bool = True) -> list[Ensaio]:
-    """Lê todos os ensaios da SisFall em dados/publicos/ (busca as pastas SAxx/SExx em qualquer nível)."""
-    raiz = Path(raiz) if raiz else DADOS / "publicos"
-    cache = CACHE / "sisfall_v1.pkl"
-    if usar_cache and cache.exists():
+def _assinatura(arquivos: list[tuple[Path, str, str, int]]) -> tuple[int, int, int]:
+    """Muda se um arquivo entra, sai ou é alterado: quantos são, o tamanho total e a data mais recente (ns)."""
+    stats = [p.stat() for p, *_ in arquivos]
+    return len(stats), sum(s.st_size for s in stats), max((s.st_mtime_ns for s in stats), default=0)
+
+
+def _ler_cache(cache: Path, raiz: Path, assinatura) -> list | None:
+    """Os brutos do cache, se ele for desta pasta e destes arquivos; None se não servir (e diz por quê)."""
+    if not cache.exists():
+        return None
+    try:
         with open(cache, "rb") as f:
-            brutos = pickle.load(f)
-    else:
-        arquivos = _arquivos_sisfall(raiz)
-        if not arquivos:
-            raise FileNotFoundError(f"nenhum ensaio da SisFall em {raiz}")
-        brutos = [(str(p.relative_to(DADOS)), pessoa, codigo, rep, _ler_txt_sisfall(p))
-                  for p, pessoa, codigo, rep in arquivos]
+            conteudo = pickle.load(f)
+    except (EOFError, pickle.UnpicklingError, OSError, AttributeError, ValueError) as e:
+        print(f"Cache da SisFall ilegível ({type(e).__name__}): relendo os arquivos, {cache} será refeito.")
+        return None
+    if not isinstance(conteudo, dict) or conteudo.get("raiz") != str(raiz.resolve()) or \
+            conteudo.get("assinatura") != assinatura:
+        print("Cache da SisFall de outra pasta ou de arquivos que mudaram: relendo.")
+        return None
+    return conteudo["brutos"]
+
+
+def carregar_sisfall(raiz: Path | None = None, usar_cache: bool = True) -> list[Ensaio]:
+    """
+    Lê todos os ensaios da SisFall em dados/publicos/ (busca as pastas SAxx/SExx em qualquer nível).
+
+    O cache (dados/cache/) guarda a pasta e uma assinatura dos arquivos: relê se algum mudou ou se a pasta é
+    outra. Ele é gravado num temporário e trocado de uma vez, então uma interrupção não deixa um cache truncado.
+    """
+    raiz = Path(raiz) if raiz else DADOS / "publicos"
+    cache = CACHE / "sisfall_v2.pkl"
+    arquivos = _arquivos_sisfall(raiz)
+    if not arquivos:
+        raise FileNotFoundError(f"nenhum ensaio da SisFall em {raiz}")
+    assinatura = _assinatura(arquivos)
+    brutos = _ler_cache(cache, raiz, assinatura) if usar_cache else None
+    if brutos is None:
+        def nome(p: Path) -> str:
+            try:
+                return str(p.relative_to(DADOS))
+            except ValueError:
+                return str(p)
+        brutos = [(nome(p), pessoa, codigo, rep, _ler_txt_sisfall(p)) for p, pessoa, codigo, rep in arquivos]
         CACHE.mkdir(parents=True, exist_ok=True)
-        with open(cache, "wb") as f:
-            pickle.dump(brutos, f, protocol=pickle.HIGHEST_PROTOCOL)
+        temporario = cache.with_name(cache.name + ".tmp")
+        with open(temporario, "wb") as f:
+            pickle.dump({"raiz": str(raiz.resolve()), "assinatura": assinatura, "brutos": brutos}, f,
+                        protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(temporario, cache)
     ensaios = []
     for arquivo, pessoa, codigo, rep, bruto in brutos:
         acc = (bruto[:, 0:3].astype(np.float32) * np.float32(ADXL345_G))
@@ -135,10 +176,19 @@ def carregar_sisfall(raiz: Path | None = None, usar_cache: bool = True) -> list[
 # Dados próprios
 # ---------------------------------------------------------------------------------------------------------
 
-_NOME_PROPRIO = re.compile(r"^(?P<rotulo>[a-z_]+?)_(?P<rep>\d+)\.csv$")
+_NOME_PROPRIO = re.compile(r"^(?P<rotulo>[a-z_]+?)_(?P<rep>\d+)\.csv$")                       # andando_1.csv
+_NOME_COLETA = re.compile(r"^(?P<pessoa>p\d+)_(?P<rotulo>[a-z_]+?)_(?P<rep>\d+)\.csv$")       # p03_queda_frente_2.csv
+_ARQUIVOS_AUXILIARES = ("metadados.csv",)
+
+# Valores brutos do MPU-6050 no firmware atual (±8 g, ±500 °/s): docs/coleta-de-dados.md
+LSB_POR_G = 4096.0
+LSB_POR_DPS = 65.5
+# Parado, a mediana de |a| é ~1 em g e ~4096 em contagens: acima disto, o arquivo está em contagens.
+_LIMIAR_CONTAGENS = 50.0
 
 
 def _ler_csv_proprio(caminho: Path) -> np.ndarray:
+    """As linhas t_ms,ax,ay,az,gx,gy,gz (com ou sem o prefixo CSV:), sem cabeçalhos e sem valores não finitos."""
     linhas = []
     for linha in caminho.read_text(encoding="utf-8", errors="replace").splitlines():
         linha = linha.strip()
@@ -148,10 +198,30 @@ def _ler_csv_proprio(caminho: Path) -> np.ndarray:
         if len(partes) < 7:
             continue
         try:
-            linhas.append([float(p) for p in partes[:7]])
+            valores = [float(p) for p in partes[:7]]
         except ValueError:
             continue                         # cabeçalho ou linha truncada
-    return np.asarray(linhas, dtype=np.float64)
+        if all(np.isfinite(valores)):        # "nan"/"inf" passam no float() e contaminariam o filtro
+            linhas.append(valores)
+    return np.asarray(linhas, dtype=np.float64).reshape(-1, 7)
+
+
+def _trecho_continuo(bruto: np.ndarray) -> np.ndarray:
+    """O trecho mais longo em que t_ms não volta atrás (o firmware recomeça a contagem a cada cabeçalho)."""
+    cortes = np.flatnonzero(np.diff(bruto[:, 0]) < 0) + 1
+    if len(cortes) == 0:
+        return bruto
+    trechos = np.split(bruto, cortes)
+    return max(trechos, key=len)
+
+
+def _em_unidades_fisicas(bruto: np.ndarray) -> np.ndarray:
+    """Converte para g e °/s se o arquivo estiver em contagens brutas (o formato do protocolo de coleta)."""
+    if np.median(np.linalg.norm(bruto[:, 1:4], axis=1)) > _LIMIAR_CONTAGENS:
+        bruto = bruto.copy()
+        bruto[:, 1:4] /= LSB_POR_G
+        bruto[:, 4:7] /= LSB_POR_DPS
+    return bruto
 
 
 def _reamostrar(t_s: np.ndarray, x: np.ndarray, fs: float) -> np.ndarray:
@@ -163,27 +233,48 @@ def _reamostrar(t_s: np.ndarray, x: np.ndarray, fs: float) -> np.ndarray:
 
 def carregar_proprios(raiz: Path | None = None, pessoa: str = "p01") -> list[Ensaio]:
     """
-    Lê os ensaios de dados/proprios/<rotulo>_<n>/<rotulo>_<n>.csv (ignora *_processado.csv).
+    Lê os ensaios próprios em dois formatos (ignora *_processado.csv e metadados.csv):
+    - os de 2026: <rotulo>_<n>.csv, em g e °/s, todos da pessoa `pessoa`;
+    - os do protocolo de coleta (docs/coleta-de-dados.md): <pessoa>_<rotulo>_<n>.csv, em contagens brutas.
 
-    O t_ms dos arquivos tem resolução de 10 ms (duas amostras por tique), então o tempo de cada amostra é
-    reconstruído como uniforme entre o primeiro e o último t_ms; depois tudo é reamostrado para 200 Hz.
+    A unidade é deduzida do próprio sinal (mediana de |a| ~1 em g, ~4096 em contagens). O t_ms dos arquivos
+    antigos tem resolução de 10 ms (duas amostras por tique), então o tempo de cada amostra é reconstruído
+    como uniforme entre o primeiro e o último t_ms; depois tudo é reamostrado para 200 Hz.
+
+    Nada é descartado em silêncio: arquivos com nome ou rótulo desconhecido, curtos demais ou sem duração
+    são listados num aviso, e uma pasta ausente também.
     """
     raiz = Path(raiz) if raiz else DADOS / "proprios"
-    ensaios = []
+    if not raiz.is_dir():
+        print(f"Aviso: pasta de ensaios próprios não encontrada ({raiz}); nenhum ensaio próprio carregado.")
+        return []
+    ensaios, ignorados = [], []
     for caminho in sorted(raiz.rglob("*.csv")):
-        if caminho.name.endswith("_processado.csv"):
+        if caminho.name.endswith("_processado.csv") or caminho.name in _ARQUIVOS_AUXILIARES:
             continue
-        m = _NOME_PROPRIO.match(caminho.name)
+        m = _NOME_COLETA.match(caminho.name) or _NOME_PROPRIO.match(caminho.name)
         if not m or m.group("rotulo") not in ATIVIDADES_PROPRIAS:
+            ignorados.append(f"{caminho.name} (nome ou rótulo desconhecido)")
             continue
         bruto = _ler_csv_proprio(caminho)
         if len(bruto) < 10:
+            ignorados.append(f"{caminho.name} ({len(bruto)} linhas válidas)")
             continue
+        bruto = _em_unidades_fisicas(_trecho_continuo(bruto))
         duracao_s = (bruto[-1, 0] - bruto[0, 0]) / 1000.0
+        if len(bruto) < 10 or duracao_s <= 0:
+            ignorados.append(f"{caminho.name} (sem duração)")
+            continue
         t_s = np.linspace(0.0, duracao_s, len(bruto))
         dados = _reamostrar(t_s, bruto[:, 1:7], FS).astype(np.float32)
         rotulo = m.group("rotulo")
-        ensaios.append(Ensaio("propria", pessoa, rotulo, int(m.group("rep")), rotulo.startswith("caindo"),
-                              dados[:, 0:3], dados[:, 3:6], str(caminho.relative_to(DADOS)),
+        try:
+            arquivo = str(caminho.relative_to(DADOS))
+        except ValueError:
+            arquivo = str(caminho)
+        ensaios.append(Ensaio("propria", m.groupdict().get("pessoa") or pessoa, rotulo, int(m.group("rep")),
+                              rotulo.startswith(PREFIXOS_QUEDA), dados[:, 0:3], dados[:, 3:6], arquivo,
                               {"fs_efetiva": (len(bruto) - 1) / duracao_s}))
+    if ignorados:
+        print(f"Aviso: {len(ignorados)} arquivo(s) de ensaio próprio ignorado(s): " + "; ".join(ignorados))
     return ensaios

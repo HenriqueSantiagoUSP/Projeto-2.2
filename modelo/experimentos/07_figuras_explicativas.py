@@ -419,7 +419,8 @@ NOME_PROPRIO = {"andando": "andando", "correndo": "correndo", "caindo_costas": "
 def decisoes_rf_proprios(sisfall, proprios, l_on):
     """O mesmo procedimento de 04_dados_proprios.py, só para o Random Forest."""
     treino, teste = montar(sisfall, "B", l_on), montar(proprios, "B", l_on)
-    pre = int(round(treino.janelas.shape[1] / 1.8))
+    # a amostra do pico na janela: o mesmo PRE_S que recorta a janela (pipeline) e que o 09 exporta
+    pre = int(PRE_S * FS)
     F_tr, nomes = atributos.calcular(treino.janelas, pre)
     F_te, _ = atributos.calcular(teste.janelas, pre)
     cols = [i for i, n in enumerate(nomes) if n not in {"corr_xy", "corr_xz", "corr_yz"}]
@@ -468,9 +469,10 @@ def fig_proprios(sisfall, proprios, l_on):
             ax.axhline(2 * np.sqrt(3), color=EIXO, lw=1)
             picos = gatilho(a, l_on)
             if e.queda:
+                # Como no montar: o disparo mais perto do impacto, ou nenhum se o gatilho o perdeu.
                 impacto = int(np.argmax(a))
-                picos_janela = [min((p for p in picos if abs(p - impacto) <= 0.5 * FS),
-                                    key=lambda p: abs(p - impacto))]
+                perto = [p for p in picos if abs(p - impacto) <= 0.5 * FS]
+                picos_janela = [min(perto, key=lambda p: abs(p - impacto))] if perto else []
             else:
                 picos_janela = picos
             assert len(picos_janela) == len(janelas_de[k])
@@ -551,7 +553,7 @@ def fig_proprios_matriz(proprios):
             n = list(csv[chave])
         q = sum(1 for v, qd in zip(n, csv.queda) if qd and v > 0)
         f = sum(v for v, qd in zip(n, csv.queda) if not qd)
-        totais.append(f"{q}/10 quedas\n{f} alarme{'' if f == 1 else 's'}")
+        totais.append(f"{q}/{int(csv.queda.sum())} quedas\n{f} alarme{'' if f == 1 else 's'}")
     for j, txt in enumerate(totais):
         ax.text(j + 0.5, len(csv) + 0.15, txt, ha="center", va="top", fontsize=8, color=TINTA)
     ax.set_ylim(len(csv) + 1.3, 0)

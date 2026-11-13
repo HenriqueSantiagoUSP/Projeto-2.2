@@ -65,6 +65,12 @@ class Resultado:
 
 def metricas(escores: np.ndarray, conj: Conjunto, sens_alvo: float = SENS_ALVO) -> Resultado:
     y = conj.y
+    # Sem uma das classes o limiar seria inf e a AUC NaN, e o 09 exportaria isso para o firmware.
+    if not (y == 1).any():
+        raise ValueError("nenhuma janela de queda: sem limiar possível (L_on alto demais, ou o gatilho perdeu "
+                         "todos os impactos?)")
+    if not (y == 0).any():
+        raise ValueError("nenhuma janela de atividade: não há como medir alarmes falsos")
     quedas_total = sum(1 for e in conj.ensaios if e["queda"])
     horas_adl = sum(e["duracao_s"] for e in conj.ensaios if not e["queda"]) / 3600
     pos, neg = np.sort(escores[y == 1]), escores[y == 0]
@@ -111,6 +117,7 @@ def detector_do_firmware(ensaios: list[Ensaio], cenario: str, l_on_g2: float = 6
     """
     faixa = CENARIOS[cenario]
     detectadas, alarmes, quedas, horas = 0, 0, 0, 0.0
+    ensaios_adl, adl_com_alarme = 0, 0
     for e in ensaios:
         acc, _ = saturar(e.acc, e.gyr, faixa["g_max"], faixa["dps_max"])
         a2 = (acc.astype(np.float64) ** 2).sum(axis=1)
@@ -123,5 +130,8 @@ def detector_do_firmware(ensaios: list[Ensaio], cenario: str, l_on_g2: float = 6
         else:
             horas += e.duracao_s / 3600
             alarmes += eventos
+            ensaios_adl += 1
+            adl_com_alarme += int(eventos > 0)
     return {"sens_ensaio": detectadas / max(quedas, 1), "alarmes_h": alarmes / max(horas, 1e-9),
-            "alarmes": alarmes, "horas_adl": horas}
+            "alarmes": alarmes, "horas_adl": horas, "detectadas": detectadas, "quedas": quedas,
+            "ensaios_adl": ensaios_adl, "ensaios_adl_com_alarme": adl_com_alarme}

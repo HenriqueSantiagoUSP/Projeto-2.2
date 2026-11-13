@@ -12,13 +12,22 @@ dados/
   publicos/
     SisFall_dataset/SisFall_dataset/   a SisFall como baixada: SA01…SA23, SE01…SE15, Readme.txt, Supplementary.pdf
   proprios/
-    <rotulo>_<n>/<rotulo>_<n>.csv      um ensaio por pasta (ex.: caindo_frente_2/caindo_frente_2.csv)
+    <rotulo>_<n>/<rotulo>_<n>.csv      os ensaios de 2026, um por pasta (ex.: caindo_frente_2/caindo_frente_2.csv)
+    <sessao>/<pessoa>_<rotulo>_<n>.csv a coleta pelo protocolo (ex.: p03_queda_frente_2.csv), com metadados.csv
   cache/                               gerado por modelo/ (pode apagar; é refeito)
 ```
 
 Os leitores (`modelo/queda/dados.py`) procuram as pastas SAxx/SExx em qualquer nível de `publicos/` e os CSVs
-em qualquer nível de `proprios/`. Os `*_processado.csv` e `*_plot.png` dos ensaios próprios são derivados e
-ficam de fora.
+em qualquer nível de `proprios/`. Os `*_processado.csv`, os `*_plot.png` e o `metadados.csv` ficam de fora.
+- **Os dois formatos de nome** são aceitos, com os rótulos de `ATIVIDADES_PROPRIAS`. Um arquivo com nome ou
+  rótulo desconhecido não é lido, e o leitor avisa quais foram ignorados.
+- **Unidade:** deduzida do próprio sinal. Parado, o \|a\| dá ~1 em g e ~4096 em contagens brutas (4096 LSB/g e
+  65,5 LSB/(°/s), como no protocolo).
+- **Defeitos tratados:** linhas com `nan`/`inf` são descartadas. Se o `t_ms` voltar atrás (o firmware recomeça a
+  contagem a cada cabeçalho), fica o trecho contínuo mais longo.
+- **Cache da SisFall** (`cache/sisfall_v2.pkl`): guarda a pasta e uma assinatura dos arquivos (quantos, tamanho e
+  data). É relido sozinho se algo mudar. Um cache truncado também é refeito. O `sisfall_v1.pkl` antigo pode ser
+  apagado.
 
 ## SisFall
 
@@ -50,7 +59,7 @@ ficam de fora.
   | `caindo_frente` | 4 |
   | `caindo_joelho` | 3 |
 
-- **Formato** (diferente do protocolo de `docs/coleta-de-dados.md`):
+- **Formato** (o antigo, diferente do protocolo de `docs/coleta-de-dados.md`; o leitor aceita os dois):
   - sem cabeçalho, 7 colunas: `t_ms,ax,ay,az,gx,gy,gz`;
   - aceleração já em g e giroscópio em °/s;
   - `t_ms` com resolução de 10 ms (duas amostras por tique), ~190–198 Hz efetivos.

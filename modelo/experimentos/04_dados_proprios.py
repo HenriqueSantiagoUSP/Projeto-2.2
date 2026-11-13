@@ -21,7 +21,8 @@ import pandas as pd
 
 from queda import atributos, avaliacao, modelos
 from queda.cnn import CNN1D
-from queda.pipeline import montar
+from queda.dados import FS
+from queda.pipeline import PRE_S, montar
 
 CENARIO = "B"
 DEPENDEM_DA_ORIENTACAO = {"corr_xy", "corr_xz", "corr_yz"}
@@ -32,7 +33,8 @@ def main():
     l_on = json.loads((_comum.RESULTADOS / "gatilho_escolhido.json").read_text())[CENARIO]
     treino = montar(sisfall, CENARIO, l_on)
     teste = montar(proprios, CENARIO, l_on)
-    pre = int(round(treino.janelas.shape[1] / 1.8))
+    # a amostra do pico na janela: o mesmo PRE_S que recorta a janela (pipeline) e que o 09 exporta
+    pre = int(PRE_S * FS)
     F_tr, nomes = atributos.calcular(treino.janelas, pre)
     F_te, _ = atributos.calcular(teste.janelas, pre)
     cols = [i for i, n in enumerate(nomes) if n not in DEPENDEM_DA_ORIENTACAO]
@@ -55,8 +57,12 @@ def main():
     }
     dobra = avaliacao.dobras(treino)
     base = avaliacao.detector_do_firmware(proprios, CENARIO)
-    resumo = [{"metodo": "limiar_do_firmware (2,5 g)", "quedas_detectadas": round(base["sens_ensaio"] * 10),
-               "quedas": 10, "alarmes_falsos": base["alarmes"], "ensaios_adl_com_alarme": np.nan}]
+    # Os totais saem dos dados: com outra coleta (o pulso), as tabelas continuam certas.
+    n_quedas = sum(1 for e in proprios if e.queda)
+    n_adl = len(proprios) - n_quedas
+    resumo = [{"metodo": "limiar_do_firmware (2,5 g)", "quedas_detectadas": base["detectadas"],
+               "quedas": n_quedas, "alarmes_falsos": base["alarmes"],
+               "ensaios_adl_com_alarme": base["ensaios_adl_com_alarme"], "ensaios_adl": n_adl}]
     por_arquivo = {i: {"arquivo": e["arquivo"], "codigo": e["codigo"], "queda": e["queda"],
                        "gatilho_pegou": e["pegou_impacto"], "disparos": e["disparos"]}
                    for i, e in enumerate(teste.ensaios)}
@@ -69,13 +75,13 @@ def main():
         detectadas = int(alarme[teste.y == 1].sum())
         falsos = int(alarme[teste.y == 0].sum())
         adl_com_alarme = len({int(k) for k in teste.ensaio[(teste.y == 0) & alarme]})
-        resumo.append({"metodo": nome, "quedas_detectadas": detectadas, "quedas": int(sum(e["queda"] for e in teste.ensaios)),
-                       "alarmes_falsos": falsos, "ensaios_adl_com_alarme": adl_com_alarme})
+        resumo.append({"metodo": nome, "quedas_detectadas": detectadas, "quedas": n_quedas,
+                       "alarmes_falsos": falsos, "ensaios_adl_com_alarme": adl_com_alarme, "ensaios_adl": n_adl})
         for k in por_arquivo:
             sel = teste.ensaio == k
             por_arquivo[k][nome] = int(alarme[sel].sum())
-        print(f"  {nome:22} quedas {detectadas}/10   alarmes falsos {falsos:2d} "
-              f"(em {adl_com_alarme} de 8 ensaios de atividade)")
+        print(f"  {nome:22} quedas {detectadas}/{n_quedas}   alarmes falsos {falsos:2d} "
+              f"(em {adl_com_alarme} de {n_adl} ensaios de atividade)")
     pd.DataFrame(resumo).to_csv(_comum.RESULTADOS / "proprios_resumo.csv", index=False)
     pd.DataFrame(list(por_arquivo.values())).to_csv(_comum.RESULTADOS / "proprios_por_arquivo.csv", index=False)
     print("limiar do firmware:", base)
