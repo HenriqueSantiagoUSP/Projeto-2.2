@@ -39,7 +39,7 @@ typedef struct __attribute__((packed)) {
     uint8_t  version;     /* ESPNOW_MSG_VERSION */
     uint8_t  type;        /* espnow_msg_type_t */
     uint16_t seq;         /* +1 per new message; a resend repeats it */
-    uint32_t uptime_ms;   /* sender uptime, for logs only */
+    uint32_t uptime_ms;   /* sender uptime; with seq, tells a resend from a new message after a reboot */
 } espnow_header_t;
 
 typedef struct __attribute__((packed)) {
