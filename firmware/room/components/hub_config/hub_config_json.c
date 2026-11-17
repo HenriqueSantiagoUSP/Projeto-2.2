@@ -115,7 +115,7 @@ bool hub_config_from_json(const char *json, size_t len, const rules_params_t *ba
     if (!read_int(root, "saida_noturna_min", 1, 720, &p.night_exit_min, err, err_len)) goto fail;
     if (!read_int(root, "banheiro_min", 1, 720, &p.bathroom_min, err, err_len)) goto fail;
     if (!read_int(root, "inatividade_min", 1, 1440, &p.inactivity_min, err, err_len)) goto fail;
-    if (!read_int(root, "vestivel_offline_s", 30, 3600, &p.wearable_offline_s, err, err_len)) goto fail;
+    if (!read_int(root, "pulseira_offline_s", 30, 3600, &p.wearable_offline_s, err, err_len)) goto fail;
     if (!read_int(root, "bateria_baixa_mV", 3000, 4200, &p.low_battery_mv, err, err_len)) goto fail;
 
     const cJSON *temp = cJSON_GetObjectItemCaseSensitive(root, "temperatura");
@@ -175,7 +175,7 @@ char *hub_config_to_json(const rules_params_t *params,
     cJSON_AddNumberToObject(temp, "histerese", params->temp_hysteresis_c);
     cJSON_AddNumberToObject(temp, "persistencia_min", params->temp_persist_min);
 
-    cJSON_AddNumberToObject(root, "vestivel_offline_s", params->wearable_offline_s);
+    cJSON_AddNumberToObject(root, "pulseira_offline_s", params->wearable_offline_s);
     cJSON_AddNumberToObject(root, "bateria_baixa_mV", params->low_battery_mv);
 
     if (error != NULL) {

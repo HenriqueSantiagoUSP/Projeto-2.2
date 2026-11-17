@@ -1,6 +1,6 @@
 # PCB v1 (2026-10-23)
 
-Primeira PCB do projeto: uma placa-base para as duas placas (hub e vestível), com a ESP32-S3-DevKitC-1 encaixada.
+Primeira PCB do projeto: uma placa-base para as duas placas (hub e pulseira), com a ESP32-S3-DevKitC-1 encaixada.
 Fonte em [`../../fontes/esquematico/`](../../fontes/esquematico/); decisões em [`../../README.md`](../../README.md).
 
 **Situação:** fabricada e em mãos; falta montar e testar (roteiro em

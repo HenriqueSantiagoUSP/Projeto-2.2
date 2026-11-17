@@ -8,8 +8,8 @@
 ## PCB única (primeiro projeto)
 
 O primeiro projeto é **uma só PCB para as duas placas**: uma placa-base em que a **ESP32-S3-DevKitC-1** é
-encaixada e que leva os periféricos do hub e do vestível. Só o firmware muda: o hub usa as portas, o PIR e o
-LM35; o vestível usa o MPU-6050 e o botão; os dois usam o CAN e o LED da DevKit. Por isso nenhuma função
+encaixada e que leva os periféricos do hub e da pulseira. Só o firmware muda: o hub usa as portas, o PIR e o
+LM35; a pulseira usa o MPU-6050 e o botão; os dois usam o CAN e o LED da DevKit. Por isso nenhuma função
 divide pino com outra.
 
 O mapa vale para o firmware em `firmware/common/pcb/include/pcb_pins.h`. Ele é verificado na compilação: o
@@ -33,27 +33,27 @@ tomaria, mesmo que hoje não haja problema.
 | nunca | 43, 44 | UART0: o console e a gravação pela ponte USB da DevKit |
 | nunca | 26–32, 33–37 | flash SPI e, nos módulos N8R8/N16R8, a PSRAM octal |
 | nunca | 38, 48, 47 | 38 e 48: LED RGB da DevKitC-1 (v1.1 e v1.0). 47 e 48 são `SPICLK_P/N`, alimentados pelo `VDD_SPI`, que é de 1,8 V nos módulos com memória de 1,8 V |
-| reserva | 15, 16 | `XTAL_32K_P/N`: um cristal de 32 kHz, para relógio preciso em *light sleep* no vestível |
+| reserva | 15, 16 | `XTAL_32K_P/N`: um cristal de 32 kHz, para relógio preciso em *light sleep* na pulseira |
 | expansão | 39–42 | `MTCK/MTDO/MTDI/MTMS`: JTAG por pinos. Hoje a depuração é pela USB; o que ficar aqui se perde se o JTAG por pinos for ligado |
 | só analógico | ADC1: 1–10 | o ADC2 (11–20) não funciona com o Wi-Fi ligado. Todo analógico vai no ADC1, e os pinos do ADC1 ficam para analógico sempre que possível |
 | I²C do ULP | 1 (SDA), 2 (SCL) | o I²C do coprocessador ULP RISC-V só aceita SDA em 1 ou 3 e SCL em 0 ou 2; tirando os de *strapping*, sobra 1/2. Com o I²C principal aí, o ULP poderá ler o MPU-6050 em *deep sleep* sem refazer a placa. Se as trilhas até o GY-521 se cruzarem, gire o módulo na placa em vez de trocar os pinos |
-| acordar | RTC GPIO: 0–21 | o botão e o INT do MPU-6050 precisam ser RTC GPIO para acordar o vestível de *deep sleep* (ext1) |
+| acordar | RTC GPIO: 0–21 | o botão e o INT do MPU-6050 precisam ser RTC GPIO para acordar a pulseira de *deep sleep* (ext1) |
 
 ### Mapa
 
 | GPIO | Função | Placa | Observação |
 |---|---|---|---|
-| 1 | I²C SDA (MPU-6050) | vestível | par do ULP; ADC1_CH0 usado como digital |
-| 2 | I²C SCL | vestível | par do ULP; ADC1_CH1 |
+| 1 | I²C SDA (MPU-6050) | pulseira | par do ULP; ADC1_CH0 usado como digital |
+| 2 | I²C SCL | pulseira | par do ULP; ADC1_CH1 |
 | 4 | LM35 (saída do LM358) | hub | ADC1_CH3 |
-| 5 | reservado: medição da bateria de um vestível próprio no futuro (nesta PCB não há divisor) | — | ADC1_CH4 |
+| 5 | reservado: medição da bateria de uma pulseira própria no futuro (nesta PCB não há divisor) | — | ADC1_CH4 |
 | 6, 7 | reserva analógica | — | ADC1_CH5 e CH6, para sensores futuros |
 | 8 | PIR HC-SR501 | hub | ADC1_CH7, usado como digital |
 | 9, 10 | portas 3 e 4 (opcionais) | hub | ADC1_CH8 e CH9: se faltar entrada analógica, essas portas cedem o lugar |
 | 11, 12 | portas 1 (quarto) e 2 (banheiro) | hub | ADC2, mas digital: sem problema com o Wi-Fi |
-| 13, 14 | CAN TX / RX | os dois | no vestível, só em bancada (`GADGET_CAN`) |
-| 17 | INT do MPU-6050 | vestível | RTC GPIO |
-| 18 | botão "estou bem" | vestível | RTC GPIO; pull-up interno e filtro de glitch |
+| 13, 14 | CAN TX / RX | os dois | na pulseira, só em bancada (`GADGET_CAN`) |
+| 17 | INT do MPU-6050 | pulseira | RTC GPIO |
+| 18 | botão "estou bem" | pulseira | RTC GPIO; pull-up interno e filtro de glitch |
 | 21 | livre: o buzzer saiu em 2026-10-23 | — | |
 | 39–42 | expansão (ex.: portas 5 a 8) | — | só enquanto o JTAG por pinos não for usado |
 | 15, 16 | não ligar: cristal de 32 kHz | — | |
@@ -90,7 +90,7 @@ Para acrescentar uma porta, basta uma linha em `BOARD_DOORS` no `board_pins.h` d
 entrada, o tópico `porta/<id>` e o ID CAN. São **até 8 portas**, uma por nibble CAN (`0x0F3`–`0x0FA`): as 4 da
 placa e as 4 da expansão. O build falha se passar disso.
 
-O CAN do vestível existe só para o requisito da disciplina e para os testes em bancada: a pulseira de verdade
+O CAN da pulseira existe só para o requisito da disciplina e para os testes em bancada: a pulseira de verdade
 não tem transceptor e fala com o hub por ESP-NOW.
 
 ### Condicionamento do LM35 (decidido em 2026-10-21)
@@ -162,7 +162,7 @@ TVS/ESD no conector.
 
 A placa tem **uma entrada só**, um módulo USB-C, e não carrega bateria:
 - o **hub** é alimentado por um carregador de tomada;
-- o **vestível** (protótipo), por um **power bank** na mesma entrada.
+- a **pulseira** (protótipo), por um **power bank** na mesma entrada.
 
 Como só existe uma entrada, nunca há duas fontes juntas.
 
@@ -180,16 +180,16 @@ Como só existe uma entrada, nunca há duas fontes juntas.
 | D1 1N5819 | do `+5V` ao pino 5V da DevKit (faixa do lado da DevKit), para não juntar duas fontes quando a USB da DevKit for ligada para gravar |
 
 - **Fonte do hub:** carregador USB-A de 1 A ou mais, com cabo A → C.
-- **Fonte do vestível:** power bank **com saída USB-A**, ligado pelo mesmo cabo A → C. Um de 5000 mAh deve durar
+- **Fonte da pulseira:** power bank **com saída USB-A**, ligado pelo mesmo cabo A → C. Um de 5000 mAh deve durar
   ~20–25 h com o consumo atual (estimativa).
   - Muitos power banks desligam sozinhos abaixo de ~50–100 mA. Hoje a placa puxa ~110–130 mA, mas com o *light
     sleep* o consumo cai, e aí é preciso um modelo com modo "always on" ou de baixa corrente. Alguns desses modos
     duram só ~2 h: confirmar com um teste.
-- **Sem medição de bateria:** o vestível manda a bateria como desconhecida (`0xFFFF`), e o alerta `bateria_baixa`
+- **Sem medição de bateria:** a pulseira manda a bateria como desconhecida (`0xFFFF`), e o alerta `bateria_baixa`
   não dispara. Quem mostra a carga são os LEDs do power bank.
 - **Descartado nesta versão:** bateria LiPo com TP4056, boost MT3608 e troca automática por diodo. Funcionaria,
   mas toma tempo e aumenta a placa, num protótipo que já junta as duas placas numa só. Fica para a placa própria
-  do vestível: LiPo + regulador LDO de 3,3 V, mais leve e eficiente ([`docs/decisoes.md`](../docs/decisoes.md)).
+  da pulseira: LiPo + regulador LDO de 3,3 V, mais leve e eficiente ([`docs/decisoes.md`](../docs/decisoes.md)).
 
 ### Recomendações para o esquemático e o layout
 
@@ -267,7 +267,7 @@ Os relatórios tiveram três mapas diferentes. Nenhum serve mais:
 | Portas (reed MC-38) | 5 | 48 | 18, 16 |
 | LM35 (saída condicionada) | 1 (ADC1_CH0) | 18 (ADC2_CH7) | 1 |
 | MPU-6050 SDA / SCL, INT | 8 / 9 | 35 / 36 | 8 / 9, INT 10 |
-| Botão, buzzer (vestível) | — | — | 11, 12 |
+| Botão, buzzer (pulseira) | — | — | 11, 12 |
 | Bateria | — | — | 2 |
 
 Conflitos que a PCB do S1 tinha, todos cobertos pelas regras acima: o LM35 no ADC2 (GPIO18), o CAN no UART0
@@ -289,4 +289,4 @@ Conflitos que a PCB do S1 tinha, todos cobertos pelas regras acima: o LM35 no AD
 - **MPU-6050 (GY-521):** o módulo já traz os pull-ups do I²C (para a saída do regulador dele) e um regulador de
   3,3 V; conferir no módulo usado se ele aceita o 3V3 da DevKit na entrada.
 - **CAN:** transceptor de 3,3 V e terminação de 120 Ω nas pontas do barramento.
-- **Vestível:** no protótipo, power bank na entrada USB-C; bateria própria só numa placa futura do vestível.
+- **Pulseira:** no protótipo, power bank na entrada USB-C; bateria própria só numa placa futura da pulseira.

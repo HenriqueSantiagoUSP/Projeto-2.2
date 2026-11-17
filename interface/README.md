@@ -18,7 +18,7 @@ hubs (ou simulador.py) ──MQTT 1883──▶ Mosquitto ─┬─▶ Telegraf 
 | Grafana | `grafana/` | painel "Quartos": estado atual e histórico, com seletor de quarto |
 | Notificador | `notificador/` | assina `idoso/+/+/alerta` e envia ao Telegram |
 | Simulador | `simulador.py` | faz o papel de um hub, para testar sem hardware |
-| Demonstração | `demo_vestivel.py` | uma placa só pela USB: o modelo de queda ao vivo e, opcionalmente, no papel do hub (seção 2) |
+| Demonstração | `demo_pulseira.py` | uma placa só pela USB: o modelo de queda ao vivo e, opcionalmente, no papel do hub (seção 2) |
 | Legado | `legado/` | a demonstração de 18/09/2026 (painel HTML, formato antigo), só como histórico |
 
 ## 1. Subir a central
@@ -39,9 +39,9 @@ docker compose ps           # os 5 serviços devem aparecer "running"
 | http://localhost:3000 | Grafana (usuário e senha `GRAFANA_ADMIN_*` do `.env`) |
 | http://localhost:8086 | InfluxDB (usuário e senha `INFLUX_ADMIN_*` do `.env`) |
 
-Os usuários do broker são fixos (`hub`, `vestivel`, `telegraf`, `notificador`, `painel`), porque o arquivo
+Os usuários do broker são fixos (`hub`, `pulseira`, `telegraf`, `notificador`, `painel`), porque o arquivo
 `mosquitto/acl` se refere a eles; só as senhas vêm do `.env`. Trocou uma senha? `docker compose restart mosquitto`.
-O `vestivel` só existe para o MQTT opcional da pulseira e só pode publicar a própria telemetria e o alerta.
+O usuário `pulseira` só existe para o MQTT opcional da pulseira e só pode publicar a própria telemetria e o alerta.
 
 Para apagar todo o histórico e começar do zero: `docker compose down -v`.
 
@@ -68,7 +68,7 @@ Abra o Grafana (painel **Quartos**) e acompanhe; os alertas aparecem na tabela e
 
 ### Demonstração com uma placa só
 
-`demo_vestivel.py` mostra o modelo de queda funcionando com uma ESP e o MPU-6050 ligados pela USB, sem hub.
+`demo_pulseira.py` mostra o modelo de queda funcionando com uma ESP e o MPU-6050 ligados pela USB, sem hub.
 
 1. **Grave na placa o perfil de demonstração** ([`firmware/gadget/README.md`](../firmware/gadget/README.md), seção
    "Demonstração com uma placa só").
@@ -81,12 +81,12 @@ Abra o Grafana (painel **Quartos**) e acompanhe; os alertas aparecem na tabela e
    - só a janela:
 
      ```powershell
-     .venv\Scripts\python demo_vestivel.py --porta COM5
+     .venv\Scripts\python demo_pulseira.py --porta COM5
      ```
    - janela e central, com o programa no papel do hub:
 
      ```powershell
-     .venv\Scripts\python demo_vestivel.py --porta COM5 --mqtt-host <IP desta máquina> --senha <MQTT_HUB_PASSWORD>
+     .venv\Scripts\python demo_pulseira.py --porta COM5 --mqtt-host <IP desta máquina> --senha <MQTT_HUB_PASSWORD>
      ```
 
 A janela mostra:
@@ -98,12 +98,12 @@ A janela mostra:
 
 Teclas: `c` = "estou bem" (publica o `cancelado` da última queda); `q` = sai.
 
-Ao abrir a porta, o programa reinicia a placa, para ler no boot o id do vestível e o modelo (`--sem-reset`
+Ao abrir a porta, o programa reinicia a placa, para ler no boot o id da pulseira e o modelo (`--sem-reset`
 desliga isso).
 
 Com a central, o programa publica no contrato do hub ([`docs/protocolo.md`](../docs/protocolo.md)):
 - `status` online, com `"fw":"demo-usb"`;
-- `vestivel/<id>` com a atividade, a cada 30 s;
+- `pulseira/<id>` com a atividade, a cada 30 s;
 - o `alerta` `queda` com `a2` e `prob`, a cada queda que a placa decide. Ele aparece na tabela de alertas do
   Grafana (coluna P(queda)) e, com o bot configurado, no Telegram.
 
@@ -134,8 +134,8 @@ No firmware do hub (`idf.py menuconfig` em `firmware/room`):
 
 A pulseira normalmente não fala com a central: manda tudo ao hub por ESP-NOW. Com a opção *Also join the
 Wi-Fi and talk to the central over MQTT* (`menuconfig` → Wearable, em `firmware/gadget`), ela usa os mesmos
-dois menus, com usuário `vestivel` e senha `MQTT_VESTIVEL_PASSWORD`, e o mesmo site e quarto do hub. Aí
-publica `vestivel/<id>/telemetria` (medição `vestivel_telemetria` no InfluxDB) e, se o hub não confirmar uma
+dois menus, com usuário `pulseira` e senha `MQTT_PULSEIRA_PASSWORD`, e o mesmo site e quarto do hub. Aí
+publica `pulseira/<id>/telemetria` (medição `pulseira_telemetria` no InfluxDB) e, se o hub não confirmar uma
 queda, o próprio alerta, que o notificador marca como "enviado pela própria pulseira".
 
 Libere as portas 1883 e 9001 no firewall se o hub estiver em outra máquina:
@@ -161,7 +161,7 @@ No PowerShell 5.1, escape as aspas internas com `\"`.
 
 ```powershell
 python -m unittest discover -s notificador     # lógica do notificador
-python -m unittest test_demo_vestivel          # leitura da serial, filtro e alerta do demo_vestivel.py
+python -m unittest test_demo_pulseira          # leitura da serial, filtro e alerta do demo_pulseira.py
 ```
 
 ## 7. Problemas comuns
@@ -169,8 +169,8 @@ python -m unittest test_demo_vestivel          # leitura da serial, filtro e ale
 | Sintoma | Causa provável | Solução |
 |---|---|---|
 | O simulador conecta, mas nada chega ao Grafana nem ao notificador | o **serviço Mosquitto do Windows** escuta em `127.0.0.1:1883` e atende `localhost` antes do Docker | use `--host <IP da máquina>` (`ipconfig`), ou pare o serviço como administrador: `net stop mosquitto` e `Set-Service mosquitto -StartupType Manual` |
-| `Connection Refused: not authorised` | senha errada, ou usuário diferente de `hub`/`vestivel`/`telegraf`/`notificador`/`painel` | confira o `.env`; trocou a senha? `docker compose restart mosquitto` |
-| `docker compose up` reclama de `MQTT_VESTIVEL_PASSWORD` | `.env` criado antes desse usuário existir | acrescente `MQTT_VESTIVEL_PASSWORD=<senha>` ao `.env` (modelo em `.env.example`) |
+| `Connection Refused: not authorised` | senha errada, ou usuário diferente de `hub`/`pulseira`/`telegraf`/`notificador`/`painel` | confira o `.env`; trocou a senha? `docker compose restart mosquitto` |
+| `docker compose up` reclama de `MQTT_PULSEIRA_PASSWORD` | `.env` criado antes desse usuário existir | acrescente `MQTT_PULSEIRA_PASSWORD=<senha>` ao `.env` (modelo em `.env.example`) |
 | Mosquitto reinicia sem parar, com `set: illegal option -` no log | `mosquitto/entrypoint.sh` salvo com fim de linha CRLF | converta para LF (o `.gitattributes` já força LF nos `*.sh` do git) |
 | `docker compose up` reclama de variável | `.env` ausente ou incompleto | `copy .env.example .env` e preencha |
 | Painel do Grafana vazio | ainda não chegou nenhuma mensagem, ou o quarto escolhido no topo não é o do hub | rode o simulador e escolha o quarto no seletor |

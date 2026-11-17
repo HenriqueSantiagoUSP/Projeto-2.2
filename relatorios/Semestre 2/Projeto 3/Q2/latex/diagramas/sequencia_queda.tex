@@ -1,10 +1,10 @@
-% Sequência de uma queda, do vestível ao Telegram, e do cancelamento.
+% Sequência de uma queda, da pulseira ao Telegram, e do cancelamento.
 \begin{tikzpicture}[font=\scriptsize, >=Stealth]
   \tikzset{ator/.style={bloco=#1, minimum width=2.3cm, minimum height=0.75cm},
            msg/.style={->, thick, draw=#1}, msg/.default=black!75,
            resp/.style={->, thick, dashed, draw=black!45},
            nota/.style={draw=black!30, fill=yellow!8, align=left, font=\tiny, inner sep=2pt, anchor=west}}
-  \foreach \x/\n/\t/\c in {0/v/Vestível/corvest, 3.4/h/Hub/corhub, 6.8/m/Mosquitto/corcentral,
+  \foreach \x/\n/\t/\c in {0/v/Pulseira/corvest, 3.4/h/Hub/corhub, 6.8/m/Mosquitto/corcentral,
                           10.2/n/notificador/corcentral, 13.6/t/Telegram/cinza} {
     \node[ator=\c] (\n) at (\x,0) {\textbf{\t}};
     \draw[black!30, thick] (\n.south) -- (\x,-8.6);

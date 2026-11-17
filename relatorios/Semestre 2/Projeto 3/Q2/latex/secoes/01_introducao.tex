@@ -1,6 +1,15 @@
 %======================================================================
 \section{Introdução}\label{sec:intro}
 %======================================================================
+\noindent\colorbox{lightblue!60}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\small
+\textbf{\color{uspblue}Termos usados neste relatório}\\[3pt]
+\textbf{Pulseira}: o dispositivo que o residente usa no pulso. É um ESP32-S3 com o
+acelerômetro e giroscópio MPU-6050 e um botão; detecta a queda e avisa o hub sem fio.\\[2pt]
+\textbf{Hub} (ou hub do quarto): a placa fixa em cada quarto, também com ESP32-S3. Lê as
+portas, a presença e a temperatura, roda as regras de alerta, recebe a pulseira e envia tudo
+à central.\\[2pt]
+No protótipo, as duas são a mesma placa de circuito impresso, com firmwares diferentes.}}
+
 \subsection{O problema}
 
 Numa Instituição de Longa Permanência para Idosos (ILPI), poucos cuidadores acompanham
@@ -26,11 +35,11 @@ processamento feito nos próprios dispositivos.
 \begin{itemize}
   \item Selecionar e caracterizar os sensores de porta, presença, temperatura e movimento.
   \item Projetar o condicionamento do sensor de temperatura e validá-lo em simulação e em bancada.
-  \item Projetar uma placa de circuito impresso única para o hub e o vestível.
+  \item Projetar uma placa de circuito impresso única para o hub e a pulseira.
   \item Integrar o hub ao barramento CAN da sala, com os módulos dos outros grupos.
-  \item Ligar o vestível ao hub sem fio e o hub à central, com um contrato de mensagens
+  \item Ligar a pulseira ao hub sem fio e o hub à central, com um contrato de mensagens
         documentado (MQTT).
-  \item Detectar quedas no vestível com um modelo treinado e embarcado, e gerar os alertas
+  \item Detectar quedas na pulseira com um modelo treinado e embarcado, e gerar os alertas
         de tempo no hub.
   \item Guardar o histórico, mostrar o estado dos quartos e notificar o cuidador.
 \end{itemize}

@@ -15,11 +15,11 @@
 #define MQTT_TOPIC_DOOR           "porta"          /* + "/<door id>" */
 #define MQTT_TOPIC_PRESENCE       "presenca"
 #define MQTT_TOPIC_TEMPERATURE    "temperatura"
-#define MQTT_TOPIC_WEARABLE       "vestivel"       /* + "/<wearable id>" */
+#define MQTT_TOPIC_WEARABLE       "pulseira"       /* + "/<wearable id>" */
 #define MQTT_TOPIC_ALERT          "alerta"
 
 /* Published by the wearable itself, only when its optional MQTT link is on:
-   vestivel/<wearable id>/<suffix>. */
+   pulseira/<wearable id>/<suffix>. */
 #define MQTT_TOPIC_WEARABLE_TELEMETRY  "telemetria"
 #define MQTT_TOPIC_WEARABLE_LINK       "mqtt"     /* online, or offline as its Last Will */
 #define MQTT_TOPIC_CONFIG_WANTED  "config/desejada"
@@ -39,7 +39,7 @@
 #define MQTT_ALERT_BATHROOM       "banheiro_prolongado"
 #define MQTT_ALERT_INACTIVITY     "inatividade"
 #define MQTT_ALERT_TEMPERATURE    "temperatura"
-#define MQTT_ALERT_WEARABLE_OFF   "vestivel_offline"
+#define MQTT_ALERT_WEARABLE_OFF   "pulseira_offline"
 #define MQTT_ALERT_LOW_BATTERY    "bateria_baixa"
 
 /* "estado" values of an alert episode. */

@@ -91,7 +91,7 @@ def comparacao_a():
                        pct(l.sens_1alarme_h), num(l.ops_janela / 1e3, 1) if l.ops_janela > 1 else "---",
                        tamanho(l.bytes_modelo)])
     tabela("comparacao_A",
-           "Comparação dos métodos no cenário A ($\\pm$8\\,g, vestível atual), SisFall com validação cruzada por "
+           "Comparação dos métodos no cenário A ($\\pm$8\\,g, pulseira atual), SisFall com validação cruzada por "
            "pessoa (5 dobras). ``Quedas'' e ``alarmes/h'': no ponto em que 95\\,\\% das janelas de impacto ficam "
            "acima do limiar; as quedas são contadas por ensaio, inclusive as que o gatilho perdeu. ``Quedas com "
            "$\\le$1 alarme/h'': maior fração de quedas detectadas com no máximo um alarme falso por hora de atividade. "

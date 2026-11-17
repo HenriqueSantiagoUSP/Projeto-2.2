@@ -70,18 +70,18 @@ completo, em PDF, fica em \code{hardware/placas/v1/esquema.pdf}.
 \toprule
 GPIO & Função & Placa & Observação \\
 \midrule
-1 & I²C SDA (MPU-6050) & vestível & par do ULP; ADC1, canal 0, usado como digital \\
-2 & I²C SCL & vestível & par do ULP; ADC1, canal 1 \\
+1 & I²C SDA (MPU-6050) & pulseira & par do ULP; ADC1, canal 0, usado como digital \\
+2 & I²C SCL & pulseira & par do ULP; ADC1, canal 1 \\
 4 & LM35 (saída do LM358) & hub & ADC1, canal 3 \\
-5 & reservado: bateria de um vestível próprio & --- & ADC1, canal 4; sem divisor nesta PCB \\
+5 & reservado: bateria de uma pulseira própria & --- & ADC1, canal 4; sem divisor nesta PCB \\
 6, 7 & reserva analógica & --- & ADC1, canais 5 e 6 \\
 8 & PIR HC-SR501 & hub & ADC1, canal 7, usado como digital \\
 9, 10 & portas 3 e 4 (opcionais) & hub & ADC1, canais 8 e 9 \\
 11, 12 & portas 1 (quarto) e 2 (banheiro) & hub & ADC2, mas digitais \\
-13, 14 & CAN TX e RX & os dois & no vestível, só em bancada \\
+13, 14 & CAN TX e RX & os dois & na pulseira, só em bancada \\
 15, 16 & não ligar: cristal de 32\,kHz & --- & reserva \\
-17 & interrupção do MPU-6050 & vestível & RTC GPIO \\
-18 & botão ``estou bem'' & vestível & RTC GPIO; \textit{pull-up} interno e filtro de \textit{glitch} \\
+17 & interrupção do MPU-6050 & pulseira & RTC GPIO \\
+18 & botão ``estou bem'' & pulseira & RTC GPIO; \textit{pull-up} interno e filtro de \textit{glitch} \\
 21 & livre (era o buzzer) & --- & \\
 38 ou 48 & LED WS2812 & os dois & o da DevKit (v1.1 ou v1.0), escolhido no \code{menuconfig} \\
 39--42 & expansão (por exemplo, portas 5 a 8) & --- & só enquanto o JTAG por pinos não for usado \\
@@ -114,17 +114,17 @@ carregador USB-A ou um \textit{power bank} com cabo USB-A $\to$ C.
 Tudo está no repositório do projeto. Os comandos abaixo partem da raiz dele.
 
 \paragraph{Firmware} (ESP-IDF 6.0.1, alvo \code{esp32s3}). Os comandos rodam na pasta da
-placa: \code{firmware/room} para o hub e \code{firmware/gadget} para o vestível.
+placa: \code{firmware/room} para o hub e \code{firmware/gadget} para a pulseira.
 \begin{lstlisting}
 idf.py menuconfig          # Wi-Fi, broker, chaves do ESP-NOW, MAC do par
 idf.py build
 idf.py -p COMx flash monitor
 \end{lstlisting}
-Demonstração com uma placa (vestível sem hub):
+Demonstração com uma placa (pulseira sem hub):
 \begin{lstlisting}
 idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig \
        -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" build flash
-python interface/demo_vestivel.py --porta COMx
+python interface/demo_pulseira.py --porta COMx
 \end{lstlisting}
 
 \paragraph{Testes no computador} (gcc do MSYS2 no Windows):
@@ -145,7 +145,7 @@ python simulador.py --host <IP da máquina> --senha <senha do hub>
 
 \paragraph{Modelo de queda e este relatório} (Python 3.12 com o \code{uv}, em \code{modelo/}):
 \begin{lstlisting}
-uv run python experimentos/09_exportar_vestivel.py   # modelo do vestível e vetores de teste
+uv run python experimentos/09_exportar_pulseira.py   # modelo da pulseira e vetores de teste
 uv run python experimentos/12_relatorio_q2.py        # figuras, tabelas e números deste relatório
 \end{lstlisting}
 Depois, em \code{relatorios/Semestre 2/Projeto 3/Q2/latex/}: \code{pdflatex main.tex}, duas

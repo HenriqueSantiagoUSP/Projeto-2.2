@@ -19,8 +19,8 @@ das duas placas agora segue os slides de [`aulas/`](../aulas/README.md) e o ESP-
 - componentes comuns em `firmware/common/`;
 - tasks com prioridade nomeada e núcleo fixo;
 - event group no lugar de variáveis compartilhadas;
-- CAN e MQTT nas duas placas (no vestível, como opção);
-- ESP-DSP no vestível.
+- CAN e MQTT nas duas placas (na pulseira, como opção);
+- ESP-DSP na pulseira.
 
 O próximo passo é gravar as placas e verificar em bancada (ver [`pendencias.md`](pendencias.md)). O mapa de pinos é o da
 **PCB única** das duas placas ([`hardware/README.md`](../hardware/README.md)). A **PCB v1** está desenhada,
@@ -34,7 +34,7 @@ comunicação sem fio funcionando com os sensores, para 24/11.
 **Modelo de queda:**
 - **2026-11-09 (S2 P3 Q1):** o pipeline e 22 métodos foram desenvolvidos e comparados **no PC**
   ([`modelo/`](../modelo/README.md)), com a SisFall e 18 ensaios próprios, validação cruzada por pessoa.
-- **2026-11-11:** o pipeline foi para o vestível, com o Random Forest (`fall_pipeline`, no lugar do detector
+- **2026-11-11:** o pipeline foi para a pulseira, com o Random Forest (`fall_pipeline`, no lugar do detector
   provisório). Foi verificado nos testes de host, com paridade C × Python, e no build; ainda não rodou em placa.
 - O modelo foi treinado na SisFall (cintura) e precisa ser retreinado com os dados do pulso.
 
@@ -43,13 +43,13 @@ comunicação sem fio funcionando com os sensores, para 24/11.
 | Fase | O quê | Situação | Verificado por |
 |---|---|---|---|
 | 0 | Estrutura do repositório e documentação | feito | — |
-| 1 | Contrato em código (`firmware/common/protocol`, agora com `protocol_can.h`) e componentes comuns (`rtos_util`, `sys_events`, `net`, `mqtt_link`, `can`, `indicators`) | feito | build (hub e vestível) |
+| 1 | Contrato em código (`firmware/common/protocol`, agora com `protocol_can.h`) e componentes comuns (`rtos_util`, `sys_events`, `net`, `mqtt_link`, `can`, `indicators`) | feito | build (hub e pulseira) |
 | 2 | Hub: debounce corrigido, portas modulares, LM35 com `adc_cali` + curva MMQ, aquecimento do PIR | código pronto | build |
 | 3 | Hub: Wi-Fi STA + `WIFI_PS_NONE` + backoff, SNTP, MQTT 3.1.1 com senha, Last Will, outbox, config em NVS, watchdog de 30 s | código pronto | build; validação da config em testes no PC (60 verificações) |
 | 4 | Hub: motor de regras, `alerta`, buzzer, LED de status | código pronto | build; regras em testes no PC (16 cenários, 54 verificações) |
-| 5 | Central: Mosquitto com ACL (agora com o usuário `vestivel`), Telegraf, InfluxDB, Grafana, notificador, simulador novo | feito | ponta a ponta (sem placa); notificador em testes no PC (12 testes) |
-| 6 | Vestível: MPU-6050 a 200 Hz pelo FIFO, modo de coleta, ESP-NOW com varredura e heartbeat; MQTT e CAN opcionais | código pronto | build (padrão e com MQTT + CAN + coleta ligados) |
-| 7 | Vestível: pipeline de queda (filtro, gatilho de 2,0 g, 23 atributos, Random Forest ou regressão logística) + cooldown, botão "estou bem", bateria. Até 2026-11-10 era o detector provisório com histerese | código pronto, **sem light sleep**; modelo provisório (SisFall, cintura) | build; `fall_pipeline` (885 verificações, com paridade C × Python em 26 janelas) e `signal_proc` (25 verificações) no PC |
+| 5 | Central: Mosquitto com ACL (agora com o usuário `pulseira`), Telegraf, InfluxDB, Grafana, notificador, simulador novo | feito | ponta a ponta (sem placa); notificador em testes no PC (12 testes) |
+| 6 | Pulseira: MPU-6050 a 200 Hz pelo FIFO, modo de coleta, ESP-NOW com varredura e heartbeat; MQTT e CAN opcionais | código pronto | build (padrão e com MQTT + CAN + coleta ligados) |
+| 7 | Pulseira: pipeline de queda (filtro, gatilho de 2,0 g, 23 atributos, Random Forest ou regressão logística) + cooldown, botão "estou bem", bateria. Até 2026-11-10 era o detector provisório com histerese | código pronto, **sem light sleep**; modelo provisório (SisFall, cintura) | build; `fall_pipeline` (885 verificações, com paridade C × Python em 26 janelas) e `signal_proc` (25 verificações) no PC |
 | 8 | Coleta de dados | protocolo escrito ([`coleta-de-dados.md`](coleta-de-dados.md)); SisFall e 18 ensaios próprios (cintura, ±2 g, fora do protocolo) descritos em [`dados/README.md`](../dados/README.md); falta a coleta no pulso | leitura e contagem pelo `modelo/` |
 | 9 | Avaliação | não iniciada | — |
 
@@ -70,6 +70,41 @@ A lista de pendências e próximos passos fica em [`pendencias.md`](pendencias.m
 Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
+
+### 2026-11-17 — "pulseira" no lugar de "vestível" em todo o projeto
+
+- **Pedido:** trocar "vestível" por "pulseira" no relatório e no resto do projeto, e explicar logo no início o que é
+  a pulseira e o que é o hub.
+- **Feito:**
+  - **texto** (78 arquivos):
+    - a troca foi feita por script, acertando artigos e contrações ("do vestível" → "da pulseira");
+    - a concordância e os pronomes ("pareado", "ele mesmo", "o hub o declara") foram revisados à mão, a partir
+      de buscas pelos padrões que o script não resolve;
+  - **contrato MQTT** ([`protocolo.md`](protocolo.md)):
+    - tópicos `pulseira/<id>`, `.../telemetria` e `.../mqtt`;
+    - alerta `pulseira_offline`, campo `pulseira` no `detalhe`, `"via":"pulseira"`;
+    - parâmetro `pulseira_offline_s`;
+    - usuário `pulseira` do broker e `MQTT_PULSEIRA_PASSWORD`;
+    - medidas `pulseira*` no InfluxDB;
+    - a mudança foi feita junto no firmware, no Telegraf, no Grafana, no notificador, no simulador e na demo;
+  - **arquivos renomeados:** `demo_pulseira.py` (e o teste), `09_exportar_pulseira.py`, `11_svm_pulseira.py`,
+    `pulseira.json`, `svm_pulseira.json` e três arquivos do relatório do Q2;
+  - **regenerados:** o `fall_model.c`/`.h` pelo `09` (só o cabeçalho mudou; vetores e números iguais) e as
+    figuras e tabelas do Q2 pelo `12`;
+  - **convenção** no início do relatório do Q2 (caixa "Termos usados neste relatório"), do `CLAUDE.md`, do
+    `README.md` e da [`arquitetura.md`](arquitetura.md); decisão em [`decisoes.md`](decisoes.md);
+  - **arquivos locais, fora do git:** a chave da senha no `interface/.env` e o usuário MQTT nos `sdkconfig` da
+    pulseira (o padrão e o da demo);
+  - **ficaram como estavam:** os materiais entregues do Q1 e o `interface/legado/`; o código C segue em inglês
+    (`gadget`, `wearable`).
+- **Verificado:**
+  - build sem avisos do hub e da pulseira (padrão, demo e com MAC, MQTT, CAN e coleta);
+  - testes de host: regras 62, `hub_config` 60, `fall_pipeline` 885, `signal_proc` 25;
+  - notificador 19, demo 15, `pytest` do modelo 30;
+  - `docker compose config` com o `.env` novo;
+  - relatório do Q2 sem erros nem *overfull*; a caixa de termos conferida na imagem;
+  - nenhuma menção a "vestível" fora das notas de convenção, da decisão e do título de um slide entregue.
+- **Não verificado:** a central de ponta a ponta com os tópicos novos, porque o Docker não estava rodando.
 
 ### 2026-11-16 — relatório do Q2 (primeira versão do relatório final)
 
@@ -94,8 +129,8 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     arquivo; a lista fica no topo do `main.tex`;
   - **tamanho dos firmwares**, medido para o relatório:
     - hub: 992 672 bytes, 35 % da partição livre;
-    - vestível com ESP-NOW (build de teste no scratchpad): 960 688 bytes, 37 %;
-    - vestível sem hub: 383 184 bytes, 75 %.
+    - pulseira com ESP-NOW (build de teste no scratchpad): 960 688 bytes, 37 %;
+    - pulseira sem hub: 383 184 bytes, 75 %.
 - **Verificado:**
   - asserts do script: o ajuste reproduz `lm35.h` e o biquad bate com o `fall_model.c`;
   - DRC: 0 erros, 0 sem ligação, 0 divergências; ERC: 0;
@@ -128,7 +163,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   [`decisoes.md`](decisoes.md) (2026-11-13), e o contrato em [`protocolo.md`](protocolo.md) §3.
   - **Quedas que se perdiam:**
     - a regra do hub reconhece a queda por `seq` e `uptime_ms`;
-    - o `seq` do vestível começa aleatório;
+    - o `seq` da pulseira começa aleatório;
     - a FALL não entregue é reenviada até passar;
     - o MPU que reinicia ou o barramento I²C preso deixam de esconder a falta de detecção;
     - o notificador (sessão persistente, envio que insiste, alerta esquisito vira texto).
@@ -138,14 +173,14 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     no fim e uma fonte só para o gatilho e o filtro.
 - **Ficou para decidir:** tirar do treino as janelas que passam da borda dos ensaios (item 19). O efeito medido
   e o que precisaria ser regenerado estão em [`pendencias.md`](pendencias.md) (Firmware).
-- **Verificado:** builds sem avisos (vestível padrão, demo e completo; hub), o build falhando com um MAC
+- **Verificado:** builds sem avisos (pulseira padrão, demo e completo; hub), o build falhando com um MAC
   malformado, todos os testes de host e de Python (com casos novos para cada correção testável no PC). O `09`, o
   `04` e o `08` dão os mesmos resultados.
 - **Não verificado:** nada em placa. A lista do que conferir está em [`pendencias.md`](pendencias.md).
 
 ### 2026-11-13 — demo na bancada: o gráfico congelava quando a USB piscava
 
-- **Pedido:** a janela do `demo_vestivel.py` parou de mostrar pontos novos depois de um tempo. Era o Python ou a
+- **Pedido:** a janela do `demo_pulseira.py` parou de mostrar pontos novos depois de um tempo. Era o Python ou a
   ESP?
 - **Investigado (com a janela travada):**
   - a COM3 abriu, então o script já tinha soltado a porta;
@@ -194,22 +229,22 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   - o Random Forest a fundo, perguntas prováveis com respostas e um glossário.
 - O roteiro dizia "60 árvores (104 KB)" no slide 24; passou a 106 kB, como os slides.
 - **Verificado:** os parâmetros contra `modelo/queda/modelos.py` e `cnn.py`; os números contra
-  `resultados/resumo.md`, `vestivel.json`, `svm_vestivel.json` e o `numeros.tex` da apresentação.
+  `resultados/resumo.md`, `pulseira.json`, `svm_pulseira.json` e o `numeros.tex` da apresentação.
 
-### 2026-11-13 — SVM na configuração do vestível; tamanho do Random Forest nos slides
+### 2026-11-13 — SVM na configuração da pulseira; tamanho do Random Forest nos slides
 
 - **Pedido:**
   - conferir os 252 kB do Random Forest nos slides;
-  - explicar por que não o SVM, que foi melhor nos nossos ensaios e é mais leve, rodando-o na configuração do
-    vestível.
+  - explicar por que não o SVM, que foi melhor nos nossos ensaios e é mais leve, rodando-o na configuração da
+    pulseira.
 - **Encontrado:**
-  - os slides misturavam duas florestas. A da comparação (150 árvores de profundidade 12) ocupa 252 kB. A do
-    vestível (60 × 10) ocupa 106 kB, medidos no `gadget.elf` (`fall_rf_nodes`: 106 248 bytes, mais 120 das
+  - os slides misturavam duas florestas. A da comparação (150 árvores de profundidade 12) ocupa 252 kB. A da
+    pulseira (60 × 10) ocupa 106 kB, medidos no `gadget.elf` (`fall_rf_nodes`: 106 248 bytes, mais 120 das
     raízes) e mostrados no slide como "104 KB", em outra unidade;
-  - o SVM nunca tinha rodado na configuração do vestível, e o `decisoes.md` não dizia por que ele ficou de fora.
+  - o SVM nunca tinha rodado na configuração da pulseira, e o `decisoes.md` não dizia por que ele ficou de fora.
 - **Feito:**
   - nota na tabela "Por que escolhemos o Random Forest" e kB nos dois slides (gerador `10` e `main.tex`);
-  - `modelo/experimentos/11_svm_vestivel.py` e `resultados/svm_vestivel.json`;
+  - `modelo/experimentos/11_svm_pulseira.py` e `resultados/svm_pulseira.json`;
   - [`decisoes.md`](decisoes.md) (2026-11-13), `modelo/README.md` e [`pendencias.md`](pendencias.md) (item do
     retreino).
 - **Resultado (SisFall, ±8 g, gatilho causal, 23 atributos):**
@@ -221,7 +256,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   - nos nossos ensaios, a vantagem do SVM (8 contra 7 de 10 quedas) é uma queda de joelhos.
 - **Verificado:**
   - o `11` reproduz o limiar do Random Forest do `09`;
-  - o `10` gerou as 15 figuras idênticas byte a byte; só mudaram a tabela e o número do vestível;
+  - o `10` gerou as 15 figuras idênticas byte a byte; só mudaram a tabela e o número da pulseira;
   - `pdflatex` da apresentação sem erros nem *overfull*; os slides 21 e 24 conferidos na imagem.
 
 ### 2026-11-11 — demonstração com uma placa e peças ausentes sem erro
@@ -231,11 +266,11 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     queda à interface;
   - nas duas placas, seguir funcionando sem CAN, sem um sensor ou sem rede, com um aviso em vez de erros.
 - **Encontrado no código:**
-  - o vestível sem MAC do hub, ou sem o MPU-6050, reiniciava em laço;
+  - a pulseira sem MAC do hub, ou sem o MPU-6050, reiniciava em laço;
   - CAN sem barramento dava um E a cada ~1 s;
   - o cliente MQTT tentava mesmo sem Wi-Fi, com erros da biblioteca a cada ~10 s;
   - PIR e portas soltos geravam alertas falsos (inatividade, saída noturna).
-- **Vestível:**
+- **Pulseira:**
   - modo sem hub (MAC vazio);
   - sem MPU segue rodando, com LED de falha, nova tentativa a cada 5 s e sem heartbeat;
   - hub fora do alcance dá um aviso só;
@@ -251,8 +286,8 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   - `indicators`: `IND_STATUS_FAULT`;
   - `sys_events`: `SYS_EV_IMU_OK`.
 - **Central:**
-  - `interface/demo_vestivel.py`: lê CSV e FEAT da serial, mostra o \|a\| filtrado, os disparos com P(queda) e a
-    faixa de queda, e com `--mqtt-host` publica `status`, `vestivel/<id>` e o alerta como o hub;
+  - `interface/demo_pulseira.py`: lê CSV e FEAT da serial, mostra o \|a\| filtrado, os disparos com P(queda) e a
+    faixa de queda, e com `--mqtt-host` publica `status`, `pulseira/<id>` e o alerta como o hub;
   - `--gravar` e `--reproduzir` para ensaiar sem a placa;
   - a tabela de alertas do Grafana ganhou a coluna P(queda).
 - **Verificado no PC:**
@@ -281,12 +316,12 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   - O estilo das figuras passou para `experimentos/_estilo.py`, usado pelo `07` e pelo `10`.
 - **Verificado:**
   - o `07` gera as mesmas figuras, byte a byte, depois de extrair o estilo;
-  - o script 10 confere que o Random Forest que ele explica é o do vestível (limiar e vetores de teste,
+  - o script 10 confere que o Random Forest que ele explica é o da pulseira (limiar e vetores de teste,
     \|ΔP\| = 5·10⁻⁷);
   - `pdflatex` sem erros nem *overfull*;
   - os 26 slides foram renderizados (`pdftoppm`) e conferidos um a um.
 
-### 2026-11-11 — pipeline de queda no vestível
+### 2026-11-11 — pipeline de queda na pulseira
 
 - **Pedido:** registrar a escolha do modelo e do gatilho e levar o pipeline ao firmware, com o envio da
   queda pelo CAN e pelo MQTT.
@@ -298,10 +333,10 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     - Random Forest de 60 × 10: 0,55 (0,34 com todos).
 - **Python:**
   - `pipeline.gatilho_causal` e `montar(..., causal=True)`, com 3 testes novos;
-  - `experimentos/09_exportar_vestivel.py` treina os dois classificadores e gera o modelo em C e os vetores de
+  - `experimentos/09_exportar_pulseira.py` treina os dois classificadores e gera o modelo em C e os vetores de
     teste;
-  - `resultados/vestivel.json` guarda as métricas e os limiares.
-- **Firmware do vestível:**
+  - `resultados/pulseira.json` guarda as métricas e os limiares.
+- **Firmware da pulseira:**
   - componente `fall_pipeline`:
     - biquad do ESP-DSP por eixo;
     - gatilho;
@@ -328,8 +363,8 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     - o pipeline inteiro em 8 trechos da SisFall: 26 janelas, mesmos picos, atributos a ≤ 3 % da tolerância;
   - regras do hub (54), `hub_config` (60), `signal_proc` (25), notificador (12) e `pytest` do `modelo/` (16);
   - build sem avisos:
-    - vestível padrão: 38 % da partição livre, `s_pipeline` com 20 KB de RAM, floresta com 104 KB de flash;
-    - vestível com MQTT + CAN + coleta + logística;
+    - pulseira padrão: 38 % da partição livre, `s_pipeline` com 20 KB de RAM, floresta com 104 KB de flash;
+    - pulseira com MQTT + CAN + coleta + logística;
     - hub.
 - **Não verificado:**
   - nada rodou em placa;
@@ -433,7 +468,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   - `historico_quedas` vira `alerta`, para os 7 tipos do `protocolo.md`, com uma tabela de transições;
   - `historico_sensores` vira `sensor` + `evento_sensor`, porque cada porta é um sensor e as leituras chegam
     em horas diferentes;
-  - entram `vestivel` (liga a queda ao idoso) e, opcional, `cuidador`.
+  - entram `pulseira` (liga a queda ao idoso) e, opcional, `cuidador`.
 - **Verificação:** nenhuma; é proposta. O que falta decidir está em [`pendencias.md`](pendencias.md) (Central).
 
 ### 2026-11-09 — modelos de queda no PC (S2 P3 Q1)
@@ -459,7 +494,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     vetorizado igual ao laço do firmware em 50 sinais aleatórios;
   - todos os scripts rodaram do início ao fim;
   - `assert` de que nenhuma pessoa fica no treino e no teste.
-  - É verificação no PC; **nada disso roda no vestível ainda**.
+  - É verificação no PC; **nada disso roda na pulseira ainda**.
 - **Rascunho do relatório e roteiro da apresentação** em `relatorios/Semestre 2/Projeto 3/Q1/`.
 - **Documentação atualizada:** decisões, roadmap, coleta, pendências, CLAUDE.md e os índices de aulas e
   relatórios.
@@ -558,7 +593,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 - **Alimentação:**
   - entrada USB-C única (só com cabo A → C, o módulo não tem os resistores de CC), com 10 µF e Schottky até a
     DevKit;
-  - o vestível roda com **power bank** na mesma entrada. O circuito de bateria na placa (LiPo + TP4056 + boost)
+  - a pulseira roda com **power bank** na mesma entrada. O circuito de bateria na placa (LiPo + TP4056 + boost)
     foi avaliado e descartado nesta versão, por tempo e tamanho;
   - firmware: `GADGET_BATTERY_SENSE` passou a vir desligado (verificado por build).
 
@@ -581,13 +616,13 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ### 2026-10-20 (noite) — mapa de pinos da PCB única
 
-- **Decisão:** no primeiro projeto, uma só PCB para o hub e o vestível; só o firmware muda.
+- **Decisão:** no primeiro projeto, uma só PCB para o hub e a pulseira; só o firmware muda.
 - **Mapa:** 16 sinais sem conflito, escolhidos pela aula de PCB e pela documentação do ESP-IDF v6.0.1
   ([`hardware/README.md`](../hardware/README.md), com as regras e as recomendações de esquemático). Ficaram
   livres 6 e 7 (analógico) e 39–42 (expansão); 15 e 16 ficam reservados para o cristal de 32 kHz.
 - **Código:**
   - novo componente `firmware/common/pcb` (`pcb_pins.h`), com o menu PCB para a versão da DevKit;
-  - os `board_pins.h` do hub e do vestível passaram a escolher a partir dele.
+  - os `board_pins.h` do hub e da pulseira passaram a escolher a partir dele.
 - **Mudança de pinos:**
 
   | Placa | Sinal | Antes → agora |
@@ -596,15 +631,15 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   | hub | portas | 18/16 → 11/12 |
   | hub | LM35 | 1 → 4 |
   | hub | CAN | 4/5 → 13/14 |
-  | vestível | I²C | 8/9 → 1/2 |
-  | vestível | INT | 10 → 17 |
-  | vestível | botão | 11 → 18 |
-  | vestível | buzzer | 12 → 21 |
-  | vestível | bateria | 2 → 5 |
-  | vestível | CAN | 4/5 → 13/14 |
+  | pulseira | I²C | 8/9 → 1/2 |
+  | pulseira | INT | 10 → 17 |
+  | pulseira | botão | 11 → 18 |
+  | pulseira | buzzer | 12 → 21 |
+  | pulseira | bateria | 2 → 5 |
+  | pulseira | CAN | 4/5 → 13/14 |
 
 - **Verificação:**
-  - build sem avisos: hub, vestível padrão e vestível com MQTT + CAN + coleta;
+  - build sem avisos: hub, pulseira padrão e pulseira com MQTT + CAN + coleta;
   - a verificação do mapa compilada com o gcc do PC: o original passa, e cada erro é recusado com a mensagem
     certa:
     - pino repetido;
@@ -637,15 +672,15 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 - **CAN reescrito:**
   - fila de TX e task dona do periférico (antes só uma task podia transmitir);
   - recuperação de *bus-off*, retransmissão até o ACK, filtro de hardware para IDs `0x0GS`.
-- **Vestível:**
+- **Pulseira:**
   - MQTT opcional: telemetria própria e reserva da queda;
   - CAN opcional de bancada (`0x0FD`, `0x0FE`);
   - CAN TX/RX nos GPIO 4/5;
   - detector provisório com histerese L<sub>on</sub>/L<sub>off</sub>;
   - componente `signal_proc`: buffer circular e atributos com `espressif/esp-dsp` 1.8.2, custo medido em ciclos.
 - **Central:**
-  - usuário `vestivel` na ACL;
-  - consumidores do Telegraf para `vestivel/<id>/telemetria` e `vestivel/<id>/mqtt`;
+  - usuário `pulseira` na ACL;
+  - consumidores do Telegraf para `pulseira/<id>/telemetria` e `pulseira/<id>/mqtt`;
   - `hora` passa a ser gravado (o parser descartava booleanos);
   - o notificador marca a queda enviada pela pulseira.
 - **Defeitos achados na revisão:**
@@ -654,16 +689,16 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     `GPIO_NUM_NC`, como no slide;
   - os indicadores liam um prazo de 64 bits sem trava: num processador de 32 bits ele pode ser lido pela metade.
     Corrigido com `portMUX`;
-  - o vestível segurava o mutex do detector durante a impressão do modo de coleta (dezenas de ms). Agora o
+  - a pulseira segurava o mutex do detector durante a impressão do modo de coleta (dezenas de ms). Agora o
     mutex só cobre a soma da atividade de cada lote.
 - **Verificação:**
-  - build sem avisos: hub (36% livre), vestível padrão (45% livre) e vestível com MQTT + CAN + coleta + botão de
+  - build sem avisos: hub (36% livre), pulseira padrão (45% livre) e pulseira com MQTT + CAN + coleta + botão de
     teste (35% livre);
   - testes no PC: regras 53, config 60, detector 14 e `signal_proc` 25 verificações; notificador 11 testes;
   - central:
-    - `vestivel` publicou em `telemetria`, `mqtt` e `alerta`;
-    - as publicações dele em `porta/...`, `vestivel/<id>` e `status` foram descartadas pelo broker;
-    - o InfluxDB gravou `vestivel_telemetria` e `vestivel_mqtt` com a tag `id`;
+    - o usuário `pulseira` publicou em `telemetria`, `mqtt` e `alerta`;
+    - as publicações dele em `porta/...`, `pulseira/<id>` e `status` foram descartadas pelo broker;
+    - o InfluxDB gravou `pulseira_telemetria` e `pulseira_mqtt` com a tag `id`;
   - todas as 10 criações de task conferidas: núcleo explícito e prioridade ≤ 20.
 - **Encontrado no caminho:** um script de edição gravou arquivos com fim de linha CRLF, e o `entrypoint.sh`
   do Mosquitto parou de rodar (`set: illegal option -`). Voltaram para LF; a dica ficou em
@@ -681,7 +716,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   - CAN com autoteste no `menuconfig` e IDs `0x0F2` (temperatura) e `0x0F3+` (portas);
   - componentes novos: `rules`, `hub_config`, `net`, `mqtt_link`, `espnow_link`;
   - watchdog de 30 s com pânico e partição de app grande (`sdkconfig.defaults`).
-- **Vestível** (era só esqueleto): `mpu6050`, `fall_detect` (provisório), `espnow_tx`, `battery`, botão, buzzer
+- **Pulseira** (era só esqueleto): `mpu6050`, `fall_detect` (provisório), `espnow_tx`, `battery`, botão, buzzer
   e modo de coleta.
 - **Central:**
   - `interface/` virou a central em Docker Compose;

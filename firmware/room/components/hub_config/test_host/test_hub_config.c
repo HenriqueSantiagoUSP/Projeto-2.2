@@ -82,7 +82,7 @@ static void test_refusals_leave_output_untouched(void){
         "{\"portas\":{\"quarto\":\"janela\"}}",
         "{\"noite\":{\"inicio\":\"25:00\"}}",
         "{\"temperatura\":{\"min\":27,\"max\":28}}",
-        "{\"vestivel_offline_s\":5}",
+        "{\"pulseira_offline_s\":5}",
         "{\"v\":2}",
         "{nao e json",
         "[1,2]",

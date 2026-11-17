@@ -5,7 +5,7 @@
 
 A disciplina pede que os módulos de todos os grupos da sala conversem por um barramento CAN.
 No nosso sistema, o CAN não é o caminho até a central (isso é o MQTT): ele integra o hub aos
-módulos dos outros grupos e publica nele os estados dos sensores do quarto. O vestível também
+módulos dos outros grupos e publica nele os estados dos sensores do quarto. A pulseira também
 tem CAN, mas só para bancada e testes; a pulseira de verdade não tem transceptor.
 
 O CAN foi escolhido no primeiro semestre no lugar do RS-485 com Modbus por três motivos que
@@ -69,15 +69,15 @@ ID & Placa & Sensor & Dados \\
 \code{0x0F1} & hub & HC-SR501 & 1 byte: 0 = livre, 1 = presença \\
 \code{0x0F2} & hub & LM35 & 2 bytes: \code{int16} em centésimos de °C \\
 \code{0x0F3}--\code{0x0FA} & hub & portas (até 8) & 1 byte: 0 = fechada, 1 = aberta. \code{0x0F3} = quarto, \code{0x0F4} = banheiro \\
-\code{0x0FD} & vestível (bancada) & MPU-6050 & 3 bytes: \code{int16} com $\amag^2$ no pico em centésimos de g$^2$ e \code{uint8} com P(queda) em \% \\
-\code{0x0FE} & vestível (bancada) & --- & 4 bytes: \code{uint16} bateria em mV (\code{0xFFFF} = não medida) e \code{uint16} atividade em mg \\
+\code{0x0FD} & pulseira (bancada) & MPU-6050 & 3 bytes: \code{int16} com $\amag^2$ no pico em centésimos de g$^2$ e \code{uint8} com P(queda) em \% \\
+\code{0x0FE} & pulseira (bancada) & --- & 4 bytes: \code{uint16} bateria em mV (\code{0xFFFF} = não medida) e \code{uint16} atividade em mg \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 O hub envia um quadro a cada mudança de porta ou de presença e a cada leitura de temperatura
-(30\,s). Os quadros dos outros grupos e os do vestível em bancada vão para o log do hub; eles
-ainda não têm tópico MQTT. Os quadros do vestível não entram nas regras: o alerta de queda
+(30\,s). Os quadros dos outros grupos e os da pulseira em bancada vão para o log do hub; eles
+ainda não têm tópico MQTT. Os quadros da pulseira não entram nas regras: o alerta de queda
 depende do número de sequência do ESP-NOW (Seção~\ref{sec:espnow}).
 
 \paragraph{Carga do barramento.} Um quadro com 1 ou 2 bytes de dados tem cerca de 65 a 75 bits,
@@ -130,7 +130,7 @@ sala, com o identificador, o tamanho e os bytes.}
 \end{subfigure}\hfill
 \begin{subfigure}[b]{0.49\linewidth}
   \centering
-  \fotoouespaco{serial_can}{\linewidth}{monitor serial do hub com os quadros 0x0FD/0x0FE do vestível}
+  \fotoouespaco{serial_can}{\linewidth}{monitor serial do hub com os quadros 0x0FD/0x0FE da pulseira}
 \end{subfigure}
 \caption{Teste do CAN entre as duas placas v1.}
 \label{fig:bancada_can}

@@ -26,16 +26,16 @@ from .dados import FS, Ensaio, saturar
 
 # Janela em torno do pico: 1,0 s antes (queda livre e impacto) e 0,8 s depois (o que o corpo faz em seguida).
 # 0,8 s porque os ensaios próprios têm só 0,82–1,62 s depois do impacto. 360 amostras cabem no buffer
-# circular de 512 do vestível.
+# circular de 512 da pulseira.
 PRE_S = 1.0
 POS_S = 0.8
 FC_PASSA_BAIXA = 20.0          # Hz: o impacto tem conteúdo até ~20 Hz; acima é ruído e vibração
 FS_REDUZIDA = 50.0             # Hz: versão reduzida da janela para templates, DTW e CNN
 DISTANCIA_S = 0.5              # s: um pico só vale depois desse tempo sem um valor maior (os dois gatilhos)
 
-# Faixas do sensor (por eixo): o cenário A é o vestível atual; o B, a configuração dos dados próprios.
+# Faixas do sensor (por eixo): o cenário A é a pulseira atual; o B, a configuração dos dados próprios.
 CENARIOS = {
-    "A": {"g_max": 8.0, "dps_max": 500.0, "descricao": "±8 g / ±500 °/s (vestível atual)"},
+    "A": {"g_max": 8.0, "dps_max": 500.0, "descricao": "±8 g / ±500 °/s (pulseira atual)"},
     "B": {"g_max": 2.0, "dps_max": 250.0, "descricao": "±2 g / ±250 °/s (dados próprios)"},
 }
 
@@ -70,7 +70,7 @@ def gatilho(a_mag: np.ndarray, l_on: float, distancia_s: float = DISTANCIA_S, fs
 
 def gatilho_causal(a_mag: np.ndarray, l_on: float, distancia_s: float = DISTANCIA_S, fs: float = FS) -> list[int]:
     """
-    O gatilho como ele roda no vestível (fall_pipeline.c), amostra a amostra e sem olhar o futuro:
+    O gatilho como ele roda na pulseira (fall_pipeline.c), amostra a amostra e sem olhar o futuro:
     - começa a acompanhar um pico quando |a| sobe (|a|[n] > |a|[n-1]) e chega a L_on;
     - a cada valor maior, o pico passa para ele;
     - emite o pico quando passam distancia_s sem um valor maior.
@@ -144,8 +144,8 @@ class Conjunto:
 def montar(ensaios: list[Ensaio], cenario: str, l_on: float, pre_s: float = PRE_S, pos_s: float = POS_S,
            tolerancia_s: float = 0.5, causal: bool = False, distancia_s: float = DISTANCIA_S) -> Conjunto:
     """
-    Aplica saturação do cenário, filtro e gatilho a cada ensaio e recorta as janelas. `causal` usa o gatilho do
-    vestível (gatilho_causal) no lugar do find_peaks: é o que treina o modelo exportado para o firmware.
+    Aplica saturação do cenário, filtro e gatilho a cada ensaio e recorta as janelas. `causal` usa o gatilho da
+    pulseira (gatilho_causal) no lugar do find_peaks: é o que treina o modelo exportado para o firmware.
     `distancia_s` é a do gatilho; o 09 passa a mesma que grava no firmware (FALL_MODEL_TRIGGER_GAP).
     """
     acionar = gatilho_causal if causal else gatilho

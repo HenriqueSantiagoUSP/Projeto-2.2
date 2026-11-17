@@ -1,4 +1,4 @@
-# demo_vestivel.py: a placa pela USB, a janela ao vivo e a ponte para a central.
+# demo_pulseira.py: a placa pela USB, a janela ao vivo e a ponte para a central.
 pyserial>=3.5
 paho-mqtt>=2.0
 matplotlib>=3.8

@@ -56,7 +56,7 @@ def test_gatilho_sem_l_on_que_passe_99_por_cento_para(monkeypatch):
 
 def test_numero_nao_finito_nunca_vira_literal_c(monkeypatch):
     monkeypatch.syspath_prepend(str(EXPERIMENTOS))      # o 09 importa o _comum, que mora lá
-    spec = importlib.util.spec_from_file_location("m09", EXPERIMENTOS / "09_exportar_vestivel.py")
+    spec = importlib.util.spec_from_file_location("m09", EXPERIMENTOS / "09_exportar_pulseira.py")
     m09 = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m09)
     assert m09.c_float(0.5) == "0.5f"

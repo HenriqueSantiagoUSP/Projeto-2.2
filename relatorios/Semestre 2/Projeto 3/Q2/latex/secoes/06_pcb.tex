@@ -13,11 +13,11 @@ sensores) no outro (Seção~\ref{sec:tasks}).
 
 \subsection{Uma PCB para as duas placas}
 
-O primeiro projeto é \textbf{uma só PCB} para o hub e o vestível: uma placa-base em que a
+O primeiro projeto é \textbf{uma só PCB} para o hub e a pulseira: uma placa-base em que a
 DevKit é encaixada e que leva os periféricos das duas. Só o firmware muda: o hub usa as
-portas, o PIR e o LM35; o vestível usa o MPU-6050 e o botão; os dois podem usar o CAN e o LED
+portas, o PIR e o LM35; a pulseira usa o MPU-6050 e o botão; os dois podem usar o CAN e o LED
 da DevKit (Figura~\ref{fig:pcb_blocos}). Uma placa só significa um projeto, um pedido e um
-mapa de pinos, o que coube no prazo. O custo é que o vestível fica maior do que precisaria;
+mapa de pinos, o que coube no prazo. O custo é que a pulseira fica maior do que precisaria;
 uma placa própria, menor e com bateria, fica para depois (Seção~\ref{sec:conclusoes}).
 
 \begin{figure}[H]
@@ -48,11 +48,11 @@ nunca & 19, 20 & USB nativa (console, gravação, depuração) \\
 nunca & 43, 44 & UART0: o console e a gravação pela ponte USB da DevKit \\
 nunca & 26--37 & memória flash e, nos módulos com PSRAM octal, a PSRAM \\
 nunca & 38, 47, 48 & LED RGB da DevKit (38 ou 48, conforme a versão) e o par 47/48, alimentado em 1,8\,V em alguns módulos \\
-reserva & 15, 16 & cristal de 32\,kHz, para um relógio preciso em \textit{light sleep} no vestível \\
+reserva & 15, 16 & cristal de 32\,kHz, para um relógio preciso em \textit{light sleep} na pulseira \\
 expansão & 39--42 & JTAG por pinos; o que ficar aqui se perde se ele for ligado \\
 analógico & 1--10 & só o ADC1: o ADC2 não funciona com o Wi-Fi ligado \\
 I²C & 1 (SDA), 2 (SCL) & o único par que o I²C do coprocessador ULP aceita fora dos pinos de \textit{strapping}: o ULP poderá ler o MPU em \textit{deep sleep} sem refazer a placa \\
-acordar & 0--21 & o botão e a interrupção do MPU precisam ser RTC GPIO para acordar o vestível \\
+acordar & 0--21 & o botão e a interrupção do MPU precisam ser RTC GPIO para acordar a pulseira \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -72,13 +72,13 @@ conflitos (Seção~\ref{sec:pcb_s1}).
 \toprule
 GPIO & Função & Placa & Observação \\
 \midrule
-1, 2 & I²C SDA, SCL (MPU-6050) & vestível & par do ULP \\
+1, 2 & I²C SDA, SCL (MPU-6050) & pulseira & par do ULP \\
 4 & LM35 (saída do LM358) & hub & ADC1, canal 3 \\
 8 & PIR HC-SR501 & hub & \\
 11, 12 & portas 1 (quarto) e 2 (banheiro) & hub & digitais: o ADC2 não importa \\
-13, 14 & CAN TX, RX & os dois & no vestível, só em bancada \\
-17 & interrupção do MPU-6050 & vestível & RTC GPIO \\
-18 & botão ``estou bem'' & vestível & RTC GPIO \\
+13, 14 & CAN TX, RX & os dois & na pulseira, só em bancada \\
+17 & interrupção do MPU-6050 & pulseira & RTC GPIO \\
+18 & botão ``estou bem'' & pulseira & RTC GPIO \\
 38 ou 48 & LED WS2812 & os dois & é o da DevKit \\
 \bottomrule
 \end{tabular}
@@ -87,7 +87,7 @@ GPIO & Função & Placa & Observação \\
 \subsection{Alimentação}\label{sec:alimentacao}
 
 A placa tem uma entrada só, um módulo USB-C, e não carrega bateria
-(Figura~\ref{fig:alimentacao}). O hub usa um carregador de tomada; o vestível, no protótipo,
+(Figura~\ref{fig:alimentacao}). O hub usa um carregador de tomada; a pulseira, no protótipo,
 um \textit{power bank}. Como só há uma entrada, nunca há duas fontes juntas.
 
 \begin{figure}[H]
@@ -110,11 +110,11 @@ um \textit{power bank}. Como só há uma entrada, nunca há duas fontes juntas.
         como confirmado num teste em 23/10.
 \end{itemize}
 
-\paragraph{Consumo.} A estimativa para o vestível com o rádio ligado é de 110 a 130\,mA,
+\paragraph{Consumo.} A estimativa para a pulseira com o rádio ligado é de 110 a 130\,mA,
 o que daria de 20 a 25\,h com um \textit{power bank} de 5000\,mAh. A estimativa ainda precisa
 ser medida (RNF14). Muitos \textit{power banks} desligam sozinhos abaixo de 50 a 100\,mA, o
 que vai importar quando o \textit{light sleep} baixar o consumo. Sem medição de bateria nesta
-placa, o vestível informa a bateria como desconhecida, e o alerta de bateria baixa fica
+placa, a pulseira informa a bateria como desconhecida, e o alerta de bateria baixa fica
 desligado.
 
 \subsection{Esquemático}
@@ -248,7 +248,7 @@ então entram os módulos.
 \end{subfigure}\hfill
 \begin{subfigure}[b]{0.49\linewidth}
   \centering
-  \fotoouespaco{pcb_montada_vestivel}{\linewidth}{PCB montada como vestível (MPU-6050, botão)}
+  \fotoouespaco{pcb_montada_pulseira}{\linewidth}{PCB montada como pulseira (MPU-6050, botão)}
 \end{subfigure}
 \caption{A PCB v1 montada nas duas configurações.}
 \label{fig:pcb_montada}

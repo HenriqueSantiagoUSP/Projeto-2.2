@@ -1,7 +1,7 @@
 """
 Comparação de todos os métodos na SisFall, com validação cruzada por pessoa (5 dobras).
 
-    uv run python experimentos/03_comparar.py --cenario A          # ±8 g, o vestível atual (principal)
+    uv run python experimentos/03_comparar.py --cenario A          # ±8 g, a pulseira atual (principal)
     uv run python experimentos/03_comparar.py --cenario B          # ±2 g, a faixa dos dados próprios
 
 Saídas em resultados/:

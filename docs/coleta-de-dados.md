@@ -6,7 +6,7 @@ coletados desde já sirvam para isso: sinais brutos, rotulados, de várias pesso
 
 ## Equipamento
 
-- Vestível com o firmware em **modo de coleta**: `idf.py menuconfig` → Wearable → *Data collection mode*.
+- Pulseira com o firmware em **modo de coleta**: `idf.py menuconfig` → Wearable → *Data collection mode*.
 - O MPU-6050 na **posição de uso** (pulso), sempre na mesma orientação; anote qual pulso.
 - Colchão grosso para as quedas e uma pessoa de apoio. Segurança acima de tudo: nada de quedas sem proteção.
 

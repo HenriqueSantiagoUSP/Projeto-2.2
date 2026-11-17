@@ -1,8 +1,8 @@
-% Visão geral: vestível -> hub -> central, com os sensores do quarto e o CAN da sala.
+% Visão geral: pulseira -> hub -> central, com os sensores do quarto e o CAN da sala.
 \begin{tikzpicture}
   % Quarto
   \node[bloco=corhub, minimum width=3.4cm] (hub) at (0,0) {\textbf{Hub do quarto}\\ESP32-S3\\regras, alertas, LED};
-  \node[bloco=corvest, minimum width=3.0cm] (vest) at (-5.7,0) {\textbf{Vestível}\\ESP32-S3 + MPU-6050\\detecta a queda};
+  \node[bloco=corvest, minimum width=3.0cm] (vest) at (-5.7,0) {\textbf{Pulseira}\\ESP32-S3 + MPU-6050\\detecta a queda};
   \node[bloco=corhub, minimum width=4.6cm, font=\scriptsize] (sens) at (0,2.1)
        {portas (MC-38), presença (HC-SR501),\\temperatura (LM35 + LM358)};
   \node[bloco=corambas, minimum width=3.0cm, font=\scriptsize] (sala) at (0,-2.3) {módulos dos outros\\grupos da sala};

@@ -16,7 +16,7 @@ services:
       - "9001:9001"   # MQTT over WebSocket: browser tools
     environment:
       MQTT_HUB_PASSWORD: ${MQTT_HUB_PASSWORD:?set it in .env}
-      MQTT_VESTIVEL_PASSWORD: ${MQTT_VESTIVEL_PASSWORD:?set it in .env}
+      MQTT_PULSEIRA_PASSWORD: ${MQTT_PULSEIRA_PASSWORD:?set it in .env}
       MQTT_TELEGRAF_PASSWORD: ${MQTT_TELEGRAF_PASSWORD:?set it in .env}
       MQTT_NOTIFICADOR_PASSWORD: ${MQTT_NOTIFICADOR_PASSWORD:?set it in .env}
       MQTT_PAINEL_PASSWORD: ${MQTT_PAINEL_PASSWORD:?set it in .env}

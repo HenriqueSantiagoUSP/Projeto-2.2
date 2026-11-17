@@ -13,7 +13,7 @@ decisões em [`decisoes.md`](decisoes.md).
 ## Visão geral
 
 ```
-Vestível ──ESP-NOW──▶ Hub do quarto ──MQTT──▶ Mosquitto ─┬─▶ Telegraf ─▶ InfluxDB ─▶ Grafana
+Pulseira ──ESP-NOW──▶ Hub do quarto ──MQTT──▶ Mosquitto ─┬─▶ Telegraf ─▶ InfluxDB ─▶ Grafana
 (detecta a queda)     (regras de tempo, alertas,          ├─▶ notificador ─▶ Telegram (cuidador)
                        LED de status)                     └─▶ futuro: backend + banco ─ nuvem via bridge
                           └── CAN ◀──▶ módulos da sala
@@ -21,7 +21,7 @@ Vestível ──ESP-NOW──▶ Hub do quarto ──MQTT──▶ Mosquitto ─
 
 Princípios:
 
-1. **Processamento na borda** (diretriz da disciplina): a queda é detectada no vestível e as regras de tempo
+1. **Processamento na borda** (diretriz da disciplina): a queda é detectada na pulseira e as regras de tempo
    rodam no hub, que publica os alertas. A central só armazena, mostra e notifica.
 2. **O MQTT é o contrato:** painéis, banco, notificador e, no futuro, backend e nuvem consomem os mesmos
    tópicos. Trocar a central não muda as placas.
@@ -30,7 +30,7 @@ Princípios:
 
 ## Por que estes enlaces
 
-**Vestível → hub: ESP-NOW.**
+**Pulseira → hub: ESP-NOW.**
 
 | Critério | ESP-NOW → hub (escolhido) | Wi-Fi direto → broker | BLE → hub |
 |---|---|---|---|
@@ -41,21 +41,24 @@ Princípios:
 | Complexidade | média: confiabilidade e tradução por nossa conta | baixa | alta; no hub disputa o rádio com o Wi-Fi |
 
 O ponto fraco do ESP-NOW é a cobertura. Se o teste mostrar áreas fora do alcance (corredor, áreas comuns), as
-saídas são mais hubs ou o Wi-Fi como reserva da queda. A reserva já existe como opção do vestível (MQTT
+saídas são mais hubs ou o Wi-Fi como reserva da queda. A reserva já existe como opção da pulseira (MQTT
 direto, desligado por padrão por causa da bateria; [`protocolo.md`](protocolo.md) §1).
 
 **Hub → central: MQTT.** Vários consumidores ao mesmo tempo, estado retido para quem conecta depois, Last
 Will para saber que o hub caiu e QoS por criticidade.
 
-**CAN.** Exigência da disciplina: integra o hub aos módulos da sala. Não é caminho da central. O vestível também
-tem CAN, mas só em bancada, para o requisito e para os testes; no produto ele não tem transceptor.
+**CAN.** Exigência da disciplina: integra o hub aos módulos da sala. Não é caminho da central. A pulseira também
+tem CAN, mas só em bancada, para o requisito e para os testes; no produto ela não tem transceptor.
 
 ## Dispositivos
+
+Dois nomes valem para todo o projeto: o **hub** (hub do quarto) é a placa fixa em cada quarto; a **pulseira** é o
+dispositivo que o residente usa no pulso. No código C, em inglês, são `room`/`hub` e `gadget`/`wearable`.
 
 | Dispositivo | Pasta | Placa | Papel | Rádio |
 |---|---|---|---|---|
 | Hub do quarto (gateway) | `firmware/room/` | ESP32-S3 DevKitC-1 | sensores do quarto, regras, alertas, recepção ESP-NOW, cliente MQTT, nó CAN | STA associado com `WIFI_PS_NONE` + ESP-NOW + TWAI |
-| Vestível (pulseira) | `firmware/gadget/` | ESP32-S3 DevKitC-1 | aquisição inercial, detecção de queda, envio ESP-NOW; opcionais: MQTT direto e CAN de bancada | STA sem associação + ESP-NOW (com o MQTT opcional, STA associado) |
+| Pulseira (pulseira) | `firmware/gadget/` | ESP32-S3 DevKitC-1 | aquisição inercial, detecção de queda, envio ESP-NOW; opcionais: MQTT direto e CAN de bancada | STA sem associação + ESP-NOW (com o MQTT opcional, STA associado) |
 | Central | `interface/` | Raspberry Pi 4 (PC no desenvolvimento) | broker, histórico, painéis, notificação | rede local |
 
 Nenhuma placa usa SoftAP nem AP+STA: o ESP-NOW funciona sobre a interface STA.
@@ -78,17 +81,17 @@ para o esquemático, a confirmar no layout.
 | LED WS2812 da placa | status: verde 1 Hz normal, amarelo 1 Hz sem broker, vermelho 4 Hz com alerta aberto | GPIO48 (v1.0) / GPIO38 (v1.1) |
 
 Configuração por `idf.py menuconfig` (fica no `sdkconfig`, fora do git), em quatro menus. Os três primeiros
-vêm dos componentes comuns e são os mesmos no vestível:
+vêm dos componentes comuns e são os mesmas na pulseira:
 - **Network (Wi-Fi):** Wi-Fi, servidor SNTP e fuso;
 - **MQTT:** broker, usuário, senha, site e quarto;
 - **CAN bus (TWAI):** modo de bancada;
-- **Room hub: ESP-NOW:** MAC do vestível e chaves.
+- **Room hub: ESP-NOW:** MAC da pulseira e chaves.
 
 Responsabilidades:
 
 1. sensores locais → CAN e MQTT;
 2. regras de tempo → `alerta` (seção Regras);
-3. ESP-NOW do vestível → MQTT e alertas ([`protocolo.md`](protocolo.md) §4);
+3. ESP-NOW da pulseira → MQTT e alertas ([`protocolo.md`](protocolo.md) §4);
 4. LED local de status e de alerta, que funciona mesmo sem a rede;
 5. hora por SNTP;
 6. parâmetros por `config/desejada`, guardados em NVS;
@@ -109,9 +112,9 @@ Fluxo:
 ```
 ISR do GPIO ─fila─▶ sensors_task ─(50 ms sem bordas: lê o nível)─┐
 lm35_task (30 s) ────────────────────────────────────────────────┼─▶ fila do hub ─▶ hub_task ─┬─▶ fila CAN ─▶ can_tx
-espnow_task (vestível) ──────────────────────────────────────────┤                            ├─▶ MQTT (estados)
+espnow_task (pulseira) ──────────────────────────────────────────┤                            ├─▶ MQTT (estados)
 MQTT config/desejada ────────────────────────────────────────────┘                            └─▶ regras ─▶ alerta, LED
-ISR do TWAI ─fila─▶ can_rx ─▶ log (portas de outros grupos, quadros do vestível em bancada)
+ISR do TWAI ─fila─▶ can_rx ─▶ log (portas de outros grupos, quadros da pulseira em bancada)
 ```
 
 As ISRs e os callbacks de rádio só enfileiram. Uma única task, `hub_task`, roda as regras e publica; por isso o
@@ -125,13 +128,13 @@ episódio: publicado uma vez como `ativo` e encerrado como `resolvido` ou `cance
 
 | `tipo` | Dispara quando | Resolve quando | Padrão |
 |---|---|---|---|
-| `queda` | chega `FALL` do vestível (LED em alerta) | `FALL_CANCEL` → `cancelado` | — |
+| `queda` | chega `FALL` da pulseira (LED em alerta) | `FALL_CANCEL` → `cancelado` | — |
 | `saida_noturna` | a porta `saida` abre no período noturno e passam N min sem presença no quarto | a presença volta | 22h–06h, 15 min |
 | `banheiro_prolongado` | a porta `banheiro` fecha e passam N min sem presença no quarto e sem a `saida` abrir | a porta do banheiro abre | 40 min |
 | `inatividade` | no período diurno, N min sem presença e sem a `saida` abrir | a presença volta | 120 min (calibrar) |
 | `temperatura` | fora de 18–28 °C por 10 min contínuos | dentro da faixa, com histerese de 0,5 °C, por 10 min | — |
-| `vestivel_offline` | 90 s sem mensagens do vestível | a próxima mensagem | — |
-| `bateria_baixa` | bateria do vestível < 3,5 V | bateria > 3,6 V | — |
+| `pulseira_offline` | 90 s sem mensagens da pulseira | a próxima mensagem | — |
+| `bateria_baixa` | bateria da pulseira < 3,5 V | bateria > 3,6 V | — |
 
 Sem hora válida, as regras com janela de horário ficam suspensas e `status` informa `"hora":false`. A
 inatividade só vale de dia porque, à noite, o residente dormindo não aciona o PIR.
@@ -145,7 +148,7 @@ de um caso real. Por isso o hub tem o menu "Room hub: sensors" para declarar o q
 Cada peça ausente (sensor, CAN, Wi-Fi, broker) dá um aviso único no log, não um erro por tentativa
 ([`firmware/room/README.md`](../firmware/room/README.md)).
 
-### Vestível — `firmware/gadget/`
+### Pulseira — `firmware/gadget/`
 
 Componentes próprios: `mpu6050`, `fall_pipeline` (pipeline de queda; C puro, testado no PC contra o Python),
 `signal_proc` (buffer circular, momentos com ESP-DSP e atividade; testado no PC), `espnow_tx` e `battery`, além
@@ -170,24 +173,24 @@ Wearable, mais os menus comuns Network (Wi-Fi), MQTT e CAN bus (TWAI) quando os 
   6. **decisão:** queda quando P(queda) ≥ o limiar do modelo, com cooldown de 30 s. O custo em ciclos é medido
      dentro de uma seção crítica e vai para o log.
 
-  O modelo (`fall_model.c`) é **gerado** por `modelo/experimentos/09_exportar_vestivel.py` e foi treinado na
+  O modelo (`fall_model.c`) é **gerado** por `modelo/experimentos/09_exportar_pulseira.py` e foi treinado na
   SisFall (cintura, ±8 g): é **provisório até retreinar com os dados do pulso** ([roadmap](roadmap.md), fase 8).
   No modo de coleta, cada janela vai para a serial com os atributos e P (`FEAT:`).
 - **Comunicação** ([`protocolo.md`](protocolo.md) §3): varredura de canal, heartbeat a cada 30 s com bateria
   e atividade, `FALL` (com o pico e a P(queda) do modelo) com reenvio até o ACK.
-- **MQTT (opcional, desligado por padrão):** o vestível se associa ao Wi-Fi do hub e publica a própria
-  telemetria; se o hub não confirmar uma queda, publica o alerta ele mesmo, com o mesmo `id`
+- **MQTT (opcional, desligado por padrão):** a pulseira se associa ao Wi-Fi do hub e publica a própria
+  telemetria; se o hub não confirmar uma queda, publica o alerta ela mesma, com o mesmo `id`
   ([`protocolo.md`](protocolo.md) §1). Custa bateria, por isso é opção.
 - **CAN (opcional, só bancada):** quedas (com a P do modelo) e heartbeats também como quadros `0x0FD`/`0x0FE`, para cumprir o
   requisito da disciplina e ajudar nos testes. O produto não tem transceptor.
-- **Interação:** botão "estou bem" e LED. O vestível envia `FALL` na hora, e o LED fica em alerta durante a
+- **Interação:** botão "estou bem" e LED. A pulseira envia `FALL` na hora, e o LED fica em alerta durante a
   janela de cancelamento (15 s); se o botão for apertado nesse tempo, envia `FALL_CANCEL`. Não há buzzer
   (retirado em 2026-10-23). Em teste, o botão pode
   simular uma queda (`menuconfig`).
-- **Energia:** no protótipo, power bank na entrada USB-C da placa, sem medição de bateria; o vestível informa
+- **Energia:** no protótipo, power bank na entrada USB-C da placa, sem medição de bateria; a pulseira informa
   "bateria desconhecida" (`0xFFFF`). O firmware já sabe ler um divisor no ADC1 (`GADGET_BATTERY_SENSE`), para a
-  placa própria do vestível com LiPo.
-- **Falha do sensor (desde 2026-11-11):** se o MPU-6050 não responde, no boot ou durante o uso, o vestível
+  placa própria da pulseira com LiPo.
+- **Falha do sensor (desde 2026-11-11):** se o MPU-6050 não responde, no boot ou durante o uso, a pulseira
   continua rodando:
   - LED vermelho lento (falha);
   - procura o sensor a cada 5 s;
@@ -204,7 +207,7 @@ Wearable, mais os menus comuns Network (Wi-Fi), MQTT e CAN bus (TWAI) quando os 
 
 | Peça | Função |
 |---|---|
-| Mosquitto | broker com usuário/senha e ACL (`hub`, `vestivel`, `telegraf`, `notificador`, `painel`) |
+| Mosquitto | broker com usuário/senha e ACL (`hub`, `pulseira`, `telegraf`, `notificador`, `painel`) |
 | Telegraf | grava todos os tópicos MQTT no InfluxDB, sem código |
 | InfluxDB | séries temporais, retenção de 30 dias |
 | Grafana | painel "Quartos", com seletor de quarto: estado atual, histórico e alertas; versionado em JSON |
@@ -248,11 +251,11 @@ rádio e tudo o que fala com ele; o núcleo 1, com o tempo real.
 | hub | `sensors_task` | 1 | ALTA | estabiliza e lê portas e PIR |
 | hub | `lm35_task` | 1 | BAIXA | temperatura a cada 30 s |
 | hub | `hub_task` | 0 | MEDIA | regras, publicação, LED |
-| hub | `espnow_task` | 0 | MEDIA | valida e encaminha as mensagens do vestível |
+| hub | `espnow_task` | 0 | MEDIA | valida e encaminha as mensagens da pulseira |
 | as duas | `can_rx`, `can_tx` | 0 | MEDIA | recepção e despacho; transmissão e estado do nó |
 | as duas | `indicators` | 0 | MINIMA | LED |
-| vestível | `sampling` | 1 | ALTA | FIFO do MPU-6050 (e as novas tentativas sem ele), pipeline de queda |
-| vestível | `comm` | 0 | MEDIA | ESP-NOW, MQTT e CAN opcionais, botão, heartbeat |
+| pulseira | `sampling` | 1 | ALTA | FIFO do MPU-6050 (e as novas tentativas sem ele), pipeline de queda |
+| pulseira | `comm` | 0 | MEDIA | ESP-NOW, MQTT e CAN opcionais, botão, heartbeat |
 
 Como os recursos são compartilhados:
 
@@ -262,7 +265,7 @@ Como os recursos são compartilhados:
 - **Event group (`sys_events`):** rede, hora, MQTT e CAN. Cada bit tem um único escritor.
 - **Notificação de task:** o callback de estado do TWAI só avisa a `can_tx`, que lê o estado ela mesma; uma
   notificação nunca se perde, ao contrário de uma fila cheia.
-- **Mutex** (com herança de prioridade): só a atividade do vestível, entre `sampling` e `comm`, e só pelo tempo
+- **Mutex** (com herança de prioridade): só a atividade da pulseira, entre `sampling` e `comm`, e só pelo tempo
   de somar um lote.
 - **Seção crítica (`portMUX`):** o estado pedido ao LED e ao buzzer (um prazo de 64 bits não é escrito numa
   instrução só), e a contagem de ciclos dos atributos.

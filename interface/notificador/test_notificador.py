@@ -16,7 +16,7 @@ from notificador import Deduplicador, formatar, interpretar, processar
 
 def alerta_json(**campos):
     base = {"v": 1, "id": "a1b2c3-42", "tipo": "queda", "estado": "ativo",
-            "origem": "vestivel/a1b2c3", "detalhe": {"a2": 7.88}, "ts": 1792497600000}
+            "origem": "pulseira/a1b2c3", "detalhe": {"a2": 7.88}, "ts": 1792497600000}
     base.update(campos)
     return json.dumps(base).encode()
 
@@ -52,7 +52,7 @@ class TestFormatar(unittest.TestCase):
 
     def test_queda_enviada_pela_pulseira(self):
         a = interpretar("idoso/butanta/quarto101/alerta",
-                        alerta_json(detalhe={"a2": 9.5, "prob": 0.97, "via": "vestivel"}))
+                        alerta_json(detalhe={"a2": 9.5, "prob": 0.97, "via": "pulseira"}))
         texto = formatar(a)
         self.assertIn("9.50 g²", texto)
         self.assertIn("confiança do modelo: 97 %", texto)

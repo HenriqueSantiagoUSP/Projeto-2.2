@@ -7,11 +7,11 @@ topic write idoso/#
 topic read idoso/+/+/config/desejada
 
 # Wearables with the optional MQTT link (firmware GADGET_MQTT): their own telemetry and
-# link status, and the fall alert when the hub does not answer. Not vestivel/<id> itself,
+# link status, and the fall alert when the hub does not answer. Not pulseira/<id> itself,
 # which is the hub's view of the wearable.
-user vestivel
-topic write idoso/+/+/vestivel/+/telemetria
-topic write idoso/+/+/vestivel/+/mqtt
+user pulseira
+topic write idoso/+/+/pulseira/+/telemetria
+topic write idoso/+/+/pulseira/+/mqtt
 topic write idoso/+/+/alerta
 
 # History: reads everything.

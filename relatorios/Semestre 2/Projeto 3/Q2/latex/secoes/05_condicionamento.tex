@@ -169,7 +169,7 @@ resistor de 1\,k$\Omega$ em série (R4), que limita a corrente entre o módulo d
 
 \paragraph{MPU-6050.} O sinal inercial passa por dois filtros. O primeiro é o DLPF do próprio
 sensor, em 44\,Hz, antes da decimação para 200\,Hz. O segundo é um passa-baixa Butterworth de
-segunda ordem, em \bqFc\,Hz, aplicado aos 6 eixos no vestível (Figura~\ref{fig:biquad}). Ele é um
+segunda ordem, em \bqFc\,Hz, aplicado aos 6 eixos na pulseira (Figura~\ref{fig:biquad}). Ele é um
 \textit{biquad} da biblioteca ESP-DSP (\code{dsps\_biquad\_f32}), com os coeficientes
 $\{b_0, b_1, b_2, a_1, a_2\} = \{\bqCoefs\}$, gerados pelo mesmo código Python que treina o
 modelo de queda. Assim, o firmware filtra exatamente como o treino filtrou. Os movimentos do
@@ -179,6 +179,6 @@ não ajudam a reconhecer uma queda.
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figuras/fig_biquad.png}
-\caption{Resposta em frequência do passa-baixa de \bqFc\,Hz do vestível ($f_s = \bqFs$\,Hz).}
+\caption{Resposta em frequência do passa-baixa de \bqFc\,Hz da pulseira ($f_s = \bqFs$\,Hz).}
 \label{fig:biquad}
 \end{figure}

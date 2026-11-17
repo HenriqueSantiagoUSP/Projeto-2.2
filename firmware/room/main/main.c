@@ -224,11 +224,11 @@ static void publish_alert(const rules_alert_t *alert){
             snprintf(detail, sizeof(detail), "\"valor\":%.2f,\"limite\":%.1f", alert->temp_c, alert->temp_limit_c);
             break;
         case ALERT_WEARABLE_OFFLINE:
-            snprintf(detail, sizeof(detail), "\"vestivel\":\"%s\",\"ultimo_contato_s\":%lu",
+            snprintf(detail, sizeof(detail), "\"pulseira\":\"%s\",\"ultimo_contato_s\":%lu",
                      alert->wearable, (unsigned long) alert->last_contact_s);
             break;
         case ALERT_LOW_BATTERY:
-            snprintf(detail, sizeof(detail), "\"vestivel\":\"%s\",\"bateria_mV\":%u",
+            snprintf(detail, sizeof(detail), "\"pulseira\":\"%s\",\"bateria_mV\":%u",
                      alert->wearable, alert->battery_mv);
             break;
     }

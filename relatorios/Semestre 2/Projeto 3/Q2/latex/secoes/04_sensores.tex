@@ -3,7 +3,7 @@
 %======================================================================
 \subsection{Visão geral}
 
-O hub usa três sensores fixos no quarto, e o vestível usa um sensor inercial e um botão
+O hub usa três sensores fixos no quarto, e a pulseira usa um sensor inercial e um botão
 (Tabela~\ref{tab:sensores}). Todos são módulos comuns e baratos, escolhidos no primeiro
 semestre e caracterizados no Projeto 2 daquele semestre; o que mudou desde então foi a faixa
 do acelerômetro (Seção~\ref{sec:mpu}) e a forma de ligar cada um à placa nova.
@@ -17,7 +17,7 @@ do acelerômetro (Seção~\ref{sec:mpu}) e a forma de ligar cada um à placa nov
 \toprule
 Sensor & Mede & Faixa usada & Interface & GPIO & Tensão \\
 \midrule
-\multicolumn{6}{@{}l}{\textit{Vestível}} \\
+\multicolumn{6}{@{}l}{\textit{Pulseira}} \\
 MPU-6050 (módulo GY-521) & aceleração e velocidade angular, 3 eixos & $\pm$8\,g e $\pm$500\,°/s, 16 bits, 200\,Hz & I²C a 400\,kHz + interrupção & 1, 2, 17 & 3,3\,V \\
 Botão & ``estou bem'' & --- & digital, \textit{pull-up} interno & 18 & --- \\
 \midrule
@@ -40,7 +40,7 @@ eixo com um conversor de 16 bits, um filtro passa-baixa digital configurável (D
 de 1024 bytes~\cite{mpu6050}. A comunicação é por I²C. O módulo GY-521 traz um regulador de
 3,3\,V e os resistores de \textit{pull-up} do barramento.
 
-\paragraph{Configuração no vestível.}
+\paragraph{Configuração na pulseira.}
 \begin{itemize}
   \item \textbf{Faixas:} $\pm$8\,g (4096 contagens por g) e $\pm$500\,°/s (65,5 contagens por °/s).
   \item \textbf{Filtro interno (DLPF):} 44\,Hz no acelerômetro e 42\,Hz no giroscópio. Com ele
@@ -86,7 +86,7 @@ dois picos ficam quase iguais. Reproduzida do relatório do Q1~\cite{q1}.}
 \label{fig:saturacao}
 \end{figure}
 
-\paragraph{Conferido na placa.} Em 13/11/2026, o vestível com o perfil de demonstração
+\paragraph{Conferido na placa.} Em 13/11/2026, a pulseira com o perfil de demonstração
 mandou o sinal bruto pela serial a 200\,Hz, sem parar, por 16 minutos. Parada, a magnitude
 lida foi de $\approx$4077 contagens, ou seja, $\approx$1\,g na escala de 4096 contagens por g:
 a faixa de $\pm$8\,g está mesmo configurada (em $\pm$2\,g, seriam $\sim$16\,384).
@@ -177,10 +177,10 @@ para mais seis.
 %----------------------------------------------------------------------
 \subsection{Botão e LED}
 
-O botão ``estou bem'' do vestível (GPIO 18) cancela um alerta de queda nos 15\,s seguintes;
+O botão ``estou bem'' da pulseira (GPIO 18) cancela um alerta de queda nos 15\,s seguintes;
 ele usa o \textit{pull-up} interno, um capacitor de 100\,nF em paralelo e o filtro de
 \textit{glitch} do GPIO. O LED é o WS2812 da própria DevKit, controlado pelo periférico RMT.
 No hub, ele pisca verde a 1\,Hz em operação normal, amarelo sem broker e vermelho a 4\,Hz
-com um alerta aberto; no vestível, um vermelho lento indica que o sensor não responde.
+com um alerta aberto; na pulseira, um vermelho lento indica que o sensor não responde.
 O buzzer previsto no início foi retirado em outubro: a sinalização local fica só com o
 LED, e o alerta chega ao cuidador pela central.

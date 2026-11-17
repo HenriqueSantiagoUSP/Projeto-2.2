@@ -1,7 +1,7 @@
 [project]
 name = "queda"
 version = "0.1.0"
-description = "Modelos de detecção de queda desenvolvidos no PC antes de irem para o vestível (S2 P3 Q1)"
+description = "Modelos de detecção de queda desenvolvidos no PC antes de irem para a pulseira (S2 P3 Q1)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy>=2.0",

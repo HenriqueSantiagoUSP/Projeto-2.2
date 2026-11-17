@@ -17,9 +17,9 @@ ficam para depois.
 \toprule
 ID & Requisito \\
 \midrule
-\multicolumn{2}{@{}l}{\textit{Vestível}} \\
+\multicolumn{2}{@{}l}{\textit{Pulseira}} \\
 RF01 & Adquirir aceleração e velocidade angular nos 3 eixos a 200\,Hz, com faixa de $\pm$8\,g \\
-RF02 & Detectar a queda no próprio vestível: gatilho em picos de $\amag \ge \gatilhoLon$\,g e classificador sobre \nAtributos{} atributos da janela (modelo provisório até retreinar com dados do pulso) \\
+RF02 & Detectar a queda na própria pulseira: gatilho em picos de $\amag \ge \gatilhoLon$\,g e classificador sobre \nAtributos{} atributos da janela (modelo provisório até retreinar com dados do pulso) \\
 RF03 & Enviar a queda ao hub imediatamente, reenviando até a confirmação \\
 RF04 & Depois de uma queda, não gerar outra por 30\,s \\
 RF05 & Cancelar a queda pelo botão ``estou bem'' \\
@@ -57,7 +57,7 @@ RF19 & Notificar cada alerta ao cuidador pelo Telegram: tipo, quarto e horário 
 ID & Requisito & Meta & Como medir \\
 \midrule
 RNF01 & Amostragem estável & 200\,Hz, \textit{jitter} $\le \pm$5\,ms & intervalos no modo de coleta \\
-RNF02 & Latência da queda & pico $\to$ MQTT $\le$ 500\,ms & hora no vestível, no hub e no broker \\
+RNF02 & Latência da queda & pico $\to$ MQTT $\le$ 500\,ms & hora na pulseira, no hub e no broker \\
 RNF03 & Latência da porta & transição $\to$ MQTT $\le$ 200\,ms & log com hora nos dois lados \\
 RNF04 & Latência da notificação & alerta $\to$ Telegram $\le$ 5\,s & hora do alerta e da mensagem \\
 RNF05 & Disponibilidade & 24/7, reconexão automática com espera crescente & 24\,h derrubando a rede \\
@@ -68,7 +68,7 @@ RNF09 & Segurança & MQTT com usuário, senha e ACL; ESP-NOW cifrado; segredos f
 RNF10 & Temperatura & resolução $\le$ 0,1\,°C; exatidão $\pm$1\,°C & comparação com termopar \\
 RNF11 & Sem internet & tudo funciona na rede local, exceto o Telegram & ensaio com a internet desligada \\
 RNF13 & Diagnóstico & log na serial: tasks, conexões, eventos & inspeção \\
-RNF14 & Autonomia do vestível & a definir depois de medir o consumo & medição com bateria \\
+RNF14 & Autonomia da pulseira & a definir depois de medir o consumo & medição com bateria \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -76,10 +76,10 @@ RNF14 & Autonomia do vestível & a definir depois de medir o consumo & medição
 \subsection{Restrições}
 
 \begin{itemize}
-  \item \textbf{Processamento na ESP32} (diretriz da disciplina): a detecção de queda roda no
-        vestível; as regras e os alertas, no hub. A central só armazena, mostra e notifica.
+  \item \textbf{Processamento na ESP32} (diretriz da disciplina): a detecção de queda roda na
+        pulseira; as regras e os alertas, no hub. A central só armazena, mostra e notifica.
   \item Firmware em C com ESP-IDF 6 e FreeRTOS, na ESP32-S3-DevKitC-1.
-  \item Hub alimentado em 5\,V; vestível a bateria (no protótipo, um \textit{power bank}).
+  \item Hub alimentado em 5\,V; pulseira a bateria (no protótipo, um \textit{power bank}).
   \item Central com ferramentas abertas: Mosquitto, Telegraf, InfluxDB, Grafana e Python.
   \item Integração com o barramento CAN da sala, compartilhado com os outros grupos.
 \end{itemize}

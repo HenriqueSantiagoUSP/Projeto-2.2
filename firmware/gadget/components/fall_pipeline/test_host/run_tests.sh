@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Builds and runs the fall_pipeline tests with the host compiler (no ESP-IDF needed:
 # stubs/esp_dsp.h stands in for ESP-DSP). The parity tests read vetores/, exported by
-# modelo/experimentos/09_exportar_vestivel.py together with the model.
+# modelo/experimentos/09_exportar_pulseira.py together with the model.
 # Usage, from anywhere: sh firmware/gadget/components/fall_pipeline/test_host/run_tests.sh
 set -e
 here="$(cd "$(dirname "$0")" && pwd)"

@@ -11,22 +11,22 @@ relatório final, que precisa justificar as mudanças. Revisão feita em 2026-10
 | mar/26 | S1 P1 (Q1–Q6) | ILPI Butantã; Modbus RTU/RS-485 com Raspberry Pi mestre; ESP32 DevKit V1; C++; Mosquitto + Node-RED + InfluxDB + Grafana + Telegram; regras de 15/40 min; queda = 2,5 g por 100 ms |
 | mai/26 | S1 P2 | ESP32-S3 DevKitC-1; 5 nós; LM35 calibrado por MMQ + LM358 com G = 5,5; 18 ensaios do MPU-6050; LED de status; queda = queda livre + impacto + giroscópio |
 | jul/26 | S1 P3 (final) | CAN no lugar do RS-485; PCB única com todos os sensores; firmware em C; queda = a² > 6,25 g² |
-| ago/26 | S2 P1 (Q1–Q3) | MQTT + Mosquitto; CAN validado em 28/08; hub + vestível; ESP-NOW + Wi-Fi em AP+STA; cascata de detecção em 4 estágios |
+| ago/26 | S2 P1 (Q1–Q3) | MQTT + Mosquitto; CAN validado em 28/08; hub + pulseira; ESP-NOW + Wi-Fi em AP+STA; cascata de detecção em 4 estágios |
 | set/26 | S2 P2 parcial | simulador → Mosquitto → painel web, demonstrado em 18/09 |
-| out/26 | S2 P2 PCB (entregue) | PCB v1 única para hub e vestível, 2 camadas, ERC/DRC sem erros; fabricada e em mãos em nov/26 |
+| out/26 | S2 P2 PCB (entregue) | PCB v1 única para hub e pulseira, 2 camadas, ERC/DRC sem erros; fabricada e em mãos em nov/26 |
 | out/26 | revisão (este documento) | processamento na borda; contrato MQTT por site/quarto; central com Grafana; limiar de queda provisório |
 | out/26 | implementação das correções | fases 1–7 com código pronto (só build e testes no PC; ver [`estado.md`](estado.md)) |
-| nov/26 | S2 P3 Q1 (entregue e apresentado) e porte do modelo | 22 métodos comparados no PC (09/11); pipeline com Random Forest no vestível no lugar do limiar (11/11) |
+| nov/26 | S2 P3 Q1 (entregue e apresentado) e porte do modelo | 22 métodos comparados no PC (09/11); pipeline com Random Forest na pulseira no lugar do limiar (11/11) |
 
 ## Decisões vigentes
 
 | Tema | Vale hoje | Detalhe |
 |---|---|---|
 | Cenário | quarto de residente em ILPI (~60 residentes, turno noturno com poucos cuidadores) | [`arquitetura.md`](arquitetura.md) |
-| Dispositivos | hub do quarto + vestível (pulseira) + central | [`arquitetura.md`](arquitetura.md) |
-| Enlaces | ESP-NOW (vestível → hub), MQTT/Wi-Fi (hub → central), CAN (hub ↔ sala); no vestível, MQTT direto opcional (reserva da queda) e CAN só de bancada | [`protocolo.md`](protocolo.md) |
-| Onde se processa | queda no vestível; regras de tempo e alertas no hub (diretriz da disciplina) | [`arquitetura.md`](arquitetura.md) |
-| Detecção de queda | pipeline no vestível: filtro de 20 Hz → gatilho causal (picos de \|a\| ≥ 2,0 g) → janela de −1,0 a +0,8 s → 23 atributos no tempo → **Random Forest** (regressão logística como opção). Treinado na SisFall (cintura, ±8 g): **provisório até retreinar com os dados do pulso** | seção "Pipeline de queda no vestível" abaixo |
+| Dispositivos | hub do quarto + pulseira (pulseira) + central | [`arquitetura.md`](arquitetura.md) |
+| Enlaces | ESP-NOW (pulseira → hub), MQTT/Wi-Fi (hub → central), CAN (hub ↔ sala); na pulseira, MQTT direto opcional (reserva da queda) e CAN só de bancada | [`protocolo.md`](protocolo.md) |
+| Onde se processa | queda na pulseira; regras de tempo e alertas no hub (diretriz da disciplina) | [`arquitetura.md`](arquitetura.md) |
+| Detecção de queda | pipeline na pulseira: filtro de 20 Hz → gatilho causal (picos de \|a\| ≥ 2,0 g) → janela de −1,0 a +0,8 s → 23 atributos no tempo → **Random Forest** (regressão logística como opção). Treinado na SisFall (cintura, ±8 g): **provisório até retreinar com os dados do pulso** | seção "Pipeline de queda na pulseira" abaixo |
 | Central | Mosquitto + Telegraf + InfluxDB + Grafana + notificador Telegram; banco relacional PostgreSQL (protótipo em SQLite, 2026-11-10); futuro: nuvem | [`roadmap.md`](roadmap.md), [`pendencias.md`](pendencias.md) |
 | Firmware | C com componentes ESP-IDF **v6.0.1**, FreeRTOS, ESP32-S3 DevKitC-1; segue os slides de `aulas/`; componentes comuns em `firmware/common/` | [`CLAUDE.md`](../CLAUDE.md) |
 | Portas | até 8 por hub (uma por nibble CAN), cada uma com papel (`saida`, `banheiro`, `outra`) | [`protocolo.md`](protocolo.md) |
@@ -41,12 +41,12 @@ Detalhes que o plano deixava em aberto e foram decididos ao escrever o código; 
 | Decisão | Por quê |
 |---|---|
 | MQTT 3.1.1, keepalive de 30 s | 3.1.1 basta para o contrato; com 30 s o Last Will sai em ~45 s, não em 3 min |
-| `battery_mv = 0xFFFF` = bateria não medida | um vestível sem divisor não pode disparar `bateria_baixa` falso |
+| `battery_mv = 0xFFFF` = bateria não medida | uma pulseira sem divisor não pode disparar `bateria_baixa` falso |
 | Temperatura no CAN em `0x0F2`; portas em `0x0F3` + índice de `BOARD_DOORS` | um nibble por sensor, derivado da mesma tabela que cria as portas |
-| ESP-NOW descarta reenvio pelo par (`seq`, `uptime_ms`) | só o `seq` confundiria o primeiro quadro de um vestível que reiniciou |
+| ESP-NOW descarta reenvio pelo par (`seq`, `uptime_ms`) | só o `seq` confundiria o primeiro quadro de uma pulseira que reiniciou |
 | Presença só conta como "alguém no quarto" 60 s depois do evento de porta | antes disso, é o residente passando pelo PIR a caminho da porta |
 | Episódio de queda só fecha com `FALL_CANCEL` | o hub não tem como saber que o socorro chegou; o reconhecimento pelo cuidador é futuro (backend) |
-| ~~Vestível reinicia se o MPU-6050 não responde~~ (trocado em 2026-11-11: segue rodando sem heartbeat; ver "Peças ausentes") | um vestível sem sensor não pode mandar heartbeats que pareçam saudáveis |
+| ~~Pulseira reinicia se o MPU-6050 não responde~~ (trocado em 2026-11-11: segue rodando sem heartbeat; ver "Peças ausentes") | uma pulseira sem sensor não pode mandar heartbeats que pareçam saudáveis |
 | Usuários do broker fixos (`hub`, `telegraf`, `notificador`, `painel`); só as senhas no `.env` | a ACL do Mosquitto se refere a nomes literais |
 | Telegraf grava com a hora de recepção; `ts` vira campo | antes de sincronizar, o hub manda sem `ts`, e o Telegraf descartaria o ponto |
 | Demonstração de 18/09 movida para `interface/legado/` | os arquivos não estavam no git; reescrever no lugar apagaria a versão entregue |
@@ -55,7 +55,7 @@ Detalhes que o plano deixava em aberto e foram decididos ao escrever o código; 
 
 Pedido: o firmware das duas placas deve seguir os slides de `aulas/` e a documentação do ESP-IDF v6.0.1, com
 componentes modulares, tasks e cuidado com recursos compartilhados; MQTT, CAN e mapa de pinos nas duas placas;
-ESP-DSP no vestível. Detalhes em [`arquitetura.md`](arquitetura.md) (Componentes comuns; Tasks, núcleos e
+ESP-DSP na pulseira. Detalhes em [`arquitetura.md`](arquitetura.md) (Componentes comuns; Tasks, núcleos e
 recursos compartilhados) e [`protocolo.md`](protocolo.md) §1 e §2.
 
 | Decisão | Por quê |
@@ -66,15 +66,15 @@ recursos compartilhados) e [`protocolo.md`](protocolo.md) §1 e §2.
 | CAN: fila de TX + task dona do periférico; um quadro por vez no driver | o driver guarda só o ponteiro do quadro; antes, só uma task podia transmitir com segurança |
 | CAN: `fail_retry_cnt = -1`, recuperação de *bus-off* após 1 s, filtro de hardware `0x000`–`0x0FF` | slide de CAN (retransmissão ilimitada, monitoramento de estado e recuperação); o atraso evita ficar alternando num barramento quebrado |
 | CAN: o callback de estado só notifica a `can_tx` (notificação de task, não fila) | uma notificação não se perde com a fila cheia; perder um *bus-off* deixaria o nó parado |
-| No vestível, CAN só de bancada (`GADGET_CAN`, desligado), quadros `0x0FD` (queda) e `0x0FE` (heartbeat), mesmos pinos do hub | o produto não tem transceptor; o CAN existe para o requisito da disciplina e para testes |
-| O hub só registra no log os quadros do vestível | a queda depende do `seq` do ESP-NOW para o episódio e a deduplicação; dois caminhos para a mesma queda gerariam alertas duplicados |
-| Portas do hub limitadas a 8 (`0x0F3`–`0x0FA`), verificado em compilação | `0x0FD`/`0x0FE` ficam para o vestível; antes nada impedia uma porta de invadir outro nibble |
-| No vestível, MQTT opcional (`GADGET_MQTT`, desligado): associa ao AP, telemetria própria e alerta de queda quando o hub não confirma | reserva para a cobertura do ESP-NOW, que é o ponto fraco do enlace; custa bateria, por isso é opção |
-| O alerta publicado pelo vestível usa o mesmo `id` do hub (`<vestível>-<seq>`) e `"via":"vestivel"` | o notificador já descarta `id` + `estado` repetidos; o cuidador fica sabendo que o hub não respondeu |
-| Usuário `vestivel` restrito a `vestivel/<id>/telemetria`, `vestivel/<id>/mqtt` e `alerta` | `vestivel/#` também casaria com `vestivel/<id>`, que é a visão do hub sobre o vestível |
+| Na pulseira, CAN só de bancada (`GADGET_CAN`, desligado), quadros `0x0FD` (queda) e `0x0FE` (heartbeat), mesmos pinos do hub | o produto não tem transceptor; o CAN existe para o requisito da disciplina e para testes |
+| O hub só registra no log os quadros da pulseira | a queda depende do `seq` do ESP-NOW para o episódio e a deduplicação; dois caminhos para a mesma queda gerariam alertas duplicados |
+| Portas do hub limitadas a 8 (`0x0F3`–`0x0FA`), verificado em compilação | `0x0FD`/`0x0FE` ficam para a pulseira; antes nada impedia uma porta de invadir outro nibble |
+| Na pulseira, MQTT opcional (`GADGET_MQTT`, desligado): associa ao AP, telemetria própria e alerta de queda quando o hub não confirma | reserva para a cobertura do ESP-NOW, que é o ponto fraco do enlace; custa bateria, por isso é opção |
+| O alerta publicado pela pulseira usa o mesmo `id` do hub (`<pulseira>-<seq>`) e `"via":"pulseira"` | o notificador já descarta `id` + `estado` repetidos; o cuidador fica sabendo que o hub não respondeu |
+| Usuário `pulseira` restrito a `pulseira/<id>/telemetria`, `pulseira/<id>/mqtt` e `alerta` | `pulseira/#` também casaria com `pulseira/<id>`, que é a visão do hub sobre a pulseira |
 | Detector provisório com histerese L<sub>on</sub>/L<sub>off</sub> e evento de até 1 s, informado no fim | slide de amostragem (segmentação por evento); um sinal oscilando perto de um limiar não vira vários eventos |
 | `signal_proc` com `espressif/esp-dsp` ^1.8.0: buffer circular de 512, janela de 384 (256 antes, 128 depois), atributos no tempo, custo em ciclos com `portMUX` | slides de amostragem e de atributos; é o esqueleto do pipeline futuro, sem mudar ainda o critério de queda |
-| A atividade do vestível saiu do detector para `signal_proc`, somada por lote sob um mutex curto | o mutex ficava preso durante a impressão do modo de coleta |
+| A atividade da pulseira saiu do detector para `signal_proc`, somada por lote sob um mutex curto | o mutex ficava preso durante a impressão do modo de coleta |
 | Filtro de glitch do GPIO nas portas, no PIR e no botão | slide de GPIO; complementa o debounce por estabilização, sem substituí-lo |
 | Telegraf grava booleanos (`hora`, `hub`) como texto `"true"`/`"false"` | o parser JSON os descartava; resolve a pendência do campo `hora` |
 
@@ -89,13 +89,13 @@ do ESP-IDF v6.0.1 para o ESP32-S3. Tabela completa em [`hardware/README.md`](../
 | Uma PCB, um mapa (`firmware/common/pcb/include/pcb_pins.h`); o `board_pins.h` de cada placa só escolhe | as duas placas são a mesma peça física; o `board_pins.h` fica para quando elas se separarem |
 | O build falha com pino repetido, proibido, reservado ou impróprio para a função | o conflito aparece na compilação, não na bancada |
 | Proibidos: 0, 3, 45, 46 (*strapping*); 19, 20 (USB); 43, 44 (console); 26–37 (flash e PSRAM octal); 38, 47, 48 (LED da DevKit; `VDD_SPI`) | documentação do ESP-IDF e o guia da DevKitC-1 |
-| Reservados: 15 e 16 (cristal de 32 kHz) | um *light sleep* preciso no vestível pode precisar do cristal |
+| Reservados: 15 e 16 (cristal de 32 kHz) | um *light sleep* preciso na pulseira pode precisar do cristal |
 | 39–42 só como expansão | são o JTAG por pinos; hoje a depuração é pela USB, mas não há por que perder o JTAG com uma função essencial |
 | Analógico só no ADC1, e o ADC1 poupado: LM35 no 4, bateria no 5, 6 e 7 livres | o ADC2 não funciona com o Wi-Fi ligado |
 | I²C no 1 (SDA) e no 2 (SCL), e o LM35 sai do GPIO1 | é o único par que o I²C do ULP RISC-V aceita fora dos pinos de *strapping*; o ULP poderá ler o MPU-6050 em *deep sleep*. Se as trilhas até o GY-521 se cruzarem, o módulo é girado no layout (uma troca de SCL e SDA chegou a ser feita e foi desfeita em 2026-10-23 por isso) |
 | Botão (18) e INT do MPU (17) em RTC GPIO | só RTC GPIO acorda o chip de *deep sleep* |
 | CAN no 13/14, no fim do J1; analógico no topo do J1 | aula de PCB: analógico longe do que chaveia, transceptor junto ao conector na borda |
-| Buzzer unificado no 21 (antes: 21 no hub, 12 no vestível) | na mesma PCB é um só buzzer |
+| Buzzer unificado no 21 (antes: 21 no hub, 12 na pulseira) | na mesma PCB é um só buzzer |
 | 4 portas na placa (11, 12, 9, 10) e 4 na expansão | as portas 3 e 4 estão em pinos do ADC1, para cederem o lugar se faltar analógico |
 | Versão da DevKit (LED no 48 ou no 38) no `menuconfig` → PCB | as duas versões existem, e o LED é da DevKit |
 
@@ -118,20 +118,20 @@ Detalhes e ligação pino a pino em [`hardware/README.md`](../hardware/README.md
 |---|---|
 | A PCB não tem buzzer; o GPIO 21 fica livre | escolha do grupo: a sinalização local é o LED da DevKit, e o alerta chega ao cuidador pela central (Telegram, painel) |
 | No firmware, `PIN_BUZZER = GPIO_NUM_NC` nas duas placas | o componente `indicators` já ignora uma saída NC; o código do buzzer continua, se um dia ele voltar |
-| A janela de cancelamento do vestível passa a ser sinalizada só pelo LED | risco aceito: o residente pode não perceber o LED; avaliar na bancada se um motor de vibração faz falta |
+| A janela de cancelamento da pulseira passa a ser sinalizada só pelo LED | risco aceito: o residente pode não perceber o LED; avaliar na bancada se um motor de vibração faz falta |
 | RF12 revisto: LED de status, sem buzzer | [`requisitos.md`](requisitos.md) |
 
-## Bateria do vestível (2026-10-23)
+## Bateria da pulseira (2026-10-23)
 
 Detalhes em [`hardware/README.md`](../hardware/README.md), seção Alimentação.
 
 | Decisão | Por quê |
 |---|---|
-| No protótipo, o vestível roda com **power bank** (saída USB-A) na entrada USB-C da placa, com cabo A → C | a placa já junta as duas num protótipo; pôr o circuito de bateria tomaria tempo que o grupo não tem e aumentaria bastante a placa |
+| No protótipo, a pulseira roda com **power bank** (saída USB-A) na entrada USB-C da placa, com cabo A → C | a placa já junta as duas num protótipo; pôr o circuito de bateria tomaria tempo que o grupo não tem e aumentaria bastante a placa |
 | Sem medição da bateria: `GADGET_BATTERY_SENSE` desligado por padrão, e o GPIO 5 fica reservado | o power bank não expõe a tensão da célula; com a bateria "desconhecida" (`0xFFFF`), o hub não aplica a regra `bateria_baixa` |
 | Avaliado e descartado nesta versão: LiPo + TP4056 + boost MT3608 na placa, com troca automática por Schottky | funcionava, mas pelo custo de tempo e de área. Antes dele também saíram o pacote externo e a chave USB/BAT |
 | Risco aceito: o power bank pode desligar sozinho com corrente baixa | hoje o consumo (~110–130 mA) fica acima do limite da maioria; com o *light sleep*, vai precisar de um modelo "always on" |
-| Para o vestível próprio (futuro): LiPo + regulador LDO de 3,3 V direto no 3V3, com divisor no GPIO 5 | mais leve e mais eficiente que um boost; o firmware já tem a medição pronta |
+| Para a pulseira própria (futuro): LiPo + regulador LDO de 3,3 V direto no 3V3, com divisor no GPIO 5 | mais leve e mais eficiente que um boost; o firmware já tem a medição pronta |
 
 ## Fabricação da PCB (2026-10-23)
 
@@ -151,22 +151,22 @@ Detalhes e números em [`modelo/README.md`](../modelo/README.md) e
 
 | Decisão | Por quê |
 |---|---|
-| Modelos desenvolvidos e comparados **no PC** (pasta `modelo/`, Python 3.12 via `uv`) antes de irem para o ESP32 | comparar métodos com validação séria é mais rápido no PC. O que vai para o vestível sai daí: classificador e limiar |
+| Modelos desenvolvidos e comparados **no PC** (pasta `modelo/`, Python 3.12 via `uv`) antes de irem para o ESP32 | comparar métodos com validação séria é mais rápido no PC. O que vai para a pulseira sai daí: classificador e limiar |
 | Saída **binária** (queda / não queda); os tipos de queda e de atividade servem só para a análise de erros | o alarme só precisa saber se houve queda; 15 classes dividiriam os dados (~120 exemplos por tipo) |
 | **Pipeline:** filtro passa-baixa → **gatilho** → janela → atributos → classificador | o limiar decide mal sozinho (~70 alarmes falsos/h na SisFall), mas como gatilho deixa passar 99 % das quedas e o classificador só roda quando ele dispara |
 | Gatilho por **picos de \|a\| > 2,0 g separados por ≥ 0,5 s**, e não pela histerese com período refratário do `fall_detect.c` | a histerese deixava um disparo da caminhada anterior esconder o impacto (só ~93 % das quedas passavam). Com os picos, o maior pico sempre dispara |
 | Janela de **−1,0 s a +0,8 s** em torno do pico | serve aos nossos ensaios curtos (só 0,8 s depois do impacto) e cabe no buffer circular de 512 |
 | **Validação cruzada por pessoa** (5 dobras) | janelas da mesma pessoa no treino e no teste inflam os resultados |
-| **Dois cenários de faixa:** ±8 g (vestível atual) e ±2 g (nossos ensaios) | os nossos ensaios foram gravados em ±2 g e saturam; a SisFall é saturada em cada faixa para comparar e treinar |
+| **Dois cenários de faixa:** ±8 g (pulseira atual) e ±2 g (nossos ensaios) | os nossos ensaios foram gravados em ±2 g e saturam; a SisFall é saturada em cada faixa para comparar e treinar |
 | Candidatos para o ESP32: **regressão logística** (412 B, 92,8 % das quedas com ≤ 1 alarme/h) e **Random Forest** (252 kB na flash, 95,7 %) | melhor acurácia × custo. O kNN (96,1 %) guarda o treino inteiro (1,5 MB) e fica de fora; a CNN de 6 eixos (93,9 %, 26 kB) depende da orientação da placa |
 | AR e ARX entram como atributos e como detector de anomalia, mas **não** como decisor | como anomalia a AUC é 0,79, porque qualquer movimento brusco também gera erro grande de predição |
 | **Limitação aceita:** todos os dados são da **cintura**, e a pulseira vai no pulso | falta coletar no pulso, com o firmware atual (±8 g), antes de embarcar o modelo |
 
-## Pipeline de queda no vestível (2026-11-11)
+## Pipeline de queda na pulseira (2026-11-11)
 
 O pipeline do PC foi portado para o firmware (`firmware/gadget/components/fall_pipeline`) e substitui o detector
 provisório com histerese. Os números são da SisFall no cenário A (±8 g), com validação por pessoa, e estão em
-[`modelo/resultados/vestivel.json`](../modelo/resultados/vestivel.json).
+[`modelo/resultados/pulseira.json`](../modelo/resultados/pulseira.json).
 
 | Decisão | Por quê |
 |---|---|
@@ -176,10 +176,10 @@ provisório com histerese. Os números são da SisFall no cenário A (±8 g), co
 | **Gatilho causal**: começa numa subida até L<sub>on</sub>, acompanha o máximo e emite o pico depois de 0,5 s sem um valor maior (`pipeline.gatilho_causal`) | o `find_peaks` olha o futuro e não roda amostra a amostra. O causal deixa passar as mesmas 99,2 % das quedas e dispara menos (753 contra 858 por hora de atividade). Os modelos exportados foram treinados com ele |
 | L<sub>on</sub> = **2,0 g** no \|a\| filtrado, configurável no `menuconfig` | é o maior limiar que deixa passar ≥ 99 % das quedas da SisFall em ±8 g. Com ±8 g, o teto de 8 g por eixo fica longe do gatilho. Deve ser revisto com os dados do pulso |
 | Limiar do classificador: o que mantém 95 % das janelas de impacto acima dele (Random Forest: P ≥ 0,73; logística: P ≥ 0,96) | é o mesmo ponto de operação das comparações, e vai junto do modelo em `fall_model.c` |
-| O modelo é **gerado** por `modelo/experimentos/09_exportar_vestivel.py` (`fall_model.h`/`.c`), com testes de paridade C × Python | o C reproduz os números do Python. Os vetores de teste (8 trechos da SisFall, 26 janelas) saem junto com o modelo, então retreinar atualiza os dois |
+| O modelo é **gerado** por `modelo/experimentos/09_exportar_pulseira.py` (`fall_model.h`/`.c`), com testes de paridade C × Python | o C reproduz os números do Python. Os vetores de teste (8 trechos da SisFall, 26 janelas) saem junto com o modelo, então retreinar atualiza os dois |
 | Limiares das árvores arredondados para baixo em `float` | para um `x` em float, `x <= t` em double (scikit-learn) decide igual a `x <= float_abaixo(t)`: a floresta do C decide como a do Python |
 | **Contrato:** P(queda) em % no `FALL` do ESP-NOW (13 bytes), no quadro CAN `0x0FD` (3 bytes) e `"prob"` no `detalhe` do alerta | o cuidador e a central veem a confiança do modelo. Nada foi gravado em placa ainda, então as duas placas mudam juntas; o hub descarta, com log, um `FALL` de tamanho diferente. A versão do ESP-NOW continua 1 |
-| O alerta continua saindo do hub; o vestível só publica no MQTT se o hub não confirmar | processamento na borda e deduplicação pelo `id`, como antes; o caminho de reserva já existia |
+| O alerta continua saindo do hub; a pulseira só publica no MQTT se o hub não confirmar | processamento na borda e deduplicação pelo `id`, como antes; o caminho de reserva já existia |
 | Cooldown de 30 s depois de uma queda informada; as janelas seguintes continuam classificadas e vão para o log | a mesma queda, ainda tremendo, não vira dois alertas |
 | `fall_detect` (histerese) removido do firmware | o limiar virou só o gatilho. A linha de base continua no Python (`avaliacao.detector_do_firmware`) |
 
@@ -190,23 +190,23 @@ seguir funcionando sem CAN, sem um sensor ou sem rede, com um aviso em vez de er
 
 | Decisão | Por quê |
 |---|---|
-| **MAC do hub vazio = vestível sem hub:** não liga o ESP-NOW; as quedas vão ao log serial (e ao MQTT e ao CAN, se ligados), e com MQTT o alerta sai direto | antes, o `espnow_tx_init` falhava e o vestível reiniciava em laço; com um MAC falso, cada queda gastaria ~1 s em reenvios |
+| **MAC do hub vazio = pulseira sem hub:** não liga o ESP-NOW; as quedas vão ao log serial (e ao MQTT e ao CAN, se ligados), e com MQTT o alerta sai direto | antes, o `espnow_tx_init` falhava e a pulseira reiniciava em laço; com um MAC falso, cada queda gastaria ~1 s em reenvios |
 | **Perfil `sdkconfig.demo.defaults`**: sem hub, modo de coleta, 5 s entre quedas, console a 921600 (console UART "custom", a mesma UART0) | o CSV a 200 Hz ocupa ~75 % de uma UART a 115200, e o `printf` espera a UART dentro da task de amostragem. A opção de baud só existe com o console "custom" |
-| **`interface/demo_vestivel.py`**: lê a placa pela USB, mostra o sinal e as decisões ao vivo e, opcionalmente, publica no papel do hub | dispensa Wi-Fi na sala e hub. A placa decide e o programa só mostra e repassa, então o contrato MQTT não muda |
-| **Sem MPU-6050, o vestível segue rodando, sem heartbeat**, com LED de falha e nova tentativa a cada 5 s, no boot e se o sensor soltar durante o uso | mantém a intenção antiga (sem sensor, o hub o declara offline) sem o reinício em laço, que impedia usar o resto da placa e enchia o log |
+| **`interface/demo_pulseira.py`**: lê a placa pela USB, mostra o sinal e as decisões ao vivo e, opcionalmente, publica no papel do hub | dispensa Wi-Fi na sala e hub. A placa decide e o programa só mostra e repassa, então o contrato MQTT não muda |
+| **Sem MPU-6050, a pulseira segue rodando, sem heartbeat**, com LED de falha e nova tentativa a cada 5 s, no boot e se o sensor soltar durante o uso | mantém a intenção antiga (sem sensor, o hub o declara offline) sem o reinício em laço, que impedia usar o resto da placa e enchia o log |
 | **Peça ausente = um aviso (W) ao ser percebida e um I ao voltar**; novas tentativas em silêncio, com espera crescente até 60 s (Wi-Fi, CAN) | uma peça que falta é um estado, não um erro por tentativa. Continuam como E, uma vez: usuário/senha recusados no broker (configuração errada) e uma queda que não chegou a lugar nenhum |
 | **O cliente MQTT só começa com a rede de pé**, e sem rede configurada nem começa; os logs da biblioteca (`mqtt_client`, `transport_base`, `esp-tls`) são silenciados, e o `mqtt_link` dá o aviso | a biblioteca tentava mesmo sem Wi-Fi e logava erros a cada ~10 s. Parar e religar o cliente a cada queda do Wi-Fi poderia travar o laço de eventos por segundos (`esp_mqtt_client_stop` espera a tentativa em curso) |
 | **CAN sem barramento:** bus-off e "error passive" viram um aviso cada; a recuperação espera 1 s → 60 s | sem transceptor e com o modo bancada desligado, era um E a cada ~1 s |
 | **Hub: menu "Room hub: sensors"** (`HUB_PIR_FITTED`, `HUB_LM35_FITTED`, `HUB_DOORS_ABSENT`); sem PIR, a inatividade e a saída noturna ficam suspensas | PIR e portas soltos não dão para detectar (leem "ninguém" e "aberta") e gerariam alertas falsos. No `menuconfig`, como escolheu o usuário; pela config MQTT mexeria no contrato |
 | LM35 solto: aviso uma vez, sem publicar | já era descartado por estar fora da faixa, mas com um W a cada leitura |
 
-## SVM na configuração do vestível (2026-11-13)
+## SVM na configuração da pulseira (2026-11-13)
 
 O SVM tinha ficado fora da escolha de 2026-11-09 sem uma razão registrada, e só tinha sido avaliado na
-configuração da comparação (todos os atributos, gatilho por picos). `modelo/experimentos/11_svm_vestivel.py` o
-avaliou na configuração do vestível (gatilho causal, 23 atributos no tempo, ±8 g, as mesmas dobras e o mesmo
+configuração da comparação (todos os atributos, gatilho por picos). `modelo/experimentos/11_svm_pulseira.py` o
+avaliou na configuração da pulseira (gatilho causal, 23 atributos no tempo, ±8 g, as mesmas dobras e o mesmo
 limiar do `09`), com um bootstrap por pessoa. Números em
-[`modelo/resultados/svm_vestivel.json`](../modelo/resultados/svm_vestivel.json).
+[`modelo/resultados/svm_pulseira.json`](../modelo/resultados/svm_pulseira.json).
 
 | Decisão | Por quê |
 |---|---|
@@ -223,23 +223,34 @@ comportamento:
 
 | Decisão | Por quê |
 |---|---|
-| **Hub:** uma FALL é a mesma queda só com o mesmo `seq` **e** o mesmo `uptime_ms` | só pelo `seq`, a queda nova de um vestível que reiniciou (o `seq` recomeça) era descartada como repetida, sem alerta |
-| **Vestível:** o `seq` começa num valor aleatório a cada reinício que não seja despertar do sono profundo | o `id` do alerta é `<vestível>-<seq>`; repetido, a central descarta a queda nova como duplicata |
-| **Vestível:** FALL ou FALL_CANCEL que não chegou a lugar nenhum é guardado e reenviado igual (2 s, dobrando até 30 s, e na hora em que um heartbeat passa) | antes ficava só num `ESP_LOGE`: a queda se perdia se o hub estivesse reiniciando ou fora de alcance por alguns segundos |
-| **Vestível:** 10 leituras seguidas sem amostra = sensor perdido; o overflow da FIFO deixou de ser um código de erro | um MPU que reinicia volta dormindo com a FIFO desligada (lê "OK, 0 amostras" para sempre), e o barramento I²C preso devolvia o mesmo código do overflow. Os dois deixavam a detecção morta com o LED verde |
-| **Vestível:** falha no meio da rajada reinicia a FIFO; amostras perdidas reiniciam o pipeline (com um cabeçalho CSV novo) | a FIFO desalinhada dava amostras com bytes trocados, e uma janela podia juntar trechos dos dois lados de uma lacuna |
-| **As duas placas:** PMK, LMK e MAC com o tamanho errado **falham o build** (`_Static_assert`); o MAC precisa ser exatamente `aa:bb:cc:dd:ee:ff` | uma chave curta era lida além do fim da string, diferente em cada placa: o hub não decifrava, mas o ACK MAC fazia o vestível achar que entregou |
-| **Hub:** com um vestível pareado, quadros de outro MAC são ignorados (um aviso); um MAC malformado dá um erro claro no boot | qualquer ESP32 por perto podia mandar uma FALL não cifrada; o MAC malformado caía calado no modo "aceita qualquer um" |
+| **Hub:** uma FALL é a mesma queda só com o mesmo `seq` **e** o mesmo `uptime_ms` | só pelo `seq`, a queda nova de uma pulseira que reiniciou (o `seq` recomeça) era descartada como repetida, sem alerta |
+| **Pulseira:** o `seq` começa num valor aleatório a cada reinício que não seja despertar do sono profundo | o `id` do alerta é `<pulseira>-<seq>`; repetido, a central descarta a queda nova como duplicata |
+| **Pulseira:** FALL ou FALL_CANCEL que não chegou a lugar nenhum é guardado e reenviado igual (2 s, dobrando até 30 s, e na hora em que um heartbeat passa) | antes ficava só num `ESP_LOGE`: a queda se perdia se o hub estivesse reiniciando ou fora de alcance por alguns segundos |
+| **Pulseira:** 10 leituras seguidas sem amostra = sensor perdido; o overflow da FIFO deixou de ser um código de erro | um MPU que reinicia volta dormindo com a FIFO desligada (lê "OK, 0 amostras" para sempre), e o barramento I²C preso devolvia o mesmo código do overflow. Os dois deixavam a detecção morta com o LED verde |
+| **Pulseira:** falha no meio da rajada reinicia a FIFO; amostras perdidas reiniciam o pipeline (com um cabeçalho CSV novo) | a FIFO desalinhada dava amostras com bytes trocados, e uma janela podia juntar trechos dos dois lados de uma lacuna |
+| **As duas placas:** PMK, LMK e MAC com o tamanho errado **falham o build** (`_Static_assert`); o MAC precisa ser exatamente `aa:bb:cc:dd:ee:ff` | uma chave curta era lida além do fim da string, diferente em cada placa: o hub não decifrava, mas o ACK MAC fazia a pulseira achar que entregou |
+| **Hub:** com uma pulseira pareada, quadros de outro MAC são ignorados (um aviso); um MAC malformado dá um erro claro no boot | qualquer ESP32 por perto podia mandar uma FALL não cifrada; o MAC malformado caía calado no modo "aceita qualquer um" |
 | **As duas placas:** ESP-NOW e MQTT que não sobem viram `ESP_LOGE` e a placa segue (sem `ESP_ERROR_CHECK`); URI do broker vazia = MQTT desligado com um aviso | a regra "nada opcional derruba a placa" valia para sensores, mas não para esses dois: uma URI apagada no `menuconfig` reiniciava o hub em laço |
 | **Hub:** `a2` e `prob` fora da faixa saem do JSON do alerta (a queda vai sem eles) | `%.2f` de um NaN escreve `nan`, que não é JSON: a central descartava o alerta inteiro |
 | **mqtt_link e net:** um `esp_mqtt_client_start` ou `esp_wifi_connect` recusado é tentado de novo por timer | as novas tentativas dependiam de um evento que, nesses casos, não vem: a placa ficava sem rede até reiniciar |
 | **CAN:** "connected again" só depois que um quadro sai de fato (ERROR_ACTIVE e TEC = 0) | toda recuperação termina em ERROR_ACTIVE, com barramento ou sem: sem transceptor, o par W/I se repetia a cada quadro e a espera nunca crescia |
-| **Eventos que não podem se perder** (MQTT conectado nas duas placas, botão do vestível) viram uma marca atômica conferida pela tarefa | com a fila cheia o evento sumia: o "offline" retido do Last Will continuava valendo |
+| **Eventos que não podem se perder** (MQTT conectado nas duas placas, botão da pulseira) viram uma marca atômica conferida pela tarefa | com a fila cheia o evento sumia: o "offline" retido do Last Will continuava valendo |
 | **ESP-NOW:** a confirmação atrasada de um envio que estourou o tempo é descartada, com um limite de uma espera de ACK | ela era lida como o ACK do envio seguinte, que podia ser uma FALL que o hub não recebeu |
 | **Notificador:** sessão MQTT persistente; o alerta que o Telegram não aceitou espera e vai de novo até passar (só um 400 é descartado); dado inesperado vira texto simples | antes, um erro HTTP fora de `OSError` matava a thread de envio, três falhas seguidas descartavam o alerta, um alerta esquisito derrubava o processo e os alertas publicados com ele fora do ar se perdiam |
 | **Demo:** a porta ocupada no início entra no mesmo laço de reconexão | o `sys.exit` dentro da thread sumia sem mensagem, e a janela abria vazia |
 | **modelo/:** o leitor dos ensaios próprios aceita o formato do protocolo de coleta (`p03_queda_frente_2.csv`, em contagens) e avisa o que ignora | a coleta no pulso seria descartada em silêncio ou lida como se as contagens fossem g |
 | **modelo/:** `DISTANCIA_S` e o biquad vêm do `pipeline.py` para o treino e para o `09`; o `09` e o `10` só gravam depois de calcular tudo; limiar infinito ou uma classe só param a exportação | o modelo exportado podia não corresponder ao gatilho ou ao filtro do firmware, sem aviso, e uma falha no meio deixava os artefatos de rodadas diferentes |
+
+## "Pulseira" no lugar de "vestível" (2026-11-17)
+
+| Decisão | Por quê |
+|---|---|
+| O dispositivo do residente passa a se chamar **pulseira** em todo o projeto: documentação, relatórios, painéis, mensagens e o contrato MQTT. O hub continua **hub** (hub do quarto) | escolha do grupo: "vestível" soava mal, e "pulseira" é o que o dispositivo é e o que o painel já mostrava. A convenção está no início do `CLAUDE.md`, do `README.md`, da `arquitetura.md` e do relatório do Q2 |
+| **Contrato MQTT** ([`protocolo.md`](protocolo.md)): os tópicos `vestivel/<id>`, `.../telemetria` e `.../mqtt` viraram `pulseira/<id>`, e assim por diante; o alerta `vestivel_offline` virou `pulseira_offline`; o campo `vestivel` do `detalhe`, `pulseira`; `"via":"pulseira"`; o parâmetro `pulseira_offline_s` em `config/desejada` | um nome só em tudo. Não há placa em campo nem dado que precise ser preservado |
+| Broker: usuário `pulseira` (senha `MQTT_PULSEIRA_PASSWORD` no `.env`); InfluxDB: medidas `pulseira`, `pulseira_telemetria` e `pulseira_mqtt` | consequência dos tópicos. O histórico gravado com os nomes antigos não aparece mais no painel |
+| Arquivos renomeados: `interface/demo_pulseira.py` (e o teste), `modelo/experimentos/09_exportar_pulseira.py` e `11_svm_pulseira.py`, `modelo/resultados/pulseira.json` e `svm_pulseira.json` | idem |
+| O código C continua em inglês: `firmware/gadget`, `wearable`, o menu "Wearable" | regra do projeto (código e comentários em inglês) |
+| Os materiais já entregues do Q1 (`relatorios/Semestre 2/Projeto 3/Q1/`) e o `interface/legado/` ficam como foram entregues, com "vestível" | são registro do que foi entregue; reescrevê-los separaria o fonte do PDF entregue |
 
 ## `aulas/` fora do git (2026-11-16)
 
@@ -253,8 +264,8 @@ comportamento:
 | De → para | Por quê |
 |---|---|
 | RS-485/Modbus com polling → CAN | multimestre, por evento, arbitragem e CRC em hardware; exigido na Q2 do S2 |
-| 5 nós (um ESP32 por sensor) → hub do quarto + vestível | 2 placas em vez de 5: menos custo, consumo (~0,5 W cada) e manutenção |
-| Pulseira em Wi-Fi alimentada por USB (RR03) → vestível a bateria com ESP-NOW | uma pulseira presa a um cabo não é usável |
+| 5 nós (um ESP32 por sensor) → hub do quarto + pulseira | 2 placas em vez de 5: menos custo, consumo (~0,5 W cada) e manutenção |
+| Pulseira em Wi-Fi alimentada por USB (RR03) → pulseira a bateria com ESP-NOW | uma pulseira presa a um cabo não é usável |
 | ESP32 DevKit V1 → ESP32-S3 DevKitC-1 | dois núcleos LX7 e USB nativo; é a placa de todos os relatórios desde o S1 P2 |
 | C++ com `SensorBase` (RNF13, "sem exceções") → C com componentes ESP-IDF | idiomático no ESP-IDF; o relatório final precisa revisar o requisito oficialmente |
 | Reed só na borda de subida (S1) → as duas bordas, com estado | as regras de porta precisam do fechamento |
@@ -275,8 +286,8 @@ comportamento:
 | Histórico de 30 dias + Grafana (RF17/RF18) | Telegraf → InfluxDB → Grafana |
 | Autenticação MQTT (RNF09) | usuário/senha + ACL desde já; TLS quando houver nuvem |
 | Buffer offline e watchdog (RNF06/RNF07) | outbox do esp-mqtt para QoS 1 + task watchdog nas tasks críticas |
-| Cooldown pós-queda de 30 s (RF05) | no vestível |
-| LED de status por nó (1 Hz normal, 4 Hz alerta) | WS2812 da própria DevKit, no hub e no vestível |
+| Cooldown pós-queda de 30 s (RF05) | na pulseira |
+| LED de status por nó (1 Hz normal, 4 Hz alerta) | WS2812 da própria DevKit, no hub e na pulseira |
 | Duas portas, quarto e banheiro | portas modulares, cada uma com seu papel |
 | Aceleração contínua no painel (RF06) | campo `atividade` no heartbeat, sem custo de rádio extra |
 | Cenários de demonstração com tempos encurtados (S1 P1 Q5/Q6) | perfil de configuração "demo" |
@@ -341,12 +352,12 @@ pura, passa nos testes no PC; nada foi verificado em bancada ainda.
      útil precisa estar documentada.
    - A validação com termopar sobre a PCB continua pendente (S1 P3).
 7. **Escala de ILPI** (~60 residentes): a documentação antiga falava de "casa" e o painel tem `quarto101`
-   fixo. O contrato passou a ter `<site>/<quarto>` e ids de porta e de vestível; o Grafana terá uma variável
+   fixo. O contrato passou a ter `<site>/<quarto>` e ids de porta e de pulseira; o Grafana terá uma variável
    de quarto.
 8. **Meta de falso positivo ≤ 1 por hora** (S1 P1 RNF08): isso permite até 24 alarmes falsos por dia e leva
    o cuidador a ignorar o sistema. Nova meta: ≤ 1 por dia por residente e sensibilidade ≥ 90 % (vale para o
    modelo; o limiar provisório não precisa atingir).
-9. **Bateria do vestível:** nenhum relatório define bateria, carregador ou orçamento de energia. Fica como
+9. **Bateria da pulseira:** nenhum relatório define bateria, carregador ou orçamento de energia. Fica como
    pendência de hardware: LiPo + carregador + leitura da tensão no ADC1 + medição do consumo real.
 10. **`CAN_SELF_TEST = true`** em `can.h`: precisa ser `false` no barramento real da sala.
 
@@ -356,7 +367,7 @@ O relatório final deve usar a coluna "Vale hoje".
 
 | Tema | Versões nos relatórios | Vale hoje |
 |---|---|---|
-| Número de nós | 4 (S1 P1), 5 (S1 P2/P3, S2 P1 Q1), hub + vestível (S2 P1 Q2/Q3) | hub + vestível |
+| Número de nós | 4 (S1 P1), 5 (S1 P2/P3, S2 P1 Q1), hub + pulseira (S2 P1 Q2/Q3) | hub + pulseira |
 | Linguagem do firmware | C++ (S1 P1 RR02/RNF13), C (S1 P3 em diante) | C |
 | Taxa do MPU-6050 | 100 Hz (S1 P1), 200 Hz (S1 P2 em diante) | 200 Hz |
 | Debounce do reed | 50 ms (S1 P1), 200 ms (S1 P2/P3), 500 ms (firmware atual) | ~50 ms de estabilização (roadmap, fase 2) |
@@ -366,7 +377,7 @@ O relatório final deve usar a coluna "Vale hoje".
 | Resistores do LM358 | R1 = 1 kΩ / R2 = 4,5 kΩ (S1 P2); 2 kΩ / 9 kΩ (S1 P3) | mesmo ganho de 5,5; vale o da PCB nova |
 | Alimentação do LM35 | 3,3 V (S1 P3, Tabela 4): **erro do relatório** | 5 V, com o LM358 em ±5 V (−5 V por um inversor); confirmado pelo grupo em 2026-10-21 |
 | Tópicos | `asilo/quarto01/…` (S1 P1), `idoso/quarto101/…` (S2) | `idoso/<site>/<quarto>/…` |
-| Critério de queda | 2,5 g por 100 ms; queda livre + impacto + giroscópio; a² > 6,25 g²; cascata de 4 estágios com rede neural | gatilho de 2,0 g + Random Forest no vestível (2026-11-11), provisório até os dados do pulso |
+| Critério de queda | 2,5 g por 100 ms; queda livre + impacto + giroscópio; a² > 6,25 g²; cascata de 4 estágios com rede neural | gatilho de 2,0 g + Random Forest na pulseira (2026-11-11), provisório até os dados do pulso |
 | Wi-Fi do hub | AP+STA (S2 P1) | STA com `WIFI_PS_NONE` |
 | Onde rodam as regras | ESP32 (S1 P1), Node-RED na central (S2 P1) | hub (ESP32) |
 | Banco de dados | InfluxDB (S1 P1), "SQLite ou InfluxDB" (S2 P1) | InfluxDB para as séries; banco relacional em PostgreSQL. O SQLite é só o protótipo da atividade de Fundamentos de Software (2026-11-10), de onde vêm o esquema e as decisões de tipos |

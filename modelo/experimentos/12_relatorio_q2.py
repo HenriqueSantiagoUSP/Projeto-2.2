@@ -11,13 +11,13 @@ Gera em Q2/latex/figuras/:
   sensor e da cadeia condicionada, e os resíduos em °C;
 - fig_lm35_faixa_adc: quanto da faixa do ADC (12 dB) o sinal ocupa com e sem o ganho de 5,5;
 - fig_rc_bode: resposta do filtro RC de 10 kΩ e 1 µF na entrada do ADC;
-- fig_biquad: resposta do passa-baixa de 20 Hz do vestível (os coeficientes de fall_model.c) e o DLPF do MPU;
+- fig_biquad: resposta do passa-baixa de 20 Hz da pulseira (os coeficientes de fall_model.c) e o DLPF do MPU;
 - fig_mpu_cenarios: um ensaio próprio de cada cenário (eixos, |a| e |ω|);
 - cópias de figuras do Q1 (relatório e apresentação) usadas no capítulo de modelos;
 - da PCB: renders 3D e camadas de cobre em PDF (kicad-cli, que também roda o ERC e o DRC) e cada folha do
   esquema em PNG, recortada no circuito (pdftoppm).
 
-E em Q2/latex/tabelas/: a lista de materiais, a comparação dos modelos do vestível e numeros.tex (macros com os
+E em Q2/latex/tabelas/: a lista de materiais, a comparação dos modelos da pulseira e numeros.tex (macros com os
 números do texto que vêm de dados: ajuste do LM35, modelo, DRC/ERC, contagens).
 """
 
@@ -195,7 +195,7 @@ def biquad():
     num("bqFc", br(FC_PASSA_BAIXA, 0)), num("bqFs", br(FS, 0))
     num("bqCoefs", ", ".join(br(v, 5).replace("-", "$-$") for v in firmware))
     fig, ax = plt.subplots(figsize=(L, 2.5))
-    ax.plot(f, db, color=LARANJA, label="biquad do vestível (Butterworth de 2ª ordem, 20 Hz)")
+    ax.plot(f, db, color=LARANJA, label="biquad da pulseira (Butterworth de 2ª ordem, 20 Hz)")
     ax.axvline(FC_PASSA_BAIXA, color=LARANJA, ls="--", lw=0.9)
     ax.axvline(DLPF_MPU_HZ, color=VIOLETA, ls="--", lw=0.9, label="DLPF do MPU-6050 (44 Hz, filtro digital dentro do sensor)")
     ax.axvspan(0.5, 12, color=VERDE_AGUA, alpha=0.18, label="banda dos movimentos do corpo (~0,5–12 Hz)")
@@ -246,7 +246,7 @@ COPIAS = {
     Q1 / "latex" / "figuras" / "fig_proprios_ensaios.png": "fig_proprios_ensaios.png",
     Q1 / "apresentacao" / "figuras" / "ap_janela.png": "fig_janela.png",
     Q1 / "apresentacao" / "figuras" / "ap_importancia.png": "fig_importancia.png",
-    Q1 / "apresentacao" / "figuras" / "ap_funil.png": "fig_funil_vestivel.png",
+    Q1 / "apresentacao" / "figuras" / "ap_funil.png": "fig_funil_pulseira.png",
 }
 
 
@@ -388,8 +388,8 @@ def tabela_bom():
 
 
 def tabela_modelos():
-    vest = json.loads((R / "vestivel.json").read_text(encoding="utf-8"))
-    svm = json.loads((R / "svm_vestivel.json").read_text(encoding="utf-8"))["modelos"]
+    vest = json.loads((R / "pulseira.json").read_text(encoding="utf-8"))
+    svm = json.loads((R / "svm_pulseira.json").read_text(encoding="utf-8"))["modelos"]
     rf = vest["rf"]
     num("rfAlarmes", br(rf["alarmes_h"], 2)), num("rfQuedas", br(rf["sens_1alarme_h"] * 100, 1))
     num("rfLimiar", br(rf["limiar_prob"], 2)), num("rfBytes", f"{rf['bytes_flash']:,}".replace(",", "\\,"))
@@ -406,13 +406,13 @@ def tabela_modelos():
         ops = f"{m['ops']:,}".replace(",", "\\,")
         linhas.append(f"{nome} & {br(m['alarmes_h'], 2)} & {br(m['sens_1alarme_h'] * 100, 1)}\\,\\% & "
                       f"{br(kb, 1)} & {ops} \\\\")
-    (TAB / "modelos_vestivel.tex").write_text(
-        "% Gerado por modelo/experimentos/12_relatorio_q2.py a partir de resultados/vestivel.json e svm_vestivel.json\n"
+    (TAB / "modelos_pulseira.tex").write_text(
+        "% Gerado por modelo/experimentos/12_relatorio_q2.py a partir de resultados/pulseira.json e svm_pulseira.json\n"
         "\\begin{tabular}{@{}lrrrr@{}}\n\\toprule\n"
         "Classificador & \\makecell[r]{Alarmes\\\\falsos/h} & \\makecell[r]{Quedas com\\\\$\\le$1 alarme/h} & "
         "\\makecell[r]{Memória\\\\(kB)} & \\makecell[r]{Operações\\\\por janela} \\\\\n\\midrule\n"
         + "\n".join(linhas) + "\n\\bottomrule\n\\end{tabular}\n", encoding="utf-8", newline="\n")
-    print("   modelos_vestivel.tex")
+    print("   modelos_pulseira.tex")
 
 
 def gravar_numeros():

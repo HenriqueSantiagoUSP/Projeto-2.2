@@ -44,7 +44,7 @@ menu "Wearable"
         prompt "Fall classifier"
         default GADGET_FALL_CLASSIFIER_RF
         help
-            Both come from modelo/experimentos/09_exportar_vestivel.py (SisFall,
+            Both come from modelo/experimentos/09_exportar_pulseira.py (SisFall,
             waist, +-8 g) and run on the same 23 features. They are provisional
             until retrained with the wrist data (docs/pendencias.md).
 
@@ -100,7 +100,7 @@ menu "Wearable"
         default n
         help
             The wearable joins APP_WIFI_SSID (menu "Network (Wi-Fi)") and the broker
-            (menu "MQTT", user "vestivel"). ESP-NOW to the hub stays the main path and
+            (menu "MQTT", user "pulseira"). ESP-NOW to the hub stays the main path and
             then rides on the access point's channel. Over MQTT the wearable publishes
             its own telemetry and, when the hub does not acknowledge a fall even after
             looking for it, publishes the fall alert itself (docs/protocolo.md §1).

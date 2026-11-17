@@ -23,14 +23,14 @@ Figuras, em resultados/ (prefixo ap_):
 - ap_arvore: uma árvore de decisão de profundidade 3 treinada nas janelas;
 - ap_fronteira: fronteira de uma árvore × da floresta, com dois atributos;
 - ap_votos: as 60 árvores votando em três janelas da SA01 (modelo treinado sem a SA01);
-- ap_importancia: importância dos atributos no Random Forest do vestível;
-- ap_funil: o pipeline do vestível na SisFall, do gatilho à decisão.
+- ap_importancia: importância dos atributos no Random Forest da pulseira;
+- ap_funil: o pipeline da pulseira na SisFall, do gatilho à decisão.
 
 Tabelas em apresentacao/tabelas/ (métodos, por que o Random Forest, nossos ensaios) e números em
 apresentacao/numeros.tex: nenhum número dos slides é digitado à mão.
 
-O Random Forest daqui é o do vestível (o mesmo do 09): o script confere que ele reproduz o limiar de
-vestivel.json e as probabilidades dos vetores de teste do firmware.
+O Random Forest daqui é o da pulseira (o mesmo do 09): o script confere que ele reproduz o limiar de
+pulseira.json e as probabilidades dos vetores de teste do firmware.
 """
 
 import importlib.util
@@ -90,7 +90,7 @@ def carregar_script(nome):
 
 
 M07 = carregar_script("07_figuras_explicativas.py")
-M09 = carregar_script("09_exportar_vestivel.py")
+M09 = carregar_script("09_exportar_pulseira.py")
 plt.rcParams.update({"font.size": 12})        # o 07 importa o _estilo de novo; vale o tamanho do slide
 
 
@@ -483,7 +483,7 @@ def fig_fronteira(conj, F, nomes):
     validas = quiet > 1e-4
     X = np.column_stack([incl, np.log10(quiet)])[validas]
     y = conj.y[validas]
-    # Os mesmos hiperparâmetros das árvores do vestível (profundidade 10, folha com 2 janelas).
+    # Os mesmos hiperparâmetros das árvores da pulseira (profundidade 10, folha com 2 janelas).
     arvore = DecisionTreeClassifier(max_depth=10, min_samples_leaf=2, class_weight="balanced",
                                     random_state=0).fit(X, y)
     floresta = RandomForestClassifier(n_estimators=60, max_depth=10, min_samples_leaf=2, n_jobs=-1,
@@ -517,8 +517,8 @@ def fig_votos(conj, F, dobra):
     da_sa01 = conj.pessoa == "SA01"
     k = int(np.unique(dobra[da_sa01])[0])
     treino = np.flatnonzero(dobra != k)
-    rf = M09.RandomForestVestivel().ajustar(avaliacao.subconjunto(conj, treino), F[treino]).modelo
-    limiar = json.loads((R / "vestivel.json").read_text())["rf"]["limiar_prob"]
+    rf = M09.RandomForestPulseira().ajustar(avaliacao.subconjunto(conj, treino), F[treino]).modelo
+    limiar = json.loads((R / "pulseira.json").read_text())["rf"]["limiar_prob"]
 
     def votos(i):
         x = F[i:i + 1].astype(np.float32)
@@ -719,24 +719,24 @@ def main():
         raise SystemExit(f"logo não encontrado: {LOGO}")
     inicio = time.time()
     sisfall, proprios = _comum.carregar()
-    vestivel = json.loads((R / "vestivel.json").read_text())
-    l_on = vestivel["l_on_g"]
+    pulseira = json.loads((R / "pulseira.json").read_text())
+    l_on = pulseira["l_on_g"]
     comp_a = pd.read_csv(R / "comparacao_A.csv").set_index("metodo")
     comp_b = pd.read_csv(R / "comparacao_B.csv").set_index("metodo")
     prop = pd.read_csv(R / "proprios_resumo.csv").set_index("metodo")
 
-    # O conjunto e o modelo do vestível (09), conferidos
+    # O conjunto e o modelo da pulseira (09), conferidos
     conj = montar(sisfall, "A", l_on, causal=True, distancia_s=M09.DISTANCIA_S)
     F, nomes = atributos.calcular(conj.janelas, PRE, grupos=("tempo",))
     dobra = avaliacao.dobras(conj)
-    s_rf, _, _ = avaliacao.escores_fora_da_dobra(M09.RandomForestVestivel, conj, F, dobra)
+    s_rf, _, _ = avaliacao.escores_fora_da_dobra(M09.RandomForestPulseira, conj, F, dobra)
     r_rf = avaliacao.metricas(s_rf, conj)
-    assert abs(r_rf.limiar - vestivel["rf"]["limiar_prob"]) < 1e-9, "não reproduz o limiar do 09: rode o 09 de novo"
-    rf = M09.RandomForestVestivel().ajustar(conj, F).modelo
+    assert abs(r_rf.limiar - pulseira["rf"]["limiar_prob"]) < 1e-9, "não reproduz o limiar do 09: rode o 09 de novo"
+    rf = M09.RandomForestPulseira().ajustar(conj, F).modelo
     esperado = pd.read_csv(ESPERADO)
     dif = np.abs(M09.prob_rf(rf, esperado[nomes].to_numpy()) - esperado.rf_prob.to_numpy()).max()
     assert dif < 1e-5, f"o Random Forest não bate com os vetores do firmware (|dP| = {dif})"
-    print(f"Random Forest do vestível conferido: limiar {r_rf.limiar:.4f}, |dP| nos vetores = {dif:.1g}")
+    print(f"Random Forest da pulseira conferido: limiar {r_rf.limiar:.4f}, |dP| nos vetores = {dif:.1g}")
 
     k_exemplo, exemplo = ensaio(sisfall, "F01")
     n = {}
@@ -744,7 +744,7 @@ def main():
     fig_saturacao(sisfall)
     n.update(fig_filtro(exemplo))
     n.update(fig_gatilho_exemplo(ensaio(sisfall, "F05")[1], l_on))
-    fig_gatilho_curva(vestivel["gatilho_disparos_h"])
+    fig_gatilho_curva(pulseira["gatilho_disparos_h"])
     n.update(fig_janela(conj, F, nomes, k_exemplo))
     fig_separacao(conj, F, nomes)
     fig_comparacao(comp_a, comp_b)
@@ -764,7 +764,7 @@ def main():
         "horasAtividade": br(n["funilHoras"]), "nProprios": len(proprios),
         "nPropriosQueda": sum(e.queda for e in proprios), "nPropriosAtividade": sum(not e.queda for e in proprios),
         "lOn": br(l_on), "gatilhoPassam": br(100 * g_a.quedas_que_passam),
-        "disparosPicos": f"{g_a.disparos_adl_por_h:.0f}", "disparosCausal": f"{vestivel['gatilho_disparos_h']:.0f}",
+        "disparosPicos": f"{g_a.disparos_adl_por_h:.0f}", "disparosCausal": f"{pulseira['gatilho_disparos_h']:.0f}",
         "nJanelas": milhar(len(conj.y)), "nImpactos": milhar(conj.y.sum()), "nAtributos": len(nomes),
         "nJanelasAtividade": milhar((conj.y == 0).sum()),
         "picoBruto": br(n["picoBruto"]), "picoFiltrado": br(n["picoFiltrado"]), "exDisparos": n["exDisparos"],
@@ -783,12 +783,12 @@ def main():
         "soAR": br(100 * comp_a.loc["rf_so_ar", "sens_1alarme_h"]),
         "rfPropriosQuedas": int(prop.loc["random_forest", "quedas_detectadas"]),
         "rfPropriosAlarmes": int(prop.loc["random_forest", "alarmes_falsos"]),
-        # o modelo do vestível (09)
-        "rfVestAlarmes": br(vestivel["rf"]["alarmes_h"], 2),
-        "rfVestSens": br(100 * vestivel["rf"]["sens_1alarme_h"]),
-        "rfVestLimiar": br(vestivel["rf"]["limiar_prob"], 2),
-        "rfVestNos": milhar(vestivel["rf"]["nos"]), "rfVestKB": f"{vestivel['rf']['bytes_flash'] / 1e3:.0f}",
-        "lrVestAlarmes": br(vestivel["lr"]["alarmes_h"], 2),
+        # o modelo da pulseira (09)
+        "rfVestAlarmes": br(pulseira["rf"]["alarmes_h"], 2),
+        "rfVestSens": br(100 * pulseira["rf"]["sens_1alarme_h"]),
+        "rfVestLimiar": br(pulseira["rf"]["limiar_prob"], 2),
+        "rfVestNos": milhar(pulseira["rf"]["nos"]), "rfVestKB": f"{pulseira['rf']['bytes_flash'] / 1e3:.0f}",
+        "lrVestAlarmes": br(pulseira["lr"]["alarmes_h"], 2),
         "nVetores": len(esperado), "nTrechos": esperado.arquivo.nunique(),
         "funilDetectadas": milhar(n["funilDetectadas"]),
         "funilDetectadasPct": br(100 * n["funilDetectadas"] / n["funilQuedas"]),
