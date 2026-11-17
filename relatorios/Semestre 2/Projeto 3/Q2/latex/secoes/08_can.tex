@@ -110,8 +110,8 @@ ignorados.
 O CAN foi validado com o professor em 28/08/2026, no Projeto 1 deste semestre, com o
 firmware de então e os módulos dos outros grupos (Figura~\ref{fig:can_s2p1}). O transporte
 foi reescrito depois (filas, recuperação de \textit{bus-off}, diretório de IDs, mapa de pinos
-novo), e a versão atual foi verificada em build e no modo de bancada; o teste entre as duas
-placas montadas, com transceptores e terminação, está no plano da
+novo). O modo de bancada, com \textit{loopback} interno, permite testar o firmware numa
+placa só; o teste entre duas placas, com transceptores e terminação, está descrito na
 Seção~\ref{sec:verificacao}.
 
 \begin{figure}[H]
@@ -122,16 +122,3 @@ sala, com o identificador, o tamanho e os bytes.}
 \label{fig:can_s2p1}
 \end{figure}
 
-\begin{figure}[H]
-\centering
-\begin{subfigure}[b]{0.49\linewidth}
-  \centering
-  \fotoouespaco{bancada_can}{\linewidth}{as duas placas ligadas pelo barramento CAN (transceptores e terminação)}
-\end{subfigure}\hfill
-\begin{subfigure}[b]{0.49\linewidth}
-  \centering
-  \fotoouespaco{serial_can}{\linewidth}{monitor serial do hub com os quadros 0x0FD/0x0FE da pulseira}
-\end{subfigure}
-\caption{Teste do CAN entre as duas placas v1.}
-\label{fig:bancada_can}
-\end{figure}

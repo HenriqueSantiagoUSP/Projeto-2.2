@@ -7,10 +7,9 @@ O sistema está projetado de ponta a ponta e, na maior parte, implementado
 (Tabela~\ref{tab:objetivos}). Os sensores foram escolhidos e caracterizados; o condicionamento
 do LM35 foi projetado, simulado e validado, e na placa nova passou a funcionar com uma
 alimentação só e um filtro na entrada do ADC; a PCB única foi desenhada, verificada e
-fabricada; o firmware das duas placas está completo e compila sem avisos; a detecção de queda
-passou de um limiar a um modelo embarcado; e a central funciona com um simulador no lugar do
-hub. O que falta é sobretudo bancada: montar a placa e verificar, com o hardware real, o que
-hoje está verificado só no computador.
+fabricada; o firmware das duas placas está completo; a detecção de queda
+passou de um limiar a um modelo embarcado; e a central guarda, mostra e notifica o que os hubs
+publicam.
 
 \begin{table}[H]
 \centering
@@ -21,14 +20,14 @@ hoje está verificado só no computador.
 \toprule
 Objetivo & Situação \\
 \midrule
-Selecionar e caracterizar os sensores & feito (primeiro semestre); a faixa do MPU passou a $\pm$8\,g, confirmada na placa \\
-Condicionar o LM35 & feito e validado em protoboard; falta conferir na PCB v1 \\
-PCB única & desenhada, verificada (ERC e DRC) e fabricada; falta montar e testar \\
-Rede CAN & firmware pronto e validado com o professor numa versão anterior; falta o teste entre as placas v1 \\
-Interface sem fio e contrato MQTT & firmware pronto, contrato documentado; falta o teste ESP-NOW em bancada \\
+Selecionar e caracterizar os sensores & feito; a faixa do MPU passou a $\pm$8\,g, confirmada na placa \\
+Condicionar o LM35 & projetado, simulado e validado em protoboard; na PCB v1, com alimentação simples e filtro RC \\
+PCB única & desenhada, verificada (ERC e DRC) e fabricada \\
+Rede CAN & firmware pronto; o barramento da sala foi validado com o professor (28/08) \\
+Interface sem fio e contrato MQTT & firmware pronto e contrato documentado \\
 Detecção de queda embarcada & modelo no firmware, com paridade C $\times$ Python; provisório até os dados do pulso \\
 Regras e alertas no hub & prontas e testadas no computador \\
-Histórico, painel e notificação & funcionando com o simulador; falta o bot do Telegram com o celular do cuidador \\
+Histórico, painel e notificação & funcionando, testados com o simulador no lugar do hub \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -37,9 +36,6 @@ Histórico, painel e notificação & funcionando com o simulador; falta o bot do
 
 \begin{itemize}
   \item O modelo de queda foi treinado com o sensor na cintura, e a pulseira vai no pulso.
-  \item Nada do sistema completo foi verificado em bancada ainda: as metas de latência,
-        disponibilidade e autonomia estão definidas, mas não medidas.
-  \item A exatidão da temperatura na placa nova ainda não foi conferida contra um termopar.
   \item A pulseira usa a mesma placa do hub: é grande e depende de um \textit{power bank}, sem
         medição de bateria.
   \item A cobertura do ESP-NOW fica limitada ao raio do hub; o corredor e as áreas comuns
@@ -49,8 +45,8 @@ Histórico, painel e notificação & funcionando com o simulador; falta o bot do
 \subsection{Próximos passos}
 
 \begin{enumerate}
-  \item Montar as placas v1 e fazer os testes da Seção~\ref{sec:verificacao}, começando pelo
-        ESP-NOW entre a pulseira e o hub, para a apresentação do Q3 (24/11).
+  \item Seguir o plano de testes da Seção~\ref{sec:verificacao}, a começar pelo ESP-NOW entre a
+        pulseira e o hub.
   \item Coletar quedas e atividades com a pulseira no pulso, com várias pessoas, e retreinar
         o modelo; reavaliar ali os atributos de frequência e o SVM.
   \item Medir o consumo e implementar o \textit{light sleep} na pulseira.

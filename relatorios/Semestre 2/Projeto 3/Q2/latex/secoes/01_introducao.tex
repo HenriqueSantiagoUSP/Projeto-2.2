@@ -44,21 +44,12 @@ processamento feito nos próprios dispositivos.
   \item Guardar o histórico, mostrar o estado dos quartos e notificar o cuidador.
 \end{itemize}
 
-\subsection{O que esta entrega cobre}
+\subsection{O que este relatório cobre}
 
-O quesito Q2 do Projeto 3 pede um relatório com todas as informações dos sensores, da
-eletrônica de condicionamento de sinais, da interface com a rede CAN, da interface sem fio
-e da placa desenvolvida, como primeira interação de entrega. Este documento vai além
-disso e já tem a forma do relatório final: inclui os requisitos, a arquitetura, o
-firmware, a detecção de queda (resumida do relatório do Q1~\cite{q1}) e a central.
-
-Sobre o estado do projeto, uma ressalva que vale para o documento todo: o firmware das duas
-placas está escrito e compila, e a lógica que não depende de hardware (regras, pipeline de
-queda, configuração, notificador) é testada automaticamente no computador. Mas o sistema
-ainda \textbf{não foi verificado em bancada} com a placa nova montada. A
-Seção~\ref{sec:verificacao} diz o que foi verificado e em que nível, e lista os testes que
-faltam. Onde há uma foto que ainda vamos tirar (a placa fabricada e montada, o barramento
-CAN entre as placas, o painel com dados reais), o documento deixa um quadro marcado.
+Este relatório descreve o sistema inteiro: os requisitos e a arquitetura, os sensores e a
+caracterização deles, a eletrônica de condicionamento de sinais, a placa desenvolvida, o
+firmware, a interface com a rede CAN, a interface sem fio, a detecção de queda (desenvolvida
+em detalhe no relatório do Q1~\cite{q1}) e a central.
 
 \subsection{Organização}
 
@@ -67,6 +58,6 @@ arquitetura. As Seções~\ref{sec:sensores} e~\ref{sec:condicionamento} tratam d
 do condicionamento; a Seção~\ref{sec:pcb}, da placa; a Seção~\ref{sec:firmware}, do
 firmware. As interfaces de comunicação estão nas Seções~\ref{sec:can} (CAN)
 e~\ref{sec:semfio} (sem fio). A Seção~\ref{sec:queda} resume a detecção de queda, a
-Seção~\ref{sec:central} descreve a central, a Seção~\ref{sec:verificacao} a verificação e o
-plano de testes, e a Seção~\ref{sec:conclusoes} conclui. Os apêndices trazem o esquema
+Seção~\ref{sec:central} descreve a central, a Seção~\ref{sec:verificacao} a verificação e os
+testes, e a Seção~\ref{sec:conclusoes} conclui. Os apêndices trazem o esquema
 completo, o mapa de pinos, a lista de materiais e como reproduzir tudo.

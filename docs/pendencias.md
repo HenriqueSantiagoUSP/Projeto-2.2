@@ -14,11 +14,13 @@ Pedidos e prazos em [`relatorios/README.md`](../relatorios/README.md), Projeto 3
 
 - [ ] **Q2 (17/11):** relatório com sensores, condicionamento de sinais, interface CAN, interface sem fio e a
   placa desenvolvida (primeira interação de entrega).
-  - Pronto: a primeira versão do relatório final, em `relatorios/Semestre 2/Projeto 3/Q2/latex/` (66 páginas).
+  - Pronto: o relatório final, em `relatorios/Semestre 2/Projeto 3/Q2/latex/` (65 páginas).
   - Falta:
     - a revisão do grupo;
-    - as fotos nos quadros tracejados: a PCB fabricada e montada, a pulseira no pulso, a bancada CAN, os
-      monitores seriais, o Grafana, o Telegram e a demo. A lista está no topo do `main.tex`;
+    - as fotos nos quadros tracejados: a PCB fabricada, o monitor serial do ESP-NOW, o Grafana, o Telegram e a
+      demo. A lista está no topo do `main.tex`. Saíram do relatório (2026-11-17) a PCB montada e a bancada CAN,
+      porque ainda faltam componentes para montar a placa, e a pulseira no pulso, porque o protótipo é a placa
+      2 em 1, não uma pulseira pronta;
     - preencher `\docentes`, se o grupo quiser.
 - [ ] **Q3 (24/11):** apresentação em sala da comunicação sem fio funcionando com os sensores. Depende da
   bancada abaixo: pulseira → ESP-NOW → hub → MQTT → central.

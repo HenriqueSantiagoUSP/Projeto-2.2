@@ -12,6 +12,9 @@ encaixada e que leva os periféricos do hub e da pulseira. Só o firmware muda: 
 LM35; a pulseira usa o MPU-6050 e o botão; os dois usam o CAN e o LED da DevKit. Por isso nenhuma função
 divide pino com outra.
 
+Por que uma placa só: a disciplina imprime um único modelo de placa por grupo, então o hub e a pulseira tinham
+de caber no mesmo projeto. Por ser um protótipo, isso não atrapalha os testes.
+
 O mapa vale para o firmware em `firmware/common/pcb/include/pcb_pins.h`. Ele é verificado na compilação: o
 build falha se dois sinais caírem no mesmo GPIO, se algum cair num pino proibido ou reservado, ou se um sinal
 estiver num pino que não serve para ele (analógico fora do ADC1, por exemplo). O `board_pins.h` de cada placa

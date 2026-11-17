@@ -1,26 +1,35 @@
 % Topologia: estrela ESP-NOW (pulseiras -> hub), estrela Wi-Fi (hubs -> AP) e barramento CAN da sala.
 \begin{tikzpicture}[font=\footnotesize]
+  % Altura de cada fileira: os hubs ficam bem abaixo do ponto de acesso, para a seta do Wi-Fi
+  % comportar o rótulo inteiro; o resto desce junto, com as mesmas distâncias de antes.
+  \def\yhub{-4.0}
+  \def\ypul{-5.7}
+  \def\ycan{-6.8}
+  \def\ygrp{-7.8}
   \node[bloco=corcentral, minimum width=2.4cm] (ap) at (0,0) {ponto de acesso\\Wi-Fi da ILPI};
   \node[bloco=corcentral, minimum width=2.4cm] (cen) at (5.0,0) {central\\(PC ou Raspberry Pi)};
   \draw[thick, corcentral] (ap) -- node[rotulo, above=2pt] {Ethernet} (cen);
 
   \foreach \i/\x/\nome in {1/-4.6/quarto 101, 2/0/quarto 102, 3/4.6/quarto 103} {
-    \node[bloco=corhub, minimum width=2.1cm] (hub\i) at (\x,-2.6) {hub\\\nome};
-    \node[bloco=corvest, minimum width=1.5cm, font=\scriptsize] (v\i) at (\x-1.0,-4.3) {pulseira};
+    \node[bloco=corhub, minimum width=2.1cm] (hub\i) at (\x,\yhub) {hub\\\nome};
+    \node[bloco=corvest, minimum width=1.5cm, font=\scriptsize] (v\i) at (\x-1.0,\ypul) {pulseira};
     \draw[sem fio=corvest] (v\i) -- (hub\i);
   }
-  \draw[sem fio=corhub] (hub1) -- node[rotulo, sloped, above=1pt] {Wi-Fi STA (MQTT)} (ap);
+  \draw[sem fio=corhub] (hub1) -- node[rotulo, sloped, above=2pt, pos=0.45] {Wi-Fi STA (MQTT)} (ap);
   \draw[sem fio=corhub] (hub2) -- (ap);
   \draw[sem fio=corhub] (hub3) -- (ap);
-  \node[font=\scriptsize, text=corvest, anchor=east] at (-5.7,-3.45) {ESP-NOW};
+  \node[font=\scriptsize, text=corvest, anchor=east] at (-5.7,{(\yhub+\ypul)/2}) {ESP-NOW};
 
   % barramento CAN
-  \draw[very thick, corambas] (-6.4,-5.4) -- (6.4,-5.4);
-  \node[font=\scriptsize, text=corambas, anchor=west, align=left] at (6.75,-5.4) {CAN\\da sala};
-  \foreach \i in {1,2,3} {\draw[thick, corambas] ($(hub\i.south)+(0.6,0)$) -- ++(0,-2.35);}
-  \foreach \x/\g in {-2.3/0xD, 2.3/0xA} {
-    \node[bloco=corambas, minimum width=1.6cm, font=\scriptsize] (g\g) at (\x,-6.4) {grupo \g};
-    \draw[thick, corambas] (g\g.north) -- (\x,-5.4);
+  \draw[very thick, corambas] (-6.4,\ycan) -- (6.4,\ycan);
+  \node[font=\scriptsize, text=corambas, anchor=west, align=left] at (6.75,\ycan) {CAN\\da sala};
+  \foreach \i in {1,2,3} {
+    \path (hub\i.south) ++(0.6,0) coordinate (desce\i);
+    \draw[thick, corambas] (desce\i) -- (desce\i |- 0,\ycan);
   }
-  \foreach \x in {-6.4,6.4} {\node[draw=corambas, fill=white, inner sep=1.2pt, font=\tiny] at (\x,-5.4) {120\,$\Omega$};}
+  \foreach \x/\g in {-2.3/0xD, 2.3/0xA} {
+    \node[bloco=corambas, minimum width=1.6cm, font=\scriptsize] (g\g) at (\x,\ygrp) {grupo \g};
+    \draw[thick, corambas] (g\g.north) -- (\x,\ycan);
+  }
+  \foreach \x in {-6.4,6.4} {\node[draw=corambas, fill=white, inner sep=1.2pt, font=\tiny] at (\x,\ycan) {120\,$\Omega$};}
 \end{tikzpicture}

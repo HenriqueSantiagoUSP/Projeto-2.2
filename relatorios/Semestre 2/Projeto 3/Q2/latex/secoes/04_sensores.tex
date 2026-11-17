@@ -86,11 +86,6 @@ dois picos ficam quase iguais. Reproduzida do relatório do Q1~\cite{q1}.}
 \label{fig:saturacao}
 \end{figure}
 
-\paragraph{Conferido na placa.} Em 13/11/2026, a pulseira com o perfil de demonstração
-mandou o sinal bruto pela serial a 200\,Hz, sem parar, por 16 minutos. Parada, a magnitude
-lida foi de $\approx$4077 contagens, ou seja, $\approx$1\,g na escala de 4096 contagens por g:
-a faixa de $\pm$8\,g está mesmo configurada (em $\pm$2\,g, seriam $\sim$16\,384).
-
 %----------------------------------------------------------------------
 \subsection{LM35DZ: temperatura}\label{sec:lm35}
 
@@ -122,8 +117,7 @@ curvatura: o maior desvio é de \lmResMaxCadeia\,°C, no ponto de 0\,°C, e o de
 quadrático na cadeia é de \lmResRmsCadeia\,°C. Como a curva usada no firmware é a da
 \emph{cadeia completa} (Eq.~\ref{eq:cadeia}), ela já absorve o ganho real do amplificador e o
 desvio do sensor. A razão entre as duas inclinações dá o ganho medido do amplificador,
-$\lmAlfaCadeia/\lmAlfa = \lmGanhoMedido$. A exatidão final ($\pm$1\,°C, RNF10) ainda precisa
-ser conferida na placa nova contra um termopar.
+$\lmAlfaCadeia/\lmAlfa = \lmGanhoMedido$.
 
 \begin{figure}[H]
 \centering

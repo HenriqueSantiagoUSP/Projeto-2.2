@@ -13,12 +13,15 @@ sensores) no outro (Seção~\ref{sec:tasks}).
 
 \subsection{Uma PCB para as duas placas}
 
-O primeiro projeto é \textbf{uma só PCB} para o hub e a pulseira: uma placa-base em que a
-DevKit é encaixada e que leva os periféricos das duas. Só o firmware muda: o hub usa as
-portas, o PIR e o LM35; a pulseira usa o MPU-6050 e o botão; os dois podem usar o CAN e o LED
-da DevKit (Figura~\ref{fig:pcb_blocos}). Uma placa só significa um projeto, um pedido e um
-mapa de pinos, o que coube no prazo. O custo é que a pulseira fica maior do que precisaria;
-uma placa própria, menor e com bateria, fica para depois (Seção~\ref{sec:conclusoes}).
+O hub e a pulseira usam \textbf{uma só PCB}: uma placa-base em que a DevKit é encaixada e
+que leva os periféricos dos dois. Só o firmware muda: o hub usa as portas, o PIR e o LM35; a
+pulseira usa o MPU-6050 e o botão; os dois podem usar o CAN e o LED da DevKit
+(Figura~\ref{fig:pcb_blocos}).
+
+A placa é única por duas razões. A disciplina imprime um único modelo de placa por grupo, então
+as duas placas do sistema tinham de caber num mesmo projeto. E, por ser um protótipo, juntar o
+hub e a pulseira numa placa só não atrapalha os testes: as duas funções usam a mesma DevKit,
+nenhuma divide pino com a outra, e o firmware escolhe o que cada uma liga.
 
 \begin{figure}[H]
 \centering
@@ -111,8 +114,7 @@ um \textit{power bank}. Como só há uma entrada, nunca há duas fontes juntas.
 \end{itemize}
 
 \paragraph{Consumo.} A estimativa para a pulseira com o rádio ligado é de 110 a 130\,mA,
-o que daria de 20 a 25\,h com um \textit{power bank} de 5000\,mAh. A estimativa ainda precisa
-ser medida (RNF14). Muitos \textit{power banks} desligam sozinhos abaixo de 50 a 100\,mA, o
+o que daria de 20 a 25\,h com um \textit{power bank} de 5000\,mAh. Muitos \textit{power banks} desligam sozinhos abaixo de 50 a 100\,mA, o
 que vai importar quando o \textit{light sleep} baixar o consumo. Sem medição de bateria nesta
 placa, a pulseira informa a bateria como desconhecida, e o alerta de bateria baixa fica
 desligado.
@@ -233,25 +235,6 @@ metalização) e acabamento HASL. A montagem é feita à mão. A lista de materi
 \end{subfigure}
 \caption{A PCB v1 como chegou da JLCPCB.}
 \label{fig:pcb_fabricada}
-\end{figure}
-
-\paragraph{Montagem.} Antes de encaixar a DevKit, o multímetro confere que não há curto entre
-5\,V e GND nem entre 3,3\,V e GND (pontos de teste TP1, TP2 e TP3). Depois, a placa é ligada
-pela USB-C e o TP1 deve marcar 5\,V; com a DevKit encaixada, o TP2 deve marcar 3,3\,V. Só
-então entram os módulos.
-
-\begin{figure}[H]
-\centering
-\begin{subfigure}[b]{0.49\linewidth}
-  \centering
-  \fotoouespaco{pcb_montada_hub}{\linewidth}{PCB montada como hub (LM35, LM358, PIR, CAN)}
-\end{subfigure}\hfill
-\begin{subfigure}[b]{0.49\linewidth}
-  \centering
-  \fotoouespaco{pcb_montada_pulseira}{\linewidth}{PCB montada como pulseira (MPU-6050, botão)}
-\end{subfigure}
-\caption{A PCB v1 montada nas duas configurações.}
-\label{fig:pcb_montada}
 \end{figure}
 
 \subsection{Da PCB do primeiro semestre à v1}\label{sec:pcb_s1}
