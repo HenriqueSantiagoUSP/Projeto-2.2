@@ -81,7 +81,8 @@ recursos compartilhados) e [`protocolo.md`](protocolo.md) §1 e §2.
 ## Mapa de pinos da PCB única (2026-10-20)
 
 Pedido: no primeiro projeto, uma só PCB para as duas placas, sem conflito de pinos e sem usar pino que um
-recurso ligado no futuro tomaria. Base: aula de PCB (`aulas/Semestre 2/CEM_Projeto_PCB.pdf`) e documentação
+recurso ligado no futuro tomaria. A placa é única porque a disciplina imprime um único modelo de placa por
+grupo; por ser um protótipo, juntar o hub e a pulseira não atrapalha os testes. Base: aula de PCB (`aulas/Semestre 2/CEM_Projeto_PCB.pdf`) e documentação
 do ESP-IDF v6.0.1 para o ESP32-S3. Tabela completa em [`hardware/README.md`](../hardware/README.md).
 
 | Decisão | Por quê |

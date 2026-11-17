@@ -1,5 +1,5 @@
 """
-Prepara o relatório do Q2 (relatorios/Semestre 2/Projeto 3/Q2/latex/), a primeira versão do relatório final:
+Prepara o relatório do Q2 (relatorios/Semestre 2/Projeto 3/Q2/latex/), o relatório final:
 gráficos, tabelas, números e exportações da PCB. Rode depois de 09 e 11, que ele lê:
 
     uv run python experimentos/12_relatorio_q2.py

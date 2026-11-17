@@ -1,4 +1,4 @@
-Este relatório é a primeira versão do relatório final do sistema de monitoramento não
+Este é o relatório final do sistema de monitoramento não
 invasivo de idosos em Instituições de Longa Permanência (ILPIs). Em cada quarto, um
 \textbf{hub} com ESP32-S3 lê as portas (reed switch MC-38), a presença (PIR HC-SR501) e a
 temperatura (LM35DZ condicionado por um LM358), roda as regras de alerta e publica tudo
@@ -17,11 +17,6 @@ interface CAN (TWAI a 250\,kbit/s, identificadores \code{0x0GS}), a interface se
 queda e a central. Na base SisFall, o Random Forest da pulseira dá \rfAlarmes{} alarme
 falso por hora de atividade e detecta \rfQuedas\,\% das quedas; o modelo ainda é
 provisório, porque foi treinado com o sensor na cintura.
-
-O firmware das duas placas compila sem avisos e a lógica pura passa em mais de mil
-verificações no computador, mas o sistema completo ainda não rodou em bancada: a
-Seção~\ref{sec:verificacao} separa o que foi verificado, e como, do plano de testes com
-as placas montadas.
 
 {\raggedright
 \textbf{Palavras-chave:} ILPI; detecção de queda; ESP32-S3; rede CAN; ESP-NOW; MQTT;

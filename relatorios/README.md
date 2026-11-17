@@ -168,12 +168,12 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
   perguntas prováveis.
 - Os números saem de `modelo/resultados/resumo.md` e, para a pulseira, de `modelo/resultados/pulseira.json`.
 
-**Q2: primeira versão do relatório final** (17/11). LaTeX em
+**Q2: relatório final** (17/11; o professor considera o Q2 o relatório final). LaTeX em
 [`Q2/latex/main.tex`](<Semestre 2/Projeto 3/Q2/latex/main.tex>), com o PDF em
 [`Q2/latex/main.pdf`](<Semestre 2/Projeto 3/Q2/latex/main.pdf>).
 - **Layout:** o mesmo do Q1 (capa, contracapa, `figuras/`, `imagens/`, `tabelas/`). Um arquivo por seção em
   `secoes/` e os diagramas em TikZ e circuitikz em `diagramas/`.
-- **Conteúdo** (~66 páginas):
+- **Conteúdo** (~65 páginas):
   - requisitos e arquitetura;
   - sensores, com a caracterização do LM35 e do MPU-6050;
   - condicionamento do LM35 (circuito, simulação, validação, filtro RC) e condicionamento digital;
@@ -189,8 +189,7 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
   `modelo/experimentos/12_relatorio_q2.py`. Compila com `pdflatex main.tex`, duas vezes.
 - **Fotos a acrescentar:** cada uma tem um quadro tracejado com o nome do arquivo esperado. Basta salvar a foto
   em `Q2/latex/imagens/` com esse nome e recompilar. A lista está no topo do `main.tex`:
-  - a PCB fabricada (cima e baixo) e montada (hub e pulseira);
-  - a pulseira no pulso;
-  - a bancada CAN e o monitor serial (CAN e ESP-NOW);
+  - a PCB fabricada (cima e baixo);
+  - o monitor serial do hub com o ESP-NOW;
   - o Grafana e o Telegram;
   - a janela do `demo_pulseira.py`.

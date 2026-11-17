@@ -71,6 +71,26 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-17 — relatório do Q2 como relatório final
+
+- **Pedido:** o professor considera o Q2 o relatório final, então o texto não deve se apresentar como "primeira
+  interação" nem "primeira versão"; e as menções de que o sistema não foi verificado em bancada saem do
+  relatório.
+- **Feito** (só no relatório do Q2):
+  - capa, contracapa e resumo dizem "relatório final"; a seção 1.3 virou "O que este relatório cobre", sem
+    citar o enunciado nem os quadros de foto;
+  - saíram as frases de "ainda não verificado/medido/conferido": resumo, introdução, LM35 (termopar), consumo,
+    CAN, paridade na placa, painel, "O que ainda não foi verificado", a coluna "Nível alcançado", o parágrafo
+    sobre o Q3 e, nas conclusões, os "falta ..." e duas limitações;
+  - saíram também as menções a "compila sem avisos" (resumo, conclusões, a linha "build" dos níveis e as das
+    tabelas da Seção 12): é o mínimo de um trabalho final, e a verificação passou a citar os testes;
+  - corrigido um exagero: o CAN e a tabela de objetivos diziam que a versão atual foi "verificada no modo de
+    bancada", mas o modo de bancada roda na placa, e o CAN ainda não rodou em placa. Agora o texto só descreve o
+    modo de bancada e aponta o teste entre as placas na Seção 12;
+  - o plano de testes continua.
+- **Verificado:** `pdflatex` sem erros nem *overfull*; capa, introdução, verificação e conclusões conferidas na
+  imagem.
+
 ### 2026-11-17 — "pulseira" no lugar de "vestível" em todo o projeto
 
 - **Pedido:** trocar "vestível" por "pulseira" no relatório e no resto do projeto, e explicar logo no início o que é

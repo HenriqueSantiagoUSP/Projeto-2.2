@@ -124,8 +124,9 @@ para o log.
 
 A garantia de que o C faz o mesmo que o Python é o teste de paridade: em 26 janelas de 8
 trechos da SisFall, o C acha os mesmos picos, calcula os atributos dentro da tolerância e dá
-a mesma probabilidade, até $10^{-6}$ (885 verificações, Tabela~\ref{tab:testes}). A paridade
-\emph{na placa}, com o sinal real do sensor, ainda vai ser conferida com o modo de coleta.
+a mesma probabilidade, até $10^{-6}$ (885 verificações, Tabela~\ref{tab:testes}). Na placa, o
+modo de coleta permite a mesma comparação com o sinal real do sensor: ele manda o sinal bruto
+e cada janela classificada pela serial, para o Python refazer as contas.
 
 \subsection{Nos nossos ensaios e limitações}
 
@@ -142,14 +143,7 @@ queda que falhou fica marcado para a coleta.
 \end{figure}
 
 O modelo é \textbf{provisório}. Os dados de treino têm o sensor na cintura, e a pulseira vai no
-pulso (Figura~\ref{fig:pulso}), onde o braço se move muito mais e o impacto chega diferente.
-
-\begin{figure}[H]
-\centering
-\fotoouespaco{pulseira_em_uso}{0.6\linewidth}{a pulseira (MPU-6050) presa ao pulso para a coleta}
-\caption{A pulseira em uso.}
-\label{fig:pulso}
-\end{figure} O próximo passo é a coleta
+pulso, onde o braço se move muito mais e o impacto chega diferente. O próximo passo é a coleta
 no pulso, com várias pessoas e com o firmware atual ($\pm$8\,g), seguindo o protocolo de coleta
 do projeto: os ensaios gravados pelo modo de coleta entram direto no treino, e o mesmo script
 gera o novo modelo e os novos vetores de teste. Com esses dados, também vale reavaliar os

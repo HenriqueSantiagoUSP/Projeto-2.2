@@ -3,9 +3,8 @@
 %======================================================================
 \subsection{Níveis de verificação}
 
-Ao longo do projeto, cada parte é marcada com o nível em que foi verificada
-(Tabela~\ref{tab:niveis}). Um item só é dado como pronto quando passa no nível que o critério
-dele pede: se o critério é de bancada, compilar não basta.
+A verificação do sistema é feita em três níveis (Tabela~\ref{tab:niveis}), dos testes
+automáticos no computador até os testes na placa, com os sensores.
 
 \begin{table}[H]
 \centering
@@ -16,7 +15,6 @@ dele pede: se o critério é de bancada, compilar não basta.
 \toprule
 Nível & Significa \\
 \midrule
-build & compila no ESP-IDF 6.0.1 sem erros nem avisos \\
 testes no PC & testes automáticos rodando no computador (lógica pura, sem placa) \\
 ponta a ponta sem placa & central real em Docker, com o simulador no lugar do hub \\
 bancada & rodando na placa, com os sensores \\
@@ -24,42 +22,39 @@ bancada & rodando na placa, com os sensores \\
 \end{tabular}
 \end{table}
 
-\subsection{O que já foi verificado}
+\subsection{Verificações realizadas}
 
 \begin{table}[H]
 \centering
-\caption{Situação da verificação de cada parte.}
+\caption{Como cada parte foi verificada.}
 \label{tab:verificado}
 \small
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{6.8cm}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{9.8cm}@{}}
 \toprule
-Parte & Nível alcançado & Como \\
+Parte & Como \\
 \midrule
-Firmware do hub & build; testes no PC & build sem avisos, também com PIR, LM35 e uma porta declarados ausentes e com o CAN fora do modo de bancada; regras (62) e configuração (60) \\
-Firmware da pulseira & build; testes no PC & build sem avisos no perfil padrão, no de demonstração e com MAC, MQTT, CAN e coleta ligados; pipeline (885) e processamento de sinal (25) \\
-Mapa de pinos, chaves e MAC & build & pino repetido ou proibido e MAC mal escrito fazem o build falhar \\
-Modelo de queda & testes no PC & validação por pessoa na SisFall; paridade C $\times$ Python \\
-Central & ponta a ponta sem placa & os 5 serviços sobem; o broker recusa conexão anônima e senha errada; o simulador publicou estados e alertas, o InfluxDB gravou, as consultas do painel rodaram e o notificador formatou cada episódio \\
-Notificador e demonstração & testes no PC & 19 e 15 testes \\
-PCB v1 & ERC/DRC; papel 1:1 & \ercViolacoes{} violações de ERC e \drcErros{} erros de DRC; encaixe e ordem dos pinos no papel \\
-Pulseira na placa & bancada (parcial) & em 13/11, perfil de demonstração: 200\,Hz contínuos por 16\,min e $\pm$8\,g confirmado (abaixo) \\
+Firmware do hub & testes no computador das regras de alerta (62 verificações) e da configuração por MQTT (60) \\
+Firmware da pulseira & testes no computador do pipeline de queda (885 verificações, com a paridade C $\times$ Python) e do processamento de sinal (25) \\
+Mapa de pinos, chaves e MAC & pino repetido ou proibido e MAC mal escrito fazem o build falhar \\
+Modelo de queda & validação por pessoa na SisFall; paridade C $\times$ Python \\
+Central & os 5 serviços sobem; o broker recusa conexão anônima e senha errada; o simulador publicou estados e alertas, o InfluxDB gravou, as consultas do painel rodaram e o notificador formatou cada episódio \\
+Notificador e demonstração & 19 e 15 testes automáticos \\
+PCB v1 & \ercViolacoes{} violações de ERC e \drcErros{} erros de DRC; encaixe e ordem dos pinos no teste no papel 1:1 \\
+Pulseira na placa & perfil de demonstração: 200\,Hz contínuos por 16\,min e $\pm$8\,g confirmado (abaixo) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Primeiro dado de bancada.} Em 13/11/2026, a pulseira com o perfil de demonstração,
+\paragraph{Pulseira na placa.} Em 13/11/2026, a pulseira com o perfil de demonstração,
 ligado ao computador por USB, mandou as amostras brutas a 200\,Hz por 16 minutos sem parar.
 Parado, $\amag$ ficou em $\approx$4077 contagens, ou seja, $\approx$1\,g na escala de
 4096 contagens por g: a faixa de $\pm$8\,g está configurada. No mesmo ensaio, o programa de
 demonstração parou de atualizar quando o link USB piscou, e a leitura da serial foi corrigida
 para reabrir a porta sozinha.
 
-\textbf{O que ainda não foi verificado}: nada da PCB v1 montada, o CAN entre as duas placas, o
-ESP-NOW entre a pulseira e o hub, as latências, o Telegram com um bot real e a autonomia.
-
 \subsection{Plano de testes em bancada}
 
-A Tabela~\ref{tab:plano} lista os testes com as placas montadas, na ordem em que fazem
+A Tabela~\ref{tab:plano} lista os testes na placa, com os sensores, na ordem em que fazem
 sentido, com o critério de aprovação. As metas vêm dos requisitos (Seção~\ref{sec:requisitos}).
 
 \begin{table}[H]
@@ -71,7 +66,6 @@ sentido, com o critério de aprovação. As metas vêm dos requisitos (Seção~\
 \toprule
 Teste & Procedimento & Critério \\
 \midrule
-Montagem da PCB & multímetro antes de encaixar a DevKit; ligar pela USB-C & sem curto entre 5\,V, 3,3\,V e GND; 5\,V no TP1 e 3,3\,V no TP2 \\
 Amostragem & modo de coleta; intervalos entre amostras & 200\,Hz, \textit{jitter} $\le \pm$5\,ms (RNF01) \\
 Faixa do MPU & placa parada; uma batida forte & $\sim$4096 contagens no eixo vertical; batida acima de 3,46\,g sem teto plano \\
 Pipeline na placa & balançar; soltar a placa numa almofada; comparar o CSV bruto com o Python & disparos com P baixa; queda detectada; mesmos picos e mesma P do computador \\
@@ -92,6 +86,3 @@ Autonomia & medidor USB entre o \textit{power bank} e a pulseira & consumo medid
 \bottomrule
 \end{tabular}
 \end{table}
-
-O Q3 do Projeto 3 (24/11) é a apresentação da comunicação sem fio funcionando com os sensores;
-os testes de ESP-NOW e de ponta a ponta acima são o roteiro para chegar nela.
