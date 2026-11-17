@@ -33,6 +33,7 @@
 #include "protocol_can.h"
 #include "protocol_espnow.h"
 #include "protocol_mqtt.h"
+#include "report.h"
 #include "rtos_err.h"
 #include "signal_proc.h"
 #include "sys_events.h"
@@ -65,6 +66,7 @@ _Static_assert(sizeof(CONFIG_GADGET_HUB_MAC) == 1 || sizeof(CONFIG_GADGET_HUB_MA
 
 #define WEARABLE_ID_LEN     7       /* last 3 MAC bytes in hex, as the hub names this wearable */
 #define JSON_MAX            256
+#define REPORT_MAX_MS       ((uint64_t) MQTT_REPORT_MAX_INTERVAL_S * 1000u)   /* telemetry summary */
 
 /*
  * Everything that reaches comm_task is a comm_event_t, copied by value into its
@@ -395,7 +397,27 @@ static void publish_link_online(void){
     mqtt_link_publish(suffix, json, 1, true);
 }
 
+/* comm_task only: what the telemetry last said, and the activity since then. */
+static report_t s_telemetry_report;
+static report_rms_t s_telemetry_activity;
+static bool s_telemetry_hub_ok;
+
+/*
+ * Called with every heartbeat, but the telemetry goes out on the first one, then every
+ * few minutes with the activity of the whole stretch, and at once when the hub stops
+ * (or starts again) answering (docs/protocolo.md §1).
+ */
 static void publish_telemetry(uint16_t battery_mv, uint16_t activity_mg, bool hub_ok){
+    report_rms_add(&s_telemetry_activity, activity_mg);
+    if (!mqtt_link_connected()) {
+        return;   /* keeps summing: the first one after the broker comes back covers the gap */
+    }
+    uint64_t now = (uint64_t) now_ms();
+    bool hub_changed = s_telemetry_report.sent && hub_ok != s_telemetry_hub_ok;
+    if (!hub_changed && !report_due(&s_telemetry_report, 0.0f, 0.0f, REPORT_MAX_MS, now)) {
+        return;
+    }
+
     char suffix[48], ts[32], battery[32] = "", json[JSON_MAX];
     wearable_suffix(suffix, sizeof(suffix), MQTT_TOPIC_WEARABLE_TELEMETRY);
     ts_field(ts, sizeof(ts));
@@ -403,10 +425,12 @@ static void publish_telemetry(uint16_t battery_mv, uint16_t activity_mg, bool hu
         snprintf(battery, sizeof(battery), ",\"bateria_mV\":%u", battery_mv);
     }
     snprintf(json, sizeof(json), "{\"v\":%d%s,\"atividade\":%.3f,\"canal\":%u,\"hub\":%s%s}",
-             MQTT_JSON_VERSION, battery, activity_mg / 1000.0f, espnow_tx_channel(),
+             MQTT_JSON_VERSION, battery, report_rms_take(&s_telemetry_activity) / 1000.0f, espnow_tx_channel(),
              hub_ok ? "true" : "false", ts);
     /* QoS 0, not retained: the next summary comes in a few minutes. */
     mqtt_link_publish(suffix, json, 0, false);
+    report_mark(&s_telemetry_report, 0.0f, now);
+    s_telemetry_hub_ok = hub_ok;
 }
 
 /*

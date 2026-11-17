@@ -70,7 +70,7 @@ placas, em [`firmware/common/`](../common/README.md): `pcb`, `protocol`, `rtos_u
 | Task | Núcleo | Prioridade | Função |
 |---|---|---|---|
 | `sensors_task` | 1 | ALTA | estabiliza e lê portas e PIR |
-| `lm35_task` | 1 | BAIXA | temperatura a cada 30 s |
+| `lm35_task` | 1 | BAIXA | temperatura a cada 60 s; a `hub_task` só a publica quando muda 0,2 °C ou a cada 5 min |
 | `hub_task` | 0 | MEDIA | regras, publicação, LED (só ela publica e chama as regras) |
 | `espnow_task` | 0 | MEDIA | valida as mensagens da pulseira |
 | `can_rx`, `can_tx` | 0 | MEDIA | CAN: recepção; transmissão e estado do nó |

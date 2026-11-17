@@ -242,6 +242,25 @@ comportamento:
 | **modelo/:** o leitor dos ensaios próprios aceita o formato do protocolo de coleta (`p03_queda_frente_2.csv`, em contagens) e avisa o que ignora | a coleta no pulso seria descartada em silêncio ou lida como se as contagens fossem g |
 | **modelo/:** `DISTANCIA_S` e o biquad vêm do `pipeline.py` para o treino e para o `09`; o `09` e o `10` só gravam depois de calcular tudo; limiar infinito ou uma classe só param a exportação | o modelo exportado podia não corresponder ao gatilho ou ao filtro do firmware, sem aviso, e uma falha no meio deixava os artefatos de rodadas diferentes |
 
+## Envio por mudança: temperatura e pulseira (2026-11-17)
+
+O hub publicava a temperatura a cada 30 s e repassava ao MQTT cada heartbeat da pulseira (30 s). O Telegraf grava
+cada mensagem como um ponto no InfluxDB: eram 2.880 pontos por dia de cada fluxo, por quarto (~350 mil por dia
+nos 60 quartos), quase todos repetindo o valor anterior. Esses dados vão para um banco, e o grupo achou ruim
+enviar a cada 30 s.
+
+| Decisão | Por quê |
+|---|---|
+| **Medir é diferente de enviar.** As regras recebem toda leitura; o MQTT e o CAN, só as que trazem novidade. Portas, presença e alertas já eram assim e não mudaram | o alerta precisa de leituras frequentes, o banco não precisa de repetições |
+| **Temperatura:** medida a cada **60 s** (era 30 s) e publicada quando muda **0,2 °C** ou mais em relação ao **último valor enviado**, ou a cada **5 min** sem envio | o ar do quarto leva dezenas de minutos para mudar, e o próprio LM35 leva minutos para acompanhar; 60 s bastam para contar os 10 min da regra. Comparar com o último **enviado** (e não com a última leitura) faz uma deriva lenta acabar saindo. Os 0,2 °C precisam ficar acima do ruído da leitura: a confirmar na bancada |
+| **Pulseira:** o heartbeat ESP-NOW continua a cada 30 s, mas o hub publica `pulseira/<id>` no primeiro heartbeat (do boot ou da volta do offline) e depois um resumo a cada 5 min, com a atividade como o RMS dos heartbeats do período. O `offline` sai na hora | o heartbeat de 30 s é o que dá o offline em 90 s; o banco só precisa do resumo |
+| Bateria sem envio imediato quando muda | o alerta `bateria_baixa` já é imediato; a curva da bateria muda em horas |
+| A telemetria opcional da pulseira (`pulseira/<id>/telemetria`) segue a mesma regra: 5 min, ou na hora em que o hub para ou volta a responder | vai para o mesmo banco |
+| Os valores (0,2 °C, 5 min) ficam no contrato em C, `protocol_mqtt.h`; a lógica num componente comum puro, `firmware/common/report`, com testes no PC | as duas placas usam a mesma regra, e quem consome pode contar com um valor a cada 5 min no máximo |
+
+Resultado: com o quarto estável, cerca de 300 pontos por dia de cada fluxo, ~10× menos; uma mudança real de
+temperatura aparece no painel na hora. Os painéis do Grafana (`last()` e `aggregateWindow`) não precisaram mudar.
+
 ## Gestos do botão (2026-11-17)
 
 Até aqui, um aperto simples no botão cancelava a queda nos 15 s seguintes, e o botão não servia para mais nada.
@@ -391,7 +410,7 @@ O relatório final deve usar a coluna "Vale hoje".
 | Debounce do reed | 50 ms (S1 P1), 200 ms (S1 P2/P3), 500 ms (firmware atual) | ~50 ms de estabilização (roadmap, fase 2) |
 | Saída noturna | 5 min (S1 P1 RF09), 15 min (texto do Q3 e Q5/Q6) | 15 min sem presença após a saída abrir |
 | Inatividade | 30 min sem PIR à noite | período diurno, 120 min (a calibrar) |
-| Leitura do LM35 | a cada 10 s, média de 10 (S1 P1/P2); a cada 30 s, 16 amostras (S1 P3) | a cada 30 s, 16 amostras |
+| Leitura do LM35 | a cada 10 s, média de 10 (S1 P1/P2); a cada 30 s, 16 amostras (S1 P3) | a cada 60 s, 16 amostras, publicada só quando muda 0,2 °C ou a cada 5 min (2026-11-17) |
 | Resistores do LM358 | R1 = 1 kΩ / R2 = 4,5 kΩ (S1 P2); 2 kΩ / 9 kΩ (S1 P3) | mesmo ganho de 5,5; vale o da PCB nova |
 | Alimentação do LM35 | 3,3 V (S1 P3, Tabela 4): **erro do relatório** | 5 V, com o LM358 em ±5 V (−5 V por um inversor); confirmado pelo grupo em 2026-10-21 |
 | Tópicos | `asilo/quarto01/…` (S1 P1), `idoso/quarto101/…` (S2) | `idoso/<site>/<quarto>/…` |

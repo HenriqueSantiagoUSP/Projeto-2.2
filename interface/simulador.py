@@ -7,6 +7,10 @@ status (com Last Will), presenca, porta/<id>, temperatura, pulseira/<id>, alerta
 (episódios "ativo" -> "resolvido"/"cancelado") e config/aplicada. Serve para testar a
 central — Telegraf, InfluxDB, Grafana e o notificador do Telegram — sem hardware.
 
+Como o hub, mede a temperatura a cada --intervalo-temp, mas só a publica quando ela muda
+0,2 °C ou mais desde o último envio, ou a cada 5 min; e publica pulseira/<id> como um
+resumo a cada --intervalo-pulseira (5 min).
+
 Uso
 ---
     pip install paho-mqtt                                   # uma única vez
@@ -42,7 +46,9 @@ except ImportError:  # biblioteca ausente: orienta em vez de mostrar um tracebac
 # -----------------------------------------------------------------------------
 TEMP_INICIAL = 22.5          # °C
 TEMP_FAIXA = (19.0, 26.0)    # °C — o passeio aleatório fica preso a esta faixa
-TEMP_PASSO = 0.3             # °C — variação máxima entre leituras
+TEMP_PASSO = 0.1             # °C — variação máxima entre leituras
+TEMP_DELTA = 0.2             # °C — como o hub: publica quando muda isto desde o último envio...
+ENVIO_MAX_S = 300            # s — ...ou a cada 5 min, como sinal de vida (docs/protocolo.md §1)
 PORTA_INTERVALO = (20, 60)   # s — uma porta muda de estado em intervalos aleatórios nesta faixa
 PRESENCA_INTERVALO = (8, 30) # s — idem para a presença
 PORTAS = ("quarto", "banheiro")
@@ -74,6 +80,8 @@ class Simulador:
         self.args = args
         self.base = f"idoso/{args.site}/{args.quarto}"
         self.temp = TEMP_INICIAL
+        self.temp_enviada = None                          # o último valor publicado, e quando
+        self.temp_enviada_em = 0.0
         self.portas = {p: False for p in PORTAS}          # False = fechada
         self.presente = False
         self.bateria_mv = 4100
@@ -115,7 +123,10 @@ class Simulador:
         self.publicar("presenca", {"sensor": "HC-SR501", "estado": "detectada" if self.presente else "livre"})
         for porta, aberta in self.portas.items():
             self.publicar(f"porta/{porta}", {"sensor": "MC-38", "estado": "aberta" if aberta else "fechada"})
-        self.temperatura()
+        if self.temp_enviada is None:
+            self.temperatura()
+        else:
+            self.publicar_temperatura(self.temp_enviada)  # o último valor enviado, como o hub
         self.heartbeat()
 
     def alerta(self, id_, tipo, estado, origem, detalhe=None):
@@ -123,10 +134,18 @@ class Simulador:
                                  "detalhe": detalhe or {}}, retain=False)
 
     # --- sensores ------------------------------------------------------------
-    def temperatura(self):
+    def publicar_temperatura(self, valor):
+        self.publicar("temperatura", {"sensor": "LM35DZ", "valor": round(valor, 2)}, qos=0)
+
+    def temperatura(self, agora=None):
+        """Uma leitura; publicada só se mudou 0,2 °C desde o último envio ou se já faz 5 min."""
+        agora = time.monotonic() if agora is None else agora
         self.temp += random.uniform(-TEMP_PASSO, TEMP_PASSO)
         self.temp = min(max(self.temp, TEMP_FAIXA[0]), TEMP_FAIXA[1])
-        self.publicar("temperatura", {"sensor": "LM35DZ", "valor": round(self.temp, 2)}, qos=0)
+        if (self.temp_enviada is None or abs(self.temp - self.temp_enviada) >= TEMP_DELTA
+                or agora - self.temp_enviada_em >= ENVIO_MAX_S):
+            self.publicar_temperatura(self.temp)
+            self.temp_enviada, self.temp_enviada_em = self.temp, agora
 
     def porta(self):
         porta = random.choice(PORTAS)
@@ -139,6 +158,7 @@ class Simulador:
         self.publicar("presenca", {"sensor": "HC-SR501", "estado": "detectada" if self.presente else "livre"})
 
     def heartbeat(self):
+        """O resumo da pulseira que o hub publica a cada 5 min (e logo que ela aparece ou volta)."""
         if self.pulseira_mudo:
             return
         self.bateria_mv = max(3300, self.bateria_mv - random.randint(0, 3))
@@ -312,8 +332,11 @@ def parse_args():
                    help="senha do usuário hub (padrão: variável MQTT_HUB_PASSWORD)")
     p.add_argument("--site", default="butanta", help="instituição no tópico (padrão: butanta)")
     p.add_argument("--quarto", default="quarto101", help="quarto no tópico (padrão: quarto101)")
-    p.add_argument("--intervalo-temp", type=float, default=30.0, help="segundos entre leituras de temperatura")
-    p.add_argument("--intervalo-pulseira", type=float, default=30.0, help="segundos entre heartbeats da pulseira")
+    p.add_argument("--intervalo-temp", type=float, default=60.0,
+                   help="segundos entre leituras de temperatura (padrão: 60, como o hub); cada uma só é "
+                        "publicada se mudou 0,2 °C ou se já faz 5 min")
+    p.add_argument("--intervalo-pulseira", type=float, default=300.0,
+                   help="segundos entre os resumos da pulseira em pulseira/<id> (padrão: 300, como o hub)")
     p.add_argument("--auto-queda", type=float, default=0, help="publica uma queda a cada N segundos (0 = só com ENTER)")
     p.add_argument("--duracao", type=float, default=0, help="encerra sozinho após N segundos (0 = até Ctrl+C ou q)")
     p.add_argument("--sem-teclado", action="store_true", help="não lê comandos do teclado (execução automática)")

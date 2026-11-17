@@ -25,6 +25,15 @@
 #define MQTT_TOPIC_CONFIG_WANTED  "config/desejada"
 #define MQTT_TOPIC_CONFIG_APPLIED "config/aplicada"
 
+/*
+ * Periodic readings are published on change, not on every reading (common/report):
+ * the temperature when it moved by MQTT_TEMP_REPORT_DELTA_C from the value last sent,
+ * and the wearable summaries every MQTT_REPORT_MAX_INTERVAL_S. A reading that does not
+ * change still goes out at least every MQTT_REPORT_MAX_INTERVAL_S, as a sign of life.
+ */
+#define MQTT_REPORT_MAX_INTERVAL_S  300
+#define MQTT_TEMP_REPORT_DELTA_C    0.2f
+
 /* "estado" values. */
 #define MQTT_STATE_ONLINE         "online"
 #define MQTT_STATE_OFFLINE        "offline"

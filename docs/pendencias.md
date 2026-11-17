@@ -36,6 +36,12 @@ Tudo isto já está no código e compila; falta rodar na placa.
     - portas com abre-fecha rápido, sem perder nem inventar estado;
     - PIR depois dos 60 s de aquecimento;
     - temperatura contra um termômetro;
+    - **envio por mudança** ([`decisoes.md`](decisoes.md)): com o quarto parado por 30 min, o log mostra uma
+      leitura por minuto e o MQTT recebe a temperatura só a cada 5 min. O ruído da leitura parada precisa ficar
+      abaixo de 0,2 °C; se não ficar, subir o limiar (`MQTT_TEMP_REPORT_DELTA_C`) ou a média. Aquecer o LM35 com
+      a mão: a mensagem sai logo que muda 0,2 °C;
+    - `pulseira/<id>` no primeiro heartbeat e depois a cada 5 min; desligar a pulseira por 2 min e religar: o
+      `offline` sai em 90 s, e a volta é publicada no primeiro heartbeat;
     - `status` offline (Last Will) até ~45 s depois de desligar;
   - **sem peças**, cada caso dá **um** aviso no log e o resto continua:
     - Wi-Fi sem SSID ou com senha errada (o aviso diz o motivo);
@@ -194,6 +200,10 @@ Tudo isto já está no código e compila; falta rodar na placa.
 
 ## Central
 
+- [ ] **Envio por mudança na central:** com o Docker no ar, rodar o simulador e conferir que os painéis de
+  temperatura, atividade e bateria aparecem com os pontos espaçados (um a cada 5 min, ou a cada 0,2 °C) e que o
+  InfluxDB recebe ~12 pontos de temperatura por hora com o quarto estável. Não foi feito em 2026-11-17 porque
+  o Docker estava parado.
 - [ ] **Painel no Grafana para `pulseira_telemetria`**, a telemetria que a pulseira publica direto (hoje ela só
   é gravada).
 - [ ] **Servidor NTP local** (no Raspberry Pi ou num container da central), para a ILPI funcionar sem internet.
@@ -265,6 +275,16 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 ## Concluído
 
 O mais recente no topo.
+
+- [x] **2026-11-17 — Envio por mudança (temperatura e pulseira):** o hub mede a temperatura a cada 60 s e só a
+  publica (MQTT e CAN) quando ela muda 0,2 °C ou a cada 5 min; `pulseira/<id>` sai no primeiro heartbeat e
+  depois como resumo a cada 5 min (a telemetria opcional da pulseira também). Componente comum novo
+  `firmware/common/report`. Detalhes em [`decisoes.md`](decisoes.md) e no diário.
+  - Verificado: builds sem avisos (hub; pulseira padrão, demo e com MQTT); testes de host (`report` 23, com seis
+    erros plantados pegos; os demais sem mudança); notificador e demo; o simulador, com a publicação
+    interceptada, deu 12 mensagens de temperatura em 1 h estável (eram 120) e 15 numa rampa de 3,6 °C;
+    relatório recompilado.
+  - Falta: a bancada (item do hub) e a central no Docker (item da Central).
 
 - [x] **2026-11-17 — Gestos do botão da pulseira:** dois toques = "estou bem" (cancela a queda ou o pedido de
   ajuda nos 15 s); segurar 3 s = pedido de ajuda (`HELP` → alerta `ajuda`); aperto simples não faz nada. No

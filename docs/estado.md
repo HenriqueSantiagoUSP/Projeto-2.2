@@ -44,7 +44,7 @@ comunicação sem fio funcionando com os sensores, para 24/11.
 |---|---|---|---|
 | 0 | Estrutura do repositório e documentação | feito | — |
 | 1 | Contrato em código (`firmware/common/protocol`, agora com `protocol_can.h`) e componentes comuns (`rtos_util`, `sys_events`, `net`, `mqtt_link`, `can`, `indicators`) | feito | build (hub e pulseira) |
-| 2 | Hub: debounce corrigido, portas modulares, LM35 com `adc_cali` + curva MMQ, aquecimento do PIR | código pronto | build |
+| 2 | Hub: debounce corrigido, portas modulares, LM35 com `adc_cali` + curva MMQ (a cada 60 s, publicada só quando muda, desde 2026-11-17), aquecimento do PIR | código pronto | build; envio por mudança em testes no PC (`report`, 23 verificações) |
 | 3 | Hub: Wi-Fi STA + `WIFI_PS_NONE` + backoff, SNTP, MQTT 3.1.1 com senha, Last Will, outbox, config em NVS, watchdog de 30 s | código pronto | build; validação da config em testes no PC (60 verificações) |
 | 4 | Hub: motor de regras, `alerta`, buzzer, LED de status | código pronto | build; regras em testes no PC (22 cenários, 82 verificações) |
 | 5 | Central: Mosquitto com ACL (agora com o usuário `pulseira`), Telegraf, InfluxDB, Grafana, notificador, simulador novo | feito | ponta a ponta (sem placa); notificador em testes no PC (22 testes) |
@@ -70,6 +70,42 @@ A lista de pendências e próximos passos fica em [`pendencias.md`](pendencias.m
 Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
+
+### 2026-11-17 — envio por mudança: temperatura e pulseira
+
+- **Pedido:** os dados vão para um banco, e enviar a temperatura e a pulseira a cada 30 s enche o banco de
+  repetições (2.880 pontos por dia de cada, por quarto).
+- **Decidido com o usuário:** medir e enviar ficam separados. A temperatura é medida a cada 60 s e publicada
+  quando muda 0,2 °C ou a cada 5 min; `pulseira/<id>` sai no primeiro heartbeat e depois como resumo a cada
+  5 min. O porquê está em [`decisoes.md`](decisoes.md) (*Envio por mudança*).
+- **Feito:**
+  - **componente comum novo** `firmware/common/report`: a regra de envio (limiar contado do último valor
+    enviado, intervalo máximo, `reset`) e o RMS do resumo, em C puro, com 23 verificações no PC. Seis erros
+    plantados numa cópia foram todos pegos;
+  - **contrato:** `MQTT_REPORT_MAX_INTERVAL_S` (300) e `MQTT_TEMP_REPORT_DELTA_C` (0,2) em `protocol_mqtt.h`;
+    [`protocolo.md`](protocolo.md) com a seção *Envio por mudança*, os tópicos e o campo `atividade`;
+  - **hub:** `LM35_PERIOD_MS` 60 s; a temperatura vai às regras toda vez e ao MQTT e ao CAN só quando o
+    `report` deixa (a reconexão republica o último valor enviado); `pulseira/<id>` com o resumo de 5 min e a
+    volta do offline publicada na hora;
+  - **pulseira com MQTT:** a telemetria sai no primeiro heartbeat, a cada 5 min e quando o hub para ou volta
+    a responder; o heartbeat ESP-NOW e o CAN de bancada não mudaram;
+  - **central:** o simulador mede a cada 60 s e publica pela mesma regra (passo do passeio de 0,1 °C), com o
+    resumo da pulseira a cada 5 min; a demo publica o primeiro resumo aos 30 s e depois a cada 5 min. Grafana e
+    Telegraf não mudaram (`last()` e `aggregateWindow` aceitam pontos espaçados);
+  - **documentos:** `requisitos.md` (RF10), `arquitetura.md`, `decisoes.md`, `roadmap.md`, os READMEs e o
+    `CLAUDE.md`;
+  - **relatório do Q2:** RF10, aquisição da temperatura (5.5), tasks e testes (7), CAN (8), tópicos e o
+    parágrafo *Envio por mudança* (9.3), verificação e plano (12).
+- **Verificado:**
+  - build sem avisos do hub e da pulseira (padrão, demo e com MAC, MQTT, CAN e coleta);
+  - testes de host: `report` 23, regras 82, `hub_config` 60, `fall_pipeline` 885, `signal_proc` 25,
+    `button_gesture` 42; notificador 22 e demo 19 testes;
+  - o simulador, com a publicação interceptada: 12 mensagens de temperatura em 1 h estável (eram 120) e 15 numa
+    rampa de 3,6 °C em 1 h;
+  - relatório: 68 páginas, sem erros, sem referência indefinida e sem *overfull*; a página dos tópicos
+    conferida na imagem.
+- **Não verificado:** a placa (o ruído da leitura parada contra os 0,2 °C) e a central no Docker, que estava
+  parado. Os dois ficaram em [`pendencias.md`](pendencias.md).
 
 ### 2026-11-17 — gestos do botão: dois toques cancelam, segurar pede ajuda
 

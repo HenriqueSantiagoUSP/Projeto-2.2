@@ -33,7 +33,7 @@ bancada & rodando na placa, com os sensores \\
 \toprule
 Parte & Como \\
 \midrule
-Firmware do hub & testes no computador das regras de alerta (82 verificações) e da configuração por MQTT (60) \\
+Firmware do hub & testes no computador das regras de alerta (82 verificações), da configuração por MQTT (60) e do envio por mudança (23) \\
 Firmware da pulseira & testes no computador do pipeline de queda (885 verificações, com a paridade C $\times$ Python), do processamento de sinal (25) e dos gestos do botão (42) \\
 Mapa de pinos, chaves e MAC & pino repetido ou proibido e MAC mal escrito fazem o build falhar \\
 Modelo de queda & validação por pessoa na SisFall; paridade C $\times$ Python \\
@@ -71,7 +71,7 @@ Faixa do MPU & placa parada; uma batida forte & $\sim$4096 contagens no eixo ver
 Pipeline na placa & balançar; soltar a placa numa almofada; comparar o CSV bruto com o Python & disparos com P baixa; queda detectada; mesmos picos e mesma P do computador \\
 Portas & abrir e fechar depressa, várias vezes & nenhuma transição perdida ou inventada \\
 PIR & movimento depois dos 60\,s de aquecimento & detecção e volta a ``livre'' \\
-Temperatura & 3 ou 4 pontos (perto de 10, 20 e 30\,°C) contra um termômetro; depois, termopar & $\pm$1\,°C (RNF10) \\
+Temperatura & 3 ou 4 pontos (perto de 10, 20 e 30\,°C) contra um termômetro; depois, termopar; 30\,min com o quarto parado & $\pm$1\,°C (RNF10); parado, o ruído fica abaixo de 0,2\,°C e sai uma mensagem a cada 5\,min \\
 Peças ausentes & sem SSID, senha errada, broker parado, LM35 solto, MPU solto, CAN sem transceptor & um aviso por caso, e o resto funcionando \\
 CAN entre as placas & pulseira com CAN de bancada, transceptores e terminação; tirar um fio do barramento & quadros \code{0x0FD}/\code{0x0FE} no log do hub; um aviso ao cair e um ao voltar \\
 Botão & aperto simples; dois toques sem alerta; dois toques na janela de uma queda; segurar 3\,s; segurar durante um alerta; ficar com o botão apertado por 30\,s & só os dois toques na janela cancelam e só o segurar fora de alerta pede ajuda; o resto não faz nada; segurar sem soltar dá um pedido só \\

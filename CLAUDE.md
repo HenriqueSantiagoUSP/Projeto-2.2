@@ -29,7 +29,7 @@ futuro, nuvem.
 | `docs/coleta-de-dados.md` | protocolo de ensaios rotulados para o futuro modelo de queda |
 | `firmware/room/` | hub do quarto (ESP-IDF) |
 | `firmware/gadget/` | pulseira (ESP-IDF) |
-| `firmware/common/` | componentes das duas placas: `pcb` (mapa de pinos da PCB única), `protocol` (contrato em C), `rtos_util` (prioridades e núcleos), `sys_events` (event group), `net`, `mqtt_link`, `can`, `indicators` (LED; buzzer opcional, ausente na PCB atual) |
+| `firmware/common/` | componentes das duas placas: `pcb` (mapa de pinos da PCB única), `protocol` (contrato em C), `report` (quando publicar uma leitura periódica: envio por mudança), `rtos_util` (prioridades e núcleos), `sys_events` (event group), `net`, `mqtt_link`, `can`, `indicators` (LED; buzzer opcional, ausente na PCB atual) |
 | `interface/` | central em Docker Compose (Mosquitto, Telegraf, InfluxDB, Grafana, notificador) + `simulador.py`; `legado/` = demonstração de 18/09, só histórico |
 | `modelo/` | modelos de detecção de queda desenvolvidos no PC (Python 3.12 via `uv`): pipeline, atributos, AR, templates, DTW, classificadores, CNN, avaliação por pessoa; `resultados/resumo.md` tem os números |
 | `dados/` | SisFall e ensaios próprios (fora do git); só `dados/README.md` é versionado e descreve o conjunto |
@@ -114,6 +114,7 @@ sh firmware/room/components/hub_config/test_host/run_tests.sh    # JSON da confi
 sh firmware/gadget/components/fall_pipeline/test_host/run_tests.sh # pipeline de queda: gatilho, filtro, paridade com o Python
 sh firmware/gadget/components/signal_proc/test_host/run_tests.sh # buffer circular, atributos, atividade
 sh firmware/gadget/components/button_gesture/test_host/run_tests.sh # gestos do botão: dois toques, segurar
+sh firmware/common/report/test_host/run_tests.sh                 # envio por mudança (temperatura, resumo da pulseira)
 ```
 
 Para compilar os caminhos opcionais da pulseira sem mexer no `sdkconfig` dela, use um build de teste com outro

@@ -32,7 +32,7 @@ Princípios que definem a ordem:
 - Corrigir o debounce: após uma borda, esperar ~50 ms sem novas bordas, ler o nível e publicar só se mudou.
 - Portas modulares: tabela `{gpio, id}` no firmware e papel (`saida`, `banheiro`, `outra`) na config; um
   nibble CAN por porta.
-- LM35 no ADC1 com `adc_cali` e a curva MMQ `T = (V_mV − 144,739) / 51,3335`; 16 amostras a cada 30 s.
+- LM35 no ADC1 com `adc_cali` e a curva MMQ `T = (V_mV − 144,739) / 51,3335`; 16 amostras a cada 30 s (desde 2026-11-17, a cada 60 s, publicadas só quando mudam: [`decisoes.md`](decisoes.md)).
 - PIR: aguardar o aquecimento de 60 s antes de considerar as leituras.
 
 **Pronto quando:**

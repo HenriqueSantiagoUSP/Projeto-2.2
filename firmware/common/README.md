@@ -10,6 +10,7 @@ de uma placa: ela os passa por uma struct de configuração (`can_config_t`, `ne
 |---|---|
 | `pcb` | o mapa de pinos da PCB única das duas placas (`pcb_pins.h`), com as regras (pinos proibidos, reservados, ADC1, RTC, I²C do ULP) verificadas em compilação. Menu **PCB**: versão da DevKit |
 | `protocol` | o contrato de [`docs/protocolo.md`](../../docs/protocolo.md) em C: `protocol_mqtt.h` (tópicos e valores de `tipo`/`estado`), `protocol_can.h` (nibbles e payloads do grupo `0xF`) e `protocol_espnow.h` (mensagens ESP-NOW, com os tamanhos verificados em tempo de compilação) |
+| `report` | quando publicar uma leitura periódica: ao mudar mais que um limiar desde o último envio, ou a cada intervalo máximo, e o RMS de janelas. C puro, com testes no PC (`test_host/`). O hub o usa na temperatura e no resumo da pulseira; a pulseira, na telemetria MQTT |
 | `rtos_util` | `task_config.h`: prioridades nomeadas (`PRIO_CRITICA` 20 … `PRIO_MINIMA` 2), núcleos (`CORE_PROTOCOL` 0, `CORE_REALTIME` 1) e pilhas, como no slide de RTOS; `rtos_err.h` |
 | `sys_events` | event group do sistema: `SYS_EV_NET_CONNECTED`, `SYS_EV_TIME_VALID`, `SYS_EV_MQTT_CONNECTED`, `SYS_EV_CAN_RUNNING`, `SYS_EV_CAN_BUS_OFF`. Cada bit tem um só escritor. `sys_events_init()` é a primeira chamada do `app_main` |
 | `net` | Wi-Fi STA com ou sem associação (`join_ap`), economia de energia opcional, reconexão com recuo de 1 a 60 s, SNTP e fuso. Menu **Network (Wi-Fi)** |

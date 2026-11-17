@@ -75,8 +75,8 @@ ID & Placa & Sensor & Dados \\
 \end{tabular}
 \end{table}
 
-O hub envia um quadro a cada mudança de porta ou de presença e a cada leitura de temperatura
-(30\,s). Os quadros dos outros grupos e os da pulseira em bancada vão para o log do hub; eles
+O hub envia um quadro a cada mudança de porta ou de presença; a temperatura segue a regra do
+MQTT (Seção~\ref{sec:mqtt}): um quadro quando muda 0,2\,°C ou a cada 5\,min. Os quadros dos outros grupos e os da pulseira em bancada vão para o log do hub; eles
 ainda não têm tópico MQTT. Os quadros da pulseira não entram nas regras: o alerta de queda
 depende do número de sequência do ESP-NOW (Seção~\ref{sec:espnow}).
 

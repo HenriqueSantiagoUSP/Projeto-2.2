@@ -9,7 +9,7 @@ Lê a serial da pulseira gravada com o perfil de demonstração (firmware/gadget
 Mostra tudo numa janela. Com --mqtt-host, também faz o papel do hub para a central, no contrato de
 docs/protocolo.md:
 - status online;
-- pulseira/<id> com a atividade;
+- pulseira/<id> com a atividade, como o hub: o primeiro logo e depois um resumo a cada 5 min;
 - o alerta de queda com a P(queda), que aparece no Grafana e no Telegram;
 - o botão da placa: segurar 3 s vira o alerta "ajuda", e dois toques cancelam o último alerta.
 
@@ -42,7 +42,8 @@ FS_HZ = 200.0                   # taxa do MPU-6050 na pulseira
 PERIODO_S = 1.0 / FS_HZ
 LSB_POR_G = 4096.0              # ±8 g
 FC_HZ = 20.0                    # o passa-baixa do pipeline (modelo/queda/pipeline.py, FC_PASSA_BAIXA)
-INTERVALO_PULSEIRA_S = 30.0     # como o heartbeat da pulseira
+INTERVALO_PULSEIRA_S = 300.0    # como o hub: um resumo da pulseira a cada 5 min (docs/protocolo.md §1)
+PRIMEIRO_RESUMO_S = 30.0        # o primeiro sai logo, como o hub faz com o primeiro heartbeat
 FAIXA_QUEDA_S = 4.0             # quanto tempo a faixa "QUEDA DETECTADA" fica na tela
 REABRIR_S = 1.0                 # intervalo entre as tentativas de reabrir a porta quando ela cai
 
@@ -439,13 +440,17 @@ class Ponte:
         self.conectado = False
 
     def _pulseira_periodico(self):
+        """pulseira/<id> como o hub a publica: o primeiro logo, depois um resumo a cada 5 min."""
+        espera = PRIMEIRO_RESUMO_S
         while True:
-            time.sleep(INTERVALO_PULSEIRA_S)
+            time.sleep(espera)
             with self.e.trava:
                 n, soma, pulseira = self.e.ativ_n, self.e.ativ_soma, self.e.pulseira
                 self.e.ativ_n, self.e.ativ_soma = 0, 0.0
             if n == 0:
-                continue         # sem amostras, como sem heartbeat: a pulseira não está viva
+                espera = PRIMEIRO_RESUMO_S   # sem amostras, como sem heartbeat: a pulseira não está viva
+                continue
+            espera = INTERVALO_PULSEIRA_S
             self.publicar(f"pulseira/{pulseira}", {"v": 1, "estado": "online",
                                                     "atividade": round(math.sqrt(soma / n), 3), "ts": agora_ms()},
                           True)

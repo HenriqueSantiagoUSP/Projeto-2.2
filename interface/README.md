@@ -52,7 +52,10 @@ pip install paho-mqtt        # ou use o .venv desta pasta
 python simulador.py --senha <MQTT_HUB_PASSWORD do .env> --intervalo-temp 5
 ```
 
-O simulador publica estados, sinais de vida da pulseira e, sob comando, alertas:
+O simulador publica estados, sinais de vida da pulseira e, sob comando, alertas. Como o hub, ele mede a
+temperatura a cada 60 s mas só a publica quando muda 0,2 °C ou a cada 5 min, e manda o resumo da pulseira a cada
+5 min (`--intervalo-temp` e `--intervalo-pulseira` mudam os intervalos; em `--intervalo-temp 5` o gráfico
+anda mais depressa):
 
 | Tecla + ENTER | Efeito |
 |---|---|
@@ -107,7 +110,7 @@ desliga isso).
 
 Com a central, o programa publica no contrato do hub ([`docs/protocolo.md`](../docs/protocolo.md)):
 - `status` online, com `"fw":"demo-usb"`;
-- `pulseira/<id>` com a atividade, a cada 30 s;
+- `pulseira/<id>` com a atividade: o primeiro logo, e depois um resumo a cada 5 min, como o hub;
 - o `alerta` `queda` com `a2` e `prob`, a cada queda que a placa decide. Ele aparece na tabela de alertas do
   Grafana (coluna P(queda)) e, com o bot configurado, no Telegram.
 
