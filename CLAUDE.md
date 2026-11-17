@@ -30,7 +30,7 @@ futuro, nuvem.
 | `dados/` | SisFall e ensaios próprios (fora do git); só `dados/README.md` é versionado e descreve o conjunto |
 | `hardware/` | esquemáticos, PCB, mapa de pinos e conflitos conhecidos |
 | `relatorios/` | enunciados e entregas por semestre/projeto; índice em `relatorios/README.md` |
-| `aulas/` | slides das aulas por semestre; índice em `aulas/README.md` (assunto de cada slide e onde ele se aplica) |
+| `aulas/` | slides das aulas por semestre (fora do git, só no disco); índice em `aulas/README.md` (assunto de cada slide e onde ele se aplica) |
 
 ## Regras
 

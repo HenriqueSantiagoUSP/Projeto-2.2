@@ -126,8 +126,9 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
 
 - Q1: PCB com esquema elétrico, layout, visualização 3D, Gerber e furação, ERC/DRC e apresentação. Parte do
   pressuposto de que sensores, condicionamento, CAN e interface sem fio já existem.
-- **Entrega: pendente.** Os arquivos de projeto da placa vão para [`hardware/`](../hardware/README.md), e ela
-  define o mapa de pinos definitivo.
+- **Entregue.** A placa é a PCB v1, com os arquivos em [`hardware/placas/v1/`](../hardware/placas/v1/README.md)
+  e as decisões em [`hardware/`](../hardware/README.md). Ela define o mapa de pinos definitivo.
+- A PCB v1 foi fabricada e está em mãos.
 
 ### Projeto 3 — modelos, relatório técnico e comunicação sem fio (entregas em novembro de 2026)
 
@@ -139,7 +140,7 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
 | Q2 | relatório com sensores, condicionamento de sinais, interface CAN, interface sem fio e a placa desenvolvida (primeira interação de entrega) | 17/11 |
 | Q3 | apresentação em sala da comunicação sem fio funcionando com os sensores | 24/11 |
 
-**Q1:**
+**Q1: entregue e apresentado.**
 - Os modelos foram desenvolvidos e comparados no PC, em [`modelo/`](../modelo/README.md), com a SisFall e 18
   ensaios próprios.
 - **Relatório em LaTeX:** [`Q1/latex/main.tex`](<Semestre 2/Projeto 3/Q1/latex/main.tex>), com o PDF em

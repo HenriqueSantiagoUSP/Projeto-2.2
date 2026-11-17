@@ -13,10 +13,10 @@ relatório final, que precisa justificar as mudanças. Revisão feita em 2026-10
 | jul/26 | S1 P3 (final) | CAN no lugar do RS-485; PCB única com todos os sensores; firmware em C; queda = a² > 6,25 g² |
 | ago/26 | S2 P1 (Q1–Q3) | MQTT + Mosquitto; CAN validado em 28/08; hub + vestível; ESP-NOW + Wi-Fi em AP+STA; cascata de detecção em 4 estágios |
 | set/26 | S2 P2 parcial | simulador → Mosquitto → painel web, demonstrado em 18/09 |
-| out/26 | S2 P2 PCB | entrega pendente |
+| out/26 | S2 P2 PCB (entregue) | PCB v1 única para hub e vestível, 2 camadas, ERC/DRC sem erros; fabricada e em mãos em nov/26 |
 | out/26 | revisão (este documento) | processamento na borda; contrato MQTT por site/quarto; central com Grafana; limiar de queda provisório |
 | out/26 | implementação das correções | fases 1–7 com código pronto (só build e testes no PC; ver [`estado.md`](estado.md)) |
-| nov/26 | S2 P3 Q1 e porte do modelo | 22 métodos comparados no PC (09/11); pipeline com Random Forest no vestível no lugar do limiar (11/11) |
+| nov/26 | S2 P3 Q1 (entregue e apresentado) e porte do modelo | 22 métodos comparados no PC (09/11); pipeline com Random Forest no vestível no lugar do limiar (11/11) |
 
 ## Decisões vigentes
 
@@ -240,6 +240,13 @@ comportamento:
 | **Demo:** a porta ocupada no início entra no mesmo laço de reconexão | o `sys.exit` dentro da thread sumia sem mensagem, e a janela abria vazia |
 | **modelo/:** o leitor dos ensaios próprios aceita o formato do protocolo de coleta (`p03_queda_frente_2.csv`, em contagens) e avisa o que ignora | a coleta no pulso seria descartada em silêncio ou lida como se as contagens fossem g |
 | **modelo/:** `DISTANCIA_S` e o biquad vêm do `pipeline.py` para o treino e para o `09`; o `09` e o `10` só gravam depois de calcular tudo; limiar infinito ou uma classe só param a exportação | o modelo exportado podia não corresponder ao gatilho ou ao filtro do firmware, sem aviso, e uma falha no meio deixava os artefatos de rodadas diferentes |
+
+## `aulas/` fora do git (2026-11-16)
+
+| Decisão | Por quê |
+|---|---|
+| Os slides das aulas ficam só no disco de cada um: `aulas/` no `.gitignore` e removida do índice. O índice `aulas/README.md` também fica fora | escolha do grupo: o material é dos professores e não precisa estar no repositório. Os documentos continuam citando `aulas/README.md`, que existe no disco |
+| O histórico ainda tem os PDFs (14 MB) | tirar exige reescrever os commits; decidir antes do primeiro push (ver `pendencias.md`, Repositório) |
 
 ## O que foi bom ter mudado
 

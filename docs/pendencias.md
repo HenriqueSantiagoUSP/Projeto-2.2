@@ -8,6 +8,15 @@ O plano por fases está em [`roadmap.md`](roadmap.md), e a fase atual e o diári
 
 Um item só sai daqui quando o critério dele foi cumprido. Se ele pede bancada, compilar não basta.
 
+## Entregas da disciplina (S2 P3)
+
+Pedidos e prazos em [`relatorios/README.md`](../relatorios/README.md), Projeto 3.
+
+- [ ] **Q2 (17/11):** relatório com sensores, condicionamento de sinais, interface CAN, interface sem fio e a
+  placa desenvolvida (primeira interação de entrega).
+- [ ] **Q3 (24/11):** apresentação em sala da comunicação sem fio funcionando com os sensores. Depende da
+  bancada abaixo: vestível → ESP-NOW → hub → MQTT → central.
+
 ## Agora: verificação em bancada
 
 Tudo isto já está no código e compila; falta rodar na placa.
@@ -91,20 +100,17 @@ Tudo isto já está no código e compila; falta rodar na placa.
 
 ## Hardware
 
-- [ ] **Encomendar a PCB v1 na JLCPCB:** enviar `hardware/placas/v1/placa-v1-jlcpcb.zip` com as opções de
-  [`hardware/placas/v1/README.md`](../hardware/placas/v1/README.md). Antes de pagar, conferir no visualizador de
-  Gerber do site: 2 camadas, plano de GND embaixo com o retângulo livre sob a antena, todos os furos.
-- [ ] **Montar e testar a PCB v1.**
+- [ ] **Montar e testar a PCB v1** (fabricada; em mãos).
+  - Antes de soldar os conectores da DevKit, conferir na placa fabricada a ordem dos pinos: os nomes no U1 da
+    serigrafia (3V3, 3V3, EN, GPIO4…) contra os impressos na própria DevKit. A ordem e o encaixe já foram
+    conferidos no teste no papel 1:1 com as peças (2026-10-23); falta só olhar a placa real. A distância entre
+    fileiras também já foi conferida (~25,4 mm medidos, 25,25 mm no footprint).
   - Antes de encaixar a DevKit, com o multímetro: sem curto entre 5V e GND nem entre 3V3 e GND (TP1, TP2,
     TP3). Depois ligar pela USB-C e medir 5 V no TP1.
   - Encaixar a DevKit e medir 3,3 V no TP2.
   - Gravar o hub e o vestível e repetir na placa os testes de "Agora: verificação em bancada".
   - O CANH passa a 0,9 mm do pino 2 do LM358: comparar a leitura do LM35 com o autoteste do CAN ligado e
     desligado.
-- [ ] **Conferir a ordem dos pinos da DevKitC-1 antes de encomendar.** Comparar os nomes de pino impressos no
-  U1 do PDF 1:1 (3V3, 3V3, EN, GPIO4…) com os impressos na própria DevKit. O footprint `projeto:ESP32-S3-DevKitC`
-  usa a ordem da biblioteca da Espressif. A distância entre fileiras já foi resolvida: medido ~25,4 mm,
-  footprint com 25,25 mm, aceito.
 - [ ] **Refazer a fiação de bancada com os pinos novos.**
   - Hub: LM35 no 4, CAN no 13/14, PIR no 8, portas no 11/12.
   - Vestível: I²C no 1/2, INT no 17, botão no 18 (o buzzer e a medição da bateria saíram do esquema).
@@ -125,8 +131,6 @@ Tudo isto já está no código e compila; falta rodar na placa.
     pinos. No teste de 2026-10-23, deu 5 V só com cabo USB-A → C. Alimentar sempre com carregador USB-A de
     ≥ 2 A e cabo A → C, e escrever isso perto do conector. Para aceitar carregador USB-C, trocar por um
     módulo com os resistores.
-- [ ] **Antena da DevKit fora de cobre da PCB:** área livre (*keep-out*) sob a antena do módulo, ou a antena
-  para fora da borda.
 - [ ] **Como o vestível vai ser usado com a PCB única:** o MPU-6050 precisa ficar preso ao corpo. Decidir entre
   a placa presa ao antebraço ou o MPU num cabo curto (com o I²C a 100 kHz).
 - [ ] **Transceptores CAN de 3,3 V e terminação de 120 Ω** para a bancada e para a sala.
@@ -194,13 +198,6 @@ Tudo isto já está no código e compila; falta rodar na placa.
 
 ## Dados e avaliação
 
-- [ ] **Entregar o S2 P3 Q1 (10/11):** revisar e formatar
-  [`relatorio.md`](../relatorios/Semestre%202/Projeto%203/Q1/relatorio.md) e montar os slides pelo
-  [`roteiro-apresentacao.md`](../relatorios/Semestre%202/Projeto%203/Q1/roteiro-apresentacao.md), com as figuras
-  de `modelo/resultados/`.
-  - Pronto: as figuras, o relatório em LaTeX (`Q1/latex/main.pdf`) e o roteiro.
-  - Falta: a revisão do grupo e montar os slides.
-  - Na contracapa, preencher `\docentes` em `main.tex` com os docentes do S2.
 - [ ] **Fase 8 — coleta de dados**, pelo protocolo de [`coleta-de-dados.md`](coleta-de-dados.md). Pronto quando
   existir um conjunto de dados descrito e reprodutível.
   - Já existem a SisFall e 18 ensaios próprios ([`dados/README.md`](../dados/README.md)).
@@ -224,8 +221,13 @@ Tudo isto já está no código e compila; falta rodar na placa.
 - [ ] **Baixar de novo 3 PDFs** de `relatorios/Semestre 2/Projeto 2/`: `Entrega 1.pdf`,
   `EnunciadoProjeto 2_parcial.pdf` e `EnunciadoProjeto 2_PCB.pdf`. Foram apagados por engano e não têm cópia no
   disco.
-- [ ] **Decidir se os slides de `aulas/` vão para o git.** Se o repositório for público, deixar só o índice.
-- [ ] **Primeiro commit** de tudo o que foi feito, quando o usuário pedir.
+- [ ] **Cópia fora deste PC:** o repositório não tem remoto, e os commits estão só neste disco. Decidir onde
+  hospedar (GitHub privado do grupo, por exemplo) e fazer o primeiro push.
+  - Antes do primeiro push, decidir se `aulas/` (14 MB de PDFs) sai também do histórico: ela saiu do git em
+    2026-11-16, mas continua nos commits antigos. Apagar exige reescrever o histórico.
+- [ ] **Fim de linha na cópia de trabalho:** o `core.autocrlf=true` do sistema faz o checkout em CRLF (o
+  repositório está em LF). Um `.gitattributes` com `* text=auto eol=lf` e um `git add --renormalize .` deixam a
+  cópia em LF também.
 
 ## Futuro (sem data)
 
@@ -244,6 +246,12 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-16 — S2 P3 Q1 entregue e apresentado** (relatório em LaTeX e 22 slides). Informado pelo grupo.
+- [x] **2026-11-16 — PCB v1 entregue (S2 P2, 16/10), fabricada e em mãos.** Informado pelo grupo. A montagem
+  e os testes seguem em Hardware.
+- [x] **2026-11-16 — `aulas/` fora do git.** Os slides ficam só no disco de cada um: `aulas/` no `.gitignore`
+  e removida do índice (`git rm -r --cached`; os 18 arquivos continuam na pasta). Verificado: `git check-ignore`
+  e a contagem dos arquivos no disco.
 - [x] **2026-11-13 — Erros não tratados: 32 achados da revisão de código e 6 menores corrigidos.**
   - O que mudou e por quê está em [`decisoes.md`](decisoes.md) (2026-11-13). Os pontos de contrato (`seq`
     aleatório no boot, a FALL reenviada até entregar, a queda reconhecida por `seq` e `uptime_ms`) estão em
