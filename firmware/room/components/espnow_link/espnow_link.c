@@ -185,8 +185,13 @@ static void espnow_task(void *arg){
                 msg.fall_cancel.fall_seq = cancel->fall_seq;
                 break;
             }
+            case ESPNOW_MSG_HELP_CANCEL: {
+                const espnow_help_cancel_t *cancel = (const espnow_help_cancel_t *) frame.data;
+                msg.help_cancel.help_seq = cancel->help_seq;
+                break;
+            }
             default:
-                break;   /* PING: being heard is the whole message */
+                break;   /* PING and HELP: the header is the whole message */
         }
 
         if (s_cb != NULL) {

@@ -16,7 +16,8 @@ Uso
 
 Comandos (digite e tecle ENTER)
 -------------------------------
-    (vazio)  queda                     c  cancela a última queda ("estou bem")
+    (vazio)  queda                     a  pedido de ajuda (botão segurado)
+    c        cancela a última queda ou o último pedido de ajuda ("estou bem", dois toques)
     s        saída noturna             b  banheiro prolongado
     t        temperatura alta          r  resolve os alertas abertos
     o        pulseira sem sinal / volta
@@ -77,9 +78,9 @@ class Simulador:
         self.presente = False
         self.bateria_mv = 4100
         self.pulseira_mudo = False
-        self.seq_queda = 0
-        self.queda_aberta = None                          # id da última queda ainda ativa
-        self.abertos = {}                                 # id -> alerta ativo (exceto quedas)
+        self.seq_pulseira = 0                             # o seq das mensagens da pulseira nomeia o alerta
+        self.ultimo_da_pulseira = None                    # (id, tipo) da última queda ou ajuda ainda ativa
+        self.abertos = {}                                 # id -> alerta ativo (exceto os da pulseira)
         self.config = json.loads(json.dumps(CONFIG_PADRAO))
         self.origem_config = "padrao"                     # como o hub: "padrao", depois "mqtt"
         self.comandos = []
@@ -151,18 +152,25 @@ class Simulador:
     # --- comandos ------------------------------------------------------------
     def executar_comando(self, cmd):
         epoch_s = int(time.time())
-        if cmd == "":
-            self.seq_queda += 1
-            self.queda_aberta = f"{PULSEIRA}-{self.seq_queda}"
-            a2 = round(random.uniform(6.3, 12.0), 2)
-            prob = round(random.uniform(0.75, 1.0), 2)       # acima do limiar do Random Forest (0,73)
-            self.alerta(self.queda_aberta, "queda", "ativo", f"pulseira/{PULSEIRA}", {"a2": a2, "prob": prob})
-        elif cmd == "c":
-            if self.queda_aberta is None:
-                print("  (nenhuma queda aberta para cancelar)")
+        if cmd in ("", "a"):
+            # Como na pulseira: o cancelamento vale para o último alerta dela, queda ou ajuda.
+            self.seq_pulseira += 1
+            id_ = f"{PULSEIRA}-{self.seq_pulseira}"
+            if cmd == "":
+                a2 = round(random.uniform(6.3, 12.0), 2)
+                prob = round(random.uniform(0.75, 1.0), 2)   # acima do limiar do Random Forest (0,73)
+                self.ultimo_da_pulseira = (id_, "queda")
+                self.alerta(id_, "queda", "ativo", f"pulseira/{PULSEIRA}", {"a2": a2, "prob": prob})
             else:
-                self.alerta(self.queda_aberta, "queda", "cancelado", f"pulseira/{PULSEIRA}")
-                self.queda_aberta = None
+                self.ultimo_da_pulseira = (id_, "ajuda")
+                self.alerta(id_, "ajuda", "ativo", f"pulseira/{PULSEIRA}")
+        elif cmd == "c":
+            if self.ultimo_da_pulseira is None:
+                print("  (nenhuma queda ou pedido de ajuda aberto para cancelar)")
+            else:
+                id_, tipo = self.ultimo_da_pulseira
+                self.alerta(id_, tipo, "cancelado", f"pulseira/{PULSEIRA}")
+                self.ultimo_da_pulseira = None
         elif cmd in ("s", "b", "t"):
             tipo, origem, detalhe = {
                 "s": ("saida_noturna", "porta/quarto", {"porta": "quarto", "min_sem_presenca": 15}),
@@ -192,7 +200,7 @@ class Simulador:
         elif cmd == "q":
             self.encerrar.set()
         else:
-            print("  comandos: ENTER queda | c cancela | s saída noturna | b banheiro | "
+            print("  comandos: ENTER queda | a ajuda | c cancela | s saída noturna | b banheiro | "
                   "t temperatura | r resolve | o pulseira | q sai")
 
     def ler_teclado(self):
@@ -251,7 +259,7 @@ class Simulador:
         }
 
         print(f"\nSimulador do hub — publicando em {self.base}/...")
-        print("  ENTER queda | c cancela | s saída noturna | b banheiro | t temperatura | "
+        print("  ENTER queda | a ajuda | c cancela | s saída noturna | b banheiro | t temperatura | "
               "r resolve | o pulseira | q sai\n")
         try:
             while not self.encerrar.is_set():

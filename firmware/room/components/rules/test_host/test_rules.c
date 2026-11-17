@@ -347,6 +347,62 @@ static void test_new_fall_after_the_wearable_restarts(void){
     CHECK(last()->a2 == 6.10f);
 }
 
+static void test_help_and_cancel(void){
+    rules_t r;
+    setup(&r, 3, 0);
+    CHECK(!rules_any_active(&r));
+    rules_on_help(&r, "a1b2c3", 7, 50000, &s_clock);
+    CHECK(count(ALERT_HELP, ALERT_ACTIVE) == 1);
+    CHECK(strcmp(last()->id, "a1b2c3-7") == 0);
+    CHECK(strcmp(last()->origin, "pulseira/a1b2c3") == 0);
+    CHECK(strcmp(rules_alert_type_name(last()->type), "ajuda") == 0);
+    CHECK(rules_any_active(&r));
+
+    rules_on_help(&r, "a1b2c3", 7, 50000, &s_clock);   /* a resend */
+    CHECK(count(ALERT_HELP, ALERT_ACTIVE) == 1);
+
+    rules_on_help_cancel(&r, "a1b2c3", 6, &s_clock);   /* wrong seq */
+    CHECK(count(ALERT_HELP, ALERT_CANCELLED) == 0);
+    rules_on_help_cancel(&r, "a1b2c3", 7, &s_clock);
+    CHECK(count(ALERT_HELP, ALERT_CANCELLED) == 1);
+    CHECK(strcmp(last()->id, "a1b2c3-7") == 0);
+    CHECK(!rules_any_active(&r));
+    rules_on_help_cancel(&r, "a1b2c3", 7, &s_clock);   /* late duplicate */
+    CHECK(count(ALERT_HELP, ALERT_CANCELLED) == 1);
+
+    /* The resident insists after the window: a new request with a new seq. */
+    rules_on_help(&r, "a1b2c3", 9, 80000, &s_clock);
+    CHECK(count(ALERT_HELP, ALERT_ACTIVE) == 2);
+    CHECK(strcmp(last()->id, "a1b2c3-9") == 0);
+}
+
+static void test_help_after_the_wearable_restarts(void){
+    rules_t r;
+    setup(&r, 3, 0);
+    rules_on_help(&r, "a1b2c3", 3, 95000, &s_clock);
+    /* Same seq, another uptime: the wearable restarted, so this is a new request. */
+    rules_on_help(&r, "a1b2c3", 3, 4200, &s_clock);
+    CHECK(count(ALERT_HELP, ALERT_ACTIVE) == 2);
+}
+
+static void test_fall_and_help_are_separate(void){
+    rules_t r;
+    setup(&r, 3, 0);
+    rules_on_help(&r, "a1b2c3", 10, 60000, &s_clock);
+    rules_on_fall(&r, "a1b2c3", 11, 61000, 7.88f, 0.97f, &s_clock);
+    CHECK(count(ALERT_HELP, ALERT_ACTIVE) == 1 && count(ALERT_FALL, ALERT_ACTIVE) == 1);
+
+    /* A cancel names one alert by its seq; it never closes the other type. */
+    rules_on_help_cancel(&r, "a1b2c3", 11, &s_clock);
+    rules_on_fall_cancel(&r, "a1b2c3", 10, &s_clock);
+    CHECK(count(ALERT_HELP, ALERT_CANCELLED) == 0 && count(ALERT_FALL, ALERT_CANCELLED) == 0);
+
+    rules_on_fall_cancel(&r, "a1b2c3", 11, &s_clock);
+    CHECK(count(ALERT_FALL, ALERT_CANCELLED) == 1);
+    CHECK(count(ALERT_HELP, ALERT_CANCELLED) == 0);
+    CHECK(rules_any_active(&r));   /* the help request is still open for the caregivers */
+}
+
 static void test_wearable_offline_and_back(void){
     rules_t r;
     setup(&r, 3, 0);
@@ -406,6 +462,9 @@ int main(void){
         { "temperature brief spike ignored",       test_temperature_brief_spike_ignored },
         { "fall and cancel",                       test_fall_and_cancel },
         { "new fall after the wearable restarts",  test_new_fall_after_the_wearable_restarts },
+        { "help and cancel",                       test_help_and_cancel },
+        { "help after the wearable restarts",      test_help_after_the_wearable_restarts },
+        { "fall and help are separate",            test_fall_and_help_are_separate },
         { "wearable offline and back",             test_wearable_offline_and_back },
         { "low battery hysteresis",                test_low_battery_hysteresis },
         { "episode ids without clock",             test_episode_ids_without_clock },

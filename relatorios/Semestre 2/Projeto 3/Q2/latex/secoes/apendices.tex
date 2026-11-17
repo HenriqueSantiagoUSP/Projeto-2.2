@@ -41,7 +41,7 @@ completo, em PDF, fica em \code{hardware/placas/v1/esquema.pdf}.
 \begin{subfigure}[b]{0.40\linewidth}
   \centering
   \includegraphics[scale=1.3]{figuras/esquema_p7.png}
-  \caption{Botão ``estou bem'' (SW1).}
+  \caption{Botão da pulseira (SW1).}
 \end{subfigure}
 
 \vspace{4mm}
@@ -81,7 +81,7 @@ GPIO & Função & Placa & Observação \\
 13, 14 & CAN TX e RX & os dois & na pulseira, só em bancada \\
 15, 16 & não ligar: cristal de 32\,kHz & --- & reserva \\
 17 & interrupção do MPU-6050 & pulseira & RTC GPIO \\
-18 & botão ``estou bem'' & pulseira & RTC GPIO; \textit{pull-up} interno e filtro de \textit{glitch} \\
+18 & botão da pulseira & pulseira & RTC GPIO; \textit{pull-up} interno e filtro de \textit{glitch} \\
 21 & livre (era o buzzer) & --- & \\
 38 ou 48 & LED WS2812 & os dois & o da DevKit (v1.1 ou v1.0), escolhido no \code{menuconfig} \\
 39--42 & expansão (por exemplo, portas 5 a 8) & --- & só enquanto o JTAG por pinos não for usado \\

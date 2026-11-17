@@ -25,7 +25,8 @@ void rules_default_params(rules_params_t *params){
 const char *rules_alert_type_name(alert_type_t type){
     switch (type) {
         case ALERT_FALL:             return MQTT_ALERT_FALL;
-        case ALERT_NIGHT_EXIT:       return MQTT_ALERT_NIGHT_EXIT;
+        case ALERT_HELP:             return MQTT_ALERT_HELP;
+        case ALERT_NIGHT_EXIT:      return MQTT_ALERT_NIGHT_EXIT;
         case ALERT_BATHROOM:         return MQTT_ALERT_BATHROOM;
         case ALERT_INACTIVITY:       return MQTT_ALERT_INACTIVITY;
         case ALERT_TEMPERATURE:      return MQTT_ALERT_TEMPERATURE;
@@ -171,6 +172,33 @@ static void wearable_alert(const rules_wearable_t *w, alert_type_t type, rules_a
     wearable_origin(w->id, origin, sizeof(origin));
     alert_template(alert, type, origin);
     snprintf(alert->wearable, sizeof(alert->wearable), "%s", w->id);
+}
+
+/* The same message again: a resend (same seq and same sender uptime) that reached us after another one. */
+static bool resident_alert_repeated(const rules_wearable_alert_t *a, uint16_t seq, uint32_t uptime_ms){
+    return a->episode.active && a->seq == seq && a->uptime_ms == uptime_ms;
+}
+
+/*
+ * Opens a fall or a help request. A new one supersedes an open one of the same type. Only
+ * the resident (a cancel) or, later, a caregiver closes it; the hub never resolves it on its own.
+ */
+static void resident_alert_open(rules_t *rules, const rules_wearable_t *w, rules_wearable_alert_t *a,
+                                rules_alert_t *alert, uint16_t seq, uint32_t uptime_ms){
+    a->seq = seq;
+    a->uptime_ms = uptime_ms;
+    snprintf(a->episode.id, sizeof(a->episode.id), "%s-%u", w->id, (unsigned) seq);
+    emit(rules, &a->episode, alert, ALERT_ACTIVE);
+}
+
+static void resident_alert_cancel(rules_t *rules, const rules_wearable_t *w, rules_wearable_alert_t *a,
+                                  alert_type_t type, uint16_t seq){
+    if (!a->episode.active || a->seq != seq) {
+        return;   /* nothing open under that seq: a late duplicate */
+    }
+    rules_alert_t alert;
+    wearable_alert(w, type, &alert);
+    emit(rules, &a->episode, &alert, ALERT_CANCELLED);
 }
 
 /* ---------------------------------------------------------------------------
@@ -364,36 +392,38 @@ void rules_on_fall(rules_t *rules, const char *wearable, uint16_t seq, uint32_t 
     if (w == NULL) {
         return;
     }
-    if (w->fall_open && w->fall_seq == seq && w->fall_uptime_ms == uptime_ms) {
-        return;   /* the same FALL again (a resend that reached us after another message) */
+    if (resident_alert_repeated(&w->fall, seq, uptime_ms)) {
+        return;
     }
-
-    /*
-     * A new fall supersedes an open one. Only the resident (FALL_CANCEL) or, later,
-     * a caregiver closes a fall episode; the hub never resolves it on its own.
-     */
-    w->fall_open = true;
-    w->fall_seq = seq;
-    w->fall_uptime_ms = uptime_ms;
-
     rules_alert_t alert;
     wearable_alert(w, ALERT_FALL, &alert);
     alert.a2 = a2;
     alert.prob = prob;
-    snprintf(w->fall.id, sizeof(w->fall.id), "%s-%u", w->id, (unsigned) seq);
-    emit(rules, &w->fall, &alert, ALERT_ACTIVE);
+    resident_alert_open(rules, w, &w->fall, &alert, seq, uptime_ms);
 }
 
 void rules_on_fall_cancel(rules_t *rules, const char *wearable, uint16_t fall_seq, const rules_clock_t *now){
     rules_wearable_t *w = wearable_find(rules, wearable, true, now);
-    if (w == NULL || !w->fall_open || w->fall_seq != fall_seq) {
-        return;   /* nothing open under that seq: a late duplicate */
+    if (w != NULL) {
+        resident_alert_cancel(rules, w, &w->fall, ALERT_FALL, fall_seq);
     }
-    w->fall_open = false;
+}
 
+void rules_on_help(rules_t *rules, const char *wearable, uint16_t seq, uint32_t uptime_ms, const rules_clock_t *now){
+    rules_wearable_t *w = wearable_find(rules, wearable, true, now);
+    if (w == NULL || resident_alert_repeated(&w->help, seq, uptime_ms)) {
+        return;
+    }
     rules_alert_t alert;
-    wearable_alert(w, ALERT_FALL, &alert);
-    emit(rules, &w->fall, &alert, ALERT_CANCELLED);
+    wearable_alert(w, ALERT_HELP, &alert);
+    resident_alert_open(rules, w, &w->help, &alert, seq, uptime_ms);
+}
+
+void rules_on_help_cancel(rules_t *rules, const char *wearable, uint16_t help_seq, const rules_clock_t *now){
+    rules_wearable_t *w = wearable_find(rules, wearable, true, now);
+    if (w != NULL) {
+        resident_alert_cancel(rules, w, &w->help, ALERT_HELP, help_seq);
+    }
 }
 
 void rules_tick(rules_t *rules, const rules_clock_t *now){
@@ -442,7 +472,7 @@ bool rules_any_active(const rules_t *rules){
     }
     for (size_t i = 0; i < rules->wearable_count; i++) {
         const rules_wearable_t *w = &rules->wearables[i];
-        if (w->fall.active || w->offline.active || w->low_battery.active) {
+        if (w->fall.episode.active || w->help.episode.active || w->offline.active || w->low_battery.active) {
             return true;
         }
     }

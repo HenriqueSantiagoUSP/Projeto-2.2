@@ -20,7 +20,7 @@
 #define ESPNOW_HEARTBEAT_PERIOD_MS  30000
 #define ESPNOW_OFFLINE_TIMEOUT_MS   90000   /* three missed heartbeats */
 
-/* Delivery policy for FALL and FALL_CANCEL; PING and HEARTBEAT are never resent. */
+/* Delivery policy for FALL, HELP and their cancels; PING and HEARTBEAT are never resent. */
 #define ESPNOW_TX_RETRIES           10
 #define ESPNOW_TX_RETRY_GAP_MS      50
 #define ESPNOW_SCAN_AFTER_FAILURES  3
@@ -33,6 +33,8 @@ typedef enum {
     ESPNOW_MSG_FALL        = 0x03,
     ESPNOW_MSG_FALL_CANCEL = 0x04,
     ESPNOW_MSG_CONFIG      = 0x05,   /* reserved: hub -> wearable, not implemented yet */
+    ESPNOW_MSG_HELP        = 0x06,   /* the resident held the button: "I need help" */
+    ESPNOW_MSG_HELP_CANCEL = 0x07,
 } espnow_msg_type_t;
 
 typedef struct __attribute__((packed)) {
@@ -66,10 +68,22 @@ typedef struct __attribute__((packed)) {
     uint16_t fall_seq;     /* seq of the FALL being cancelled */
 } espnow_fall_cancel_t;
 
+/* The header says it all: who asks for help, and the seq that names the request. */
+typedef struct __attribute__((packed)) {
+    espnow_header_t hdr;
+} espnow_help_t;
+
+typedef struct __attribute__((packed)) {
+    espnow_header_t hdr;
+    uint16_t help_seq;     /* seq of the HELP being cancelled */
+} espnow_help_cancel_t;
+
 _Static_assert(sizeof(espnow_header_t) == 8, "header layout is part of the contract");
 _Static_assert(sizeof(espnow_heartbeat_t) == 12, "heartbeat layout is part of the contract");
 _Static_assert(sizeof(espnow_fall_t) == 13, "fall layout is part of the contract");
 _Static_assert(sizeof(espnow_fall_cancel_t) == 10, "fall cancel layout is part of the contract");
+_Static_assert(sizeof(espnow_help_t) == 8, "help layout is part of the contract");
+_Static_assert(sizeof(espnow_help_cancel_t) == 10, "help cancel layout is part of the contract");
 
 /* Exact length a message of this type must have, 0 when the type is not known. */
 static inline size_t espnow_msg_len(uint8_t type){
@@ -78,6 +92,8 @@ static inline size_t espnow_msg_len(uint8_t type){
         case ESPNOW_MSG_HEARTBEAT:   return sizeof(espnow_heartbeat_t);
         case ESPNOW_MSG_FALL:        return sizeof(espnow_fall_t);
         case ESPNOW_MSG_FALL_CANCEL: return sizeof(espnow_fall_cancel_t);
+        case ESPNOW_MSG_HELP:        return sizeof(espnow_help_t);
+        case ESPNOW_MSG_HELP_CANCEL: return sizeof(espnow_help_cancel_t);
         default:                     return 0;
     }
 }

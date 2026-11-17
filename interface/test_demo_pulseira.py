@@ -56,6 +56,16 @@ class TestLinhas(unittest.TestCase):
         self.assertIsNone(demo.interpretar_linha("W (600) main: FALL (a2 = 57.54 g2, P = 99 %), seq 3"))
         self.assertIsNone(demo.interpretar_linha("I (700) main: trigger at sample 10: peak 2.10 g"))
 
+    def test_botao_da_placa(self):
+        self.assertEqual(demo.interpretar_linha("\x1b[0;33mW (900) main: HELP (button held 3 s), seq 5\x1b[0m"),
+                         ("ajuda", None))
+        self.assertEqual(demo.interpretar_linha("I (950) main: HELP_CANCEL for seq 5"), ("cancelamento", "ajuda"))
+        self.assertEqual(demo.interpretar_linha("I (960) main: FALL_CANCEL for seq 3"), ("cancelamento", "queda"))
+        # Um reenvio atrasado não é um novo "estou bem"; uma falha de envio é só um aviso.
+        self.assertIsNone(demo.interpretar_linha("I (980) main: FALL_CANCEL for seq 3 delivered late"))
+        tipo, _ = demo.interpretar_linha("W (970) main: FALL_CANCEL not delivered to the hub: trying again from 2 s on")
+        self.assertEqual(tipo, "aviso")
+
 
 class TestFiltro(unittest.TestCase):
     def test_coeficientes_iguais_aos_do_firmware(self):
@@ -87,6 +97,30 @@ class TestPonte(unittest.TestCase):
         alerta = demo.alerta_queda("a1b2c3", 42, "cancelado", ts=1)
         self.assertEqual((alerta["estado"], alerta["detalhe"]), ("cancelado", {}))
 
+    def test_pedido_de_ajuda_como_o_do_hub(self):
+        alerta = demo.alerta_ajuda("a1b2c3", 43, "ativo", ts=1792497600000)
+        self.assertEqual(alerta, {"v": 1, "id": "a1b2c3-43", "tipo": "ajuda", "estado": "ativo",
+                                  "origem": "pulseira/a1b2c3", "detalhe": {}, "ts": 1792497600000})
+        texto = formatar(interpretar("idoso/butanta/quarto101/alerta", json.dumps(alerta).encode()))
+        self.assertIn("Pedido de ajuda", texto)
+
+    def test_estou_bem_cancela_o_ultimo_alerta(self):
+        ponte = object.__new__(demo.Ponte)      # sem broker: só a lógica dos alertas
+        ponte.e = demo.Estado(janela_s=10.0)
+        ponte.e.pulseira = "a1b2c3"
+        ponte.seq, ponte.aberto = 10, None
+        publicados = []
+        ponte.publicar = lambda sufixo, dados, retain: publicados.append(dados)
+        ponte.queda(3.0, 0.97)
+        ponte.ajuda()
+        ponte.cancelar()
+        self.assertEqual([(a["id"], a["tipo"], a["estado"]) for a in publicados],
+                         [("a1b2c3-11", "queda", "ativo"), ("a1b2c3-12", "ajuda", "ativo"),
+                          ("a1b2c3-12", "ajuda", "cancelado")])
+        with contextlib.redirect_stdout(io.StringIO()):
+            ponte.cancelar()                    # nada mais aberto
+        self.assertEqual(len(publicados), 3)
+
 
 class TestLeitor(unittest.TestCase):
     def test_feat_vai_para_o_tempo_da_amostra_e_continua_depois_de_um_reinicio(self):
@@ -107,6 +141,22 @@ class TestLeitor(unittest.TestCase):
         self.assertTrue(estado.disparos[-1].queda)
         self.assertAlmostEqual(estado.disparos[-1].t, 2.0, places=6)
         self.assertEqual(estado.n_quedas, 1)
+
+    def test_botao_da_placa_vai_para_a_ponte_e_para_a_faixa(self):
+        estado = demo.Estado(janela_s=10.0)
+        chamadas = []
+        ponte = types.SimpleNamespace(queda=lambda *a: chamadas.append("queda"),
+                                      ajuda=lambda: chamadas.append("ajuda"),
+                                      cancelar=lambda: chamadas.append("cancelar"))
+        leitor = demo.Leitor(estado, ponte)
+        leitor.linha("CSV:t_ms,ax,ay,az,gx,gy,gz")
+        leitor.linha("CSV:0,0,0,4096,0,0,0")
+        leitor.linha("W (900) main: HELP (button held 3 s), seq 5")
+        self.assertEqual(estado.faixa_tipo, "ajuda")
+        self.assertGreater(estado.faixa_ate, estado.t_ultimo)
+        leitor.linha("I (950) main: HELP_CANCEL for seq 5")
+        self.assertEqual(estado.faixa_ate, 0.0)
+        self.assertEqual(chamadas, ["ajuda", "cancelar"])
 
     def test_sinal_limitado_depois_de_um_tempo_absurdo(self):
         # Bytes perdidos na serial podem juntar dois tempos numa linha só ("CSV:1234" + "123455,...").

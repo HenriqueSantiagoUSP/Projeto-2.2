@@ -26,6 +26,7 @@ typedef struct {
         struct { uint16_t battery_mv; uint16_t activity_mg; } heartbeat;
         struct { float a2_peak; uint8_t prob_pct; } fall;
         struct { uint16_t fall_seq; } fall_cancel;
+        struct { uint16_t help_seq; } help_cancel;   /* HELP itself has no payload */
     };
 } espnow_rx_msg_t;
 

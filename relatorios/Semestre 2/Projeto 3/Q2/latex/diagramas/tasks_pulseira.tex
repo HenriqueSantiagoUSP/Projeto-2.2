@@ -20,14 +20,17 @@
   \end{scope}
   % comm
   \node[fila] (q) at (12.4,-1.9) {};
-  \node[bloco=corvest, minimum width=3.0cm] (comm) at (9.4,-1.9) {\textbf{comm}: núcleo 0, MÉDIA\\ESP-NOW, heartbeat, botão};
+  \node[bloco=corvest, anchor=east] (comm) at (11.3,-1.9) {\textbf{comm}: núcleo 0, MÉDIA\\ESP-NOW, heartbeat, alertas};
   \draw[seta] (d) -- node[rotulo, right] {queda} (q);
   \draw[seta] (q) -- (comm);
-  \node[draw=black!50, fill=black!4, rounded corners=1pt, align=center] (bt) at (5.6,-1.9) {botão\\(ISR)};
-  \draw[seta] (bt) -- (comm);
-  \node[bloco=corhub, minimum width=2.2cm] (hub) at (9.4,-3.5) {hub\\(ESP-NOW cifrado)};
-  \draw[sem fio=corvest] (comm) -- node[rotulo, right] {\code{FALL}, \code{FALL\_CANCEL}, \code{HEARTBEAT}} (hub);
-  \node[draw=black!40, dashed, rounded corners, align=center, font=\tiny] (op) at (5.6,-3.5)
+  % botão: a ISR só acorda a task button, que mede os gestos
+  \node[bloco=corvest, anchor=east] (bt) at (5.6,-1.9) {\textbf{button}: núcleo 1\\dois toques, segurar};
+  \node[draw=black!50, fill=black!4, rounded corners=1pt, align=center, anchor=east] (isr) at ($(bt.west)+(-1.1,0)$) {botão\\(ISR)};
+  \draw[seta] (isr) -- node[rotulo, above] {borda} (bt);
+  \draw[seta] (bt) -- node[rotulo, above] {gesto} (comm);
+  \node[bloco=corhub, minimum width=2.2cm] (hub) at (10.2,-3.5) {hub\\(ESP-NOW cifrado)};
+  \draw[sem fio=corvest] (comm.south -| hub.north) -- node[rotulo, right] {\code{FALL}, \code{HELP}, cancelamentos, \code{HEARTBEAT}} (hub.north);
+  \node[draw=black!40, dashed, rounded corners, align=center, font=\tiny] (op) at (4.4,-3.5)
        {opcionais: MQTT direto\\e CAN de bancada};
-  \draw[seta=black!40, dashed] (comm.west) ++(0,-0.3) -| (op.north);
+  \draw[seta=black!40, dashed] (comm.south west) ++(0.3,0) |- (op.east);
 \end{tikzpicture}

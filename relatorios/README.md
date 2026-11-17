@@ -173,7 +173,7 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
 [`Q2/latex/main.pdf`](<Semestre 2/Projeto 3/Q2/latex/main.pdf>).
 - **Layout:** o mesmo do Q1 (capa, contracapa, `figuras/`, `imagens/`, `tabelas/`). Um arquivo por seção em
   `secoes/` e os diagramas em TikZ e circuitikz em `diagramas/`.
-- **Conteúdo** (~65 páginas):
+- **Conteúdo** (~68 páginas):
   - requisitos e arquitetura;
   - sensores, com a caracterização do LM35 e do MPU-6050;
   - condicionamento do LM35 (circuito, simulação, validação, filtro RC) e condicionamento digital;

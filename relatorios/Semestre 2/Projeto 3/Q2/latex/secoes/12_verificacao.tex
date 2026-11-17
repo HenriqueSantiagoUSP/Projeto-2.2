@@ -33,12 +33,12 @@ bancada & rodando na placa, com os sensores \\
 \toprule
 Parte & Como \\
 \midrule
-Firmware do hub & testes no computador das regras de alerta (62 verificações) e da configuração por MQTT (60) \\
-Firmware da pulseira & testes no computador do pipeline de queda (885 verificações, com a paridade C $\times$ Python) e do processamento de sinal (25) \\
+Firmware do hub & testes no computador das regras de alerta (82 verificações) e da configuração por MQTT (60) \\
+Firmware da pulseira & testes no computador do pipeline de queda (885 verificações, com a paridade C $\times$ Python), do processamento de sinal (25) e dos gestos do botão (42) \\
 Mapa de pinos, chaves e MAC & pino repetido ou proibido e MAC mal escrito fazem o build falhar \\
 Modelo de queda & validação por pessoa na SisFall; paridade C $\times$ Python \\
 Central & os 5 serviços sobem; o broker recusa conexão anônima e senha errada; o simulador publicou estados e alertas, o InfluxDB gravou, as consultas do painel rodaram e o notificador formatou cada episódio \\
-Notificador e demonstração & 19 e 15 testes automáticos \\
+Notificador e demonstração & 22 e 19 testes automáticos \\
 PCB v1 & \ercViolacoes{} violações de ERC e \drcErros{} erros de DRC; encaixe e ordem dos pinos no teste no papel 1:1 \\
 Pulseira na placa & perfil de demonstração: 200\,Hz contínuos por 16\,min e $\pm$8\,g confirmado (abaixo) \\
 \bottomrule
@@ -74,7 +74,8 @@ PIR & movimento depois dos 60\,s de aquecimento & detecção e volta a ``livre''
 Temperatura & 3 ou 4 pontos (perto de 10, 20 e 30\,°C) contra um termômetro; depois, termopar & $\pm$1\,°C (RNF10) \\
 Peças ausentes & sem SSID, senha errada, broker parado, LM35 solto, MPU solto, CAN sem transceptor & um aviso por caso, e o resto funcionando \\
 CAN entre as placas & pulseira com CAN de bancada, transceptores e terminação; tirar um fio do barramento & quadros \code{0x0FD}/\code{0x0FE} no log do hub; um aviso ao cair e um ao voltar \\
-ESP-NOW & boot da pulseira; queda simulada pelo botão; ``estou bem'' & canal descoberto; heartbeat no Grafana; alerta \code{ativo} e \code{cancelado} \\
+Botão & aperto simples; dois toques sem alerta; dois toques na janela de uma queda; segurar 3\,s; segurar durante um alerta; ficar com o botão apertado por 30\,s & só os dois toques na janela cancelam e só o segurar fora de alerta pede ajuda; o resto não faz nada; segurar sem soltar dá um pedido só \\
+ESP-NOW & boot da pulseira; queda simulada (dois toques, opção de teste); ``estou bem''; pedido de ajuda & canal descoberto; heartbeat no Grafana; alertas \code{queda} e \code{ajuda}, \code{ativo} e \code{cancelado} \\
 Queda atrasada & hub desligado, queda, hub religado em $\sim$20\,s & o alerta chega uma vez só \\
 Queda após reinício & queda, pulseira reiniciada, nova queda & dois alertas, com \code{id} diferentes \\
 Remetente estranho & outro ESP32 mandando ESP-NOW ao hub & um aviso e nenhum alerta \\

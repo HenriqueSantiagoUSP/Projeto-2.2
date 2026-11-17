@@ -165,7 +165,10 @@ Assim, o repique do reed vira uma única transição, com o estado final. Na sa�
 resistor de 1\,k$\Omega$ em série (R4), que limita a corrente entre o módulo de 5\,V e o pino.
 
 \paragraph{Botão.} \textit{Pull-up} interno, 100\,nF em paralelo e o filtro de
-\textit{glitch}.
+\textit{glitch}. O \textit{debounce} também é por estabilização, em 30\,ms: a interrupção pega
+as duas bordas e só acorda a task do botão, que lê o nível quando a linha fica quieta. Um
+bloqueio fixo depois de cada aperto, como os 300\,ms usados antes, engoliria o segundo toque
+dos dois toques (Seção~\ref{sec:botao}).
 
 \paragraph{MPU-6050.} O sinal inercial passa por dois filtros. O primeiro é o DLPF do próprio
 sensor, em 44\,Hz, antes da decimação para 200\,Hz. O segundo é um passa-baixa Butterworth de

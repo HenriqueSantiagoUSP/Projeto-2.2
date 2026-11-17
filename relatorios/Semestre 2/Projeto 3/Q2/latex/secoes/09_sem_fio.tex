@@ -59,8 +59,11 @@ Confirmação & ACK da camada MAC do hub, informado pelo \textit{callback} de en
 \paragraph{Formato.} As mensagens são estruturas empacotadas, em \textit{little endian},
 definidas num cabeçalho C (\code{protocol\_espnow.h}) que as duas placas compilam
 (Figura~\ref{fig:espnow_quadro}). O cabeçalho comum traz a versão do formato, o tipo, um
-número de sequência e o tempo desde o boot da pulseira. O hub descarta versão ou tipo
-desconhecidos e mensagens com tamanho diferente do esperado para o tipo.
+número de sequência e o tempo desde o boot da pulseira. São seis tipos: \code{PING} (varredura
+de canal), \code{HEARTBEAT}, \code{FALL} e \code{HELP} (o pedido de ajuda, só o cabeçalho), e
+os cancelamentos \code{FALL\_CANCEL} e \code{HELP\_CANCEL}, que levam a sequência do alerta
+cancelado. O hub descarta versão ou tipo desconhecidos e mensagens com tamanho diferente do
+esperado para o tipo.
 
 \begin{figure}[H]
 \centering
@@ -93,8 +96,8 @@ diante. Se nenhum responder, ela espera 30\,s e recomeça.
 erro do sistema. Por isso:
 \begin{itemize}
   \item uma mensagem só conta como entregue com o ACK da camada MAC do hub;
-  \item \code{FALL} e \code{FALL\_CANCEL} têm até 10 tentativas, a cada 50\,ms, com o mesmo
-        número de sequência. Se todas falharem, a pulseira refaz a varredura e tenta de novo;
+  \item \code{FALL}, \code{HELP} e os cancelamentos têm até 10 tentativas, a cada 50\,ms, com o
+        mesmo número de sequência. Se todas falharem, a pulseira refaz a varredura e tenta de novo;
         com o MQTT da pulseira ligado, publica o alerta direto no broker;
   \item se nem assim a mensagem chegar, a pulseira guarda o quadro e o reenvia \emph{igual}
         2\,s depois, dobrando a espera até 30\,s, e na hora em que um heartbeat voltar a ser
@@ -181,10 +184,12 @@ pelos episódios. Um alerta de queda:
 O \code{id} identifica o episódio e se repete no \code{resolvido} ou \code{cancelado}
 correspondente. Com QoS 1, uma mensagem pode chegar duas vezes; quem consome descarta
 \code{id} e \code{estado} repetidos. O \code{detalhe} da queda traz o $\amag^2$ no pico e a
-probabilidade que o classificador da pulseira deu.
+probabilidade que o classificador da pulseira deu. O pedido de ajuda é um alerta do tipo
+\code{ajuda}, com o \code{id} formado do mesmo jeito e o \code{detalhe} vazio.
 
 \paragraph{Reserva pela pulseira.} Com a opção MQTT ligada, a pulseira se associa ao mesmo
-Wi-Fi e, se o hub não confirmar uma queda, publica o alerta ela mesma, com o mesmo \code{id};
+Wi-Fi e, se o hub não confirmar uma queda ou um pedido de ajuda, publica o alerta ela mesma,
+com o mesmo \code{id};
 a central recebe uma notificação só. Custa bateria, por isso vem desligado.
 
 \subsection{Segurança}

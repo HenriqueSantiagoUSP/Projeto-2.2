@@ -22,6 +22,7 @@
 
 #include "battery.h"
 #include "board_pins.h"
+#include "button_gesture.h"
 #include "can.h"
 #include "espnow_tx.h"
 #include "fall_pipeline.h"
@@ -41,9 +42,9 @@ static const char *TAG = "main";
 
 #define SAMPLE_BATCH_MS     50      /* FIFO drained every 50 ms: 10 samples, far from its 85 */
 #define FIFO_BATCH_MAX      64
-#define BUTTON_DEBOUNCE_MS  300
 #define COMM_QUEUE_DEPTH    8
 #define COMM_MAX_WAIT_MS    500     /* comm_task wakes this often to feed the watchdog */
+#define BUTTON_MAX_WAIT_MS  1000    /* and button_task this often */
 #define LOCK_WAIT_MS        100     /* no task waits forever for the activity lock */
 #define NET_WAIT_MS         10000   /* with MQTT on: how long the first contact waits for the AP */
 #define IMU_RETRY_MS        5000    /* without the MPU-6050, look for it again this often */
@@ -58,7 +59,7 @@ _Static_assert(sizeof(CONFIG_GADGET_ESPNOW_LMK) - 1 == 16,
 _Static_assert(sizeof(CONFIG_GADGET_HUB_MAC) == 1 || sizeof(CONFIG_GADGET_HUB_MAC) == 18,
                "menuconfig > Wearable > the hub MAC must be empty or aa:bb:cc:dd:ee:ff");
 
-#define RETRY_FIRST_MS      2000    /* an undelivered FALL / FALL_CANCEL is tried again after this... */
+#define RETRY_FIRST_MS      2000    /* an undelivered alert (FALL, HELP) or cancel is tried again after this... */
 #define RETRY_MAX_MS        30000   /* ...doubling up to this, until it gets through */
 #define RETRY_SCAN_EVERY    3       /* every 3rd retry looks for the hub on every channel first */
 
@@ -67,13 +68,13 @@ _Static_assert(sizeof(CONFIG_GADGET_HUB_MAC) == 1 || sizeof(CONFIG_GADGET_HUB_MA
 
 /*
  * Everything that reaches comm_task is a comm_event_t, copied by value into its
- * queue: the sampling task, the button ISR and the MQTT task never touch the
+ * queue: the sampling task, the button task and the MQTT task never touch the
  * radio, the CAN node or comm_task's state.
  */
 typedef enum {
     COMM_EV_FALL,       /* sampling_task: the classifier said fall (outside the cooldown) */
     COMM_EV_WINDOW,     /* sampling_task: every classified window, for the log */
-    COMM_EV_BUTTON,     /* button ISR */
+    COMM_EV_GESTURE,    /* button_task: a double tap or a hold */
 } comm_event_kind_t;
 
 typedef struct {
@@ -86,32 +87,65 @@ typedef struct {
     union {
         fall_info_t fall;                                                   /* COMM_EV_FALL */
         struct { fp_result_t r; uint32_t cycles; bool reported; } window;   /* COMM_EV_WINDOW */
+        struct { bg_gesture_t gesture; int64_t at_ms; } button;             /* COMM_EV_GESTURE */
     };
 } comm_event_t;
 
+/*
+ * The alerts raised on the wearable that the button can cancel (docs/protocolo.md §3).
+ * A fall and a help request are separate alerts on the hub.
+ */
+typedef enum {
+    ALERT_KIND_FALL,
+    ALERT_KIND_HELP,
+    ALERT_KIND_COUNT,
+} alert_kind_t;
+
+/* A FALL or a HELP frame, kept as sent: a resend repeats it byte for byte. */
+typedef union {
+    espnow_header_t hdr;
+    espnow_fall_t   fall;
+    espnow_help_t   help;
+} alert_frame_t;
+
+typedef union {
+    espnow_header_t      hdr;
+    espnow_fall_cancel_t fall;
+    espnow_help_cancel_t help;
+} cancel_frame_t;
+
+/* The last alert of one kind raised here. */
+typedef struct {
+    uint16_t      seq;           /* names it on the hub: "<wearable>-<seq>" */
+    bool          via_mqtt;      /* the hub never ACKed it: it went out over MQTT */
+    /*
+     * Reached nobody: kept and resent unchanged (same seq and uptime, so the hub sees one
+     * alert) until delivered, at the backoff below and at once when a heartbeat gets through.
+     */
+    bool          undelivered;
+    alert_frame_t frame;
+} raised_alert_t;
+
 /* State of comm_task; nobody else reads it. */
 typedef struct {
-    bool     link_ok;            /* the hub ACKed the last heartbeat */
-    bool     fall_pending;       /* inside the cancel window */
-    uint16_t fall_seq;
-    bool     fall_via_mqtt;      /* the hub never ACKed it: the alert went out over MQTT */
-    int64_t  cancel_deadline_ms;
-    int64_t  last_button_ms;
-    int64_t  next_heartbeat_ms;
+    bool           link_ok;            /* the hub ACKed the last heartbeat */
+    int64_t        next_heartbeat_ms;
+    raised_alert_t alerts[ALERT_KIND_COUNT];
+    fall_info_t    fall_info;          /* the last fall's values, for its MQTT copy */
 
-    /*
-     * A FALL (or FALL_CANCEL) that reached nobody is kept and resent unchanged (same seq and
-     * uptime, so the hub sees one fall) until it is delivered: at the backoff below, and at
-     * once when a heartbeat gets through again.
-     */
-    bool                 fall_undelivered;
-    espnow_fall_t        fall_frame;
-    fall_info_t          fall_info;
-    bool                 cancel_undelivered;
-    espnow_fall_cancel_t cancel_frame;
-    int64_t              retry_at_ms;
-    int64_t              retry_delay_ms;
-    unsigned             retries;
+    /* The cancel window of the last alert raised: a double tap inside it cancels that alert. */
+    bool           window_open;
+    alert_kind_t   window_kind;
+    int64_t        window_start_ms;
+    int64_t        window_end_ms;
+
+    /* One cancel waits at a time; losing an older one leaves an alert open, the safe side. */
+    bool           cancel_undelivered;
+    cancel_frame_t cancel_frame;
+
+    int64_t        retry_at_ms;
+    int64_t        retry_delay_ms;
+    unsigned       retries;
 } comm_state_t;
 
 static QueueHandle_t s_comm_queue = NULL;
@@ -125,9 +159,13 @@ static fp_classifier_t s_classifier;              /* written once at boot */
  * is never started, and falls go to the log (and to MQTT and CAN when they are on).
  */
 static bool s_has_hub = false;                    /* written at boot, before the tasks start */
-/* Set where a queued event could be lost (MQTT task, button ISR), taken by comm_task. */
+/* Set where a queued event could be lost (MQTT task, button task), taken by comm_task. */
 static atomic_bool s_mqtt_up_pending = false;
-static atomic_bool s_button_missed = false;
+static atomic_int s_gesture_missed = BG_NONE;
+
+/* Button ISR -> button_task: when the last edge happened, in ms (wraps every 49 days). */
+static atomic_uint_least32_t s_button_edge_ms;
+static TaskHandle_t s_button_task = NULL;         /* written at boot, before the ISR is enabled */
 
 /* Activity between heartbeats: sampling_task merges each batch, comm_task takes the average. */
 static sp_activity_t s_activity;
@@ -328,7 +366,7 @@ static void sampling_task(void *arg){
 }
 
 /* ---------------------------------------------------------------------------
- * MQTT (optional): telemetry, and the fall alert when the hub does not answer
+ * MQTT (optional): telemetry, and the alerts when the hub does not answer
  * ------------------------------------------------------------------------- */
 
 #ifdef CONFIG_GADGET_MQTT
@@ -367,21 +405,22 @@ static void publish_telemetry(uint16_t battery_mv, uint16_t activity_mg, bool hu
     snprintf(json, sizeof(json), "{\"v\":%d%s,\"atividade\":%.3f,\"canal\":%u,\"hub\":%s%s}",
              MQTT_JSON_VERSION, battery, activity_mg / 1000.0f, espnow_tx_channel(),
              hub_ok ? "true" : "false", ts);
-    /* QoS 0, not retained: the next one comes with the next heartbeat. */
+    /* QoS 0, not retained: the next summary comes in a few minutes. */
     mqtt_link_publish(suffix, json, 0, false);
 }
 
 /*
- * The same alert the hub would publish for this fall (docs/protocolo.md §1): same id
- * "<wearable>-<seq>", so if the hub got it after all the notifier drops the copy.
+ * The same alert the hub would publish for this fall or help request (docs/protocolo.md §1):
+ * same id "<wearable>-<seq>", so if the hub got it after all the notifier drops the copy.
+ * fall: the values of an active fall; NULL otherwise.
  */
-static bool publish_fall_alert(uint16_t seq, const fall_info_t *fall, bool active){
+static bool publish_button_alert(alert_kind_t kind, uint16_t seq, const fall_info_t *fall, bool active){
     if (!mqtt_link_connected()) {
         return false;
     }
     char ts[32], detail[64], json[JSON_MAX];
     ts_field(ts, sizeof(ts));
-    if (active) {
+    if (active && kind == ALERT_KIND_FALL && fall != NULL) {
         snprintf(detail, sizeof(detail), "\"a2\":%.2f,\"prob\":%.2f,\"via\":\"pulseira\"", fall->a2_peak,
                  fall->prob_pct / 100.0f);
     } else {
@@ -389,7 +428,7 @@ static bool publish_fall_alert(uint16_t seq, const fall_info_t *fall, bool activ
     }
     snprintf(json, sizeof(json),
              "{\"v\":%d,\"id\":\"%s-%u\",\"tipo\":\"%s\",\"estado\":\"%s\",\"origem\":\"%s/%s\",\"detalhe\":{%s}%s}",
-             MQTT_JSON_VERSION, s_wearable_id, seq, MQTT_ALERT_FALL,
+             MQTT_JSON_VERSION, s_wearable_id, seq, kind == ALERT_KIND_FALL ? MQTT_ALERT_FALL : MQTT_ALERT_HELP,
              active ? MQTT_ALERT_ACTIVE : MQTT_ALERT_CANCELLED, MQTT_TOPIC_WEARABLE, s_wearable_id,
              detail, ts);
     return mqtt_link_publish(MQTT_TOPIC_ALERT, json, 1, false) == ESP_OK;
@@ -478,104 +517,166 @@ static bool send_heartbeat(void){
     return delivered;
 }
 
-/* Sends FALL until the hub ACKs, looking for it once if needed, then the fallbacks. */
-static void send_fall(comm_state_t *st, const fall_info_t *info){
-    espnow_fall_t fall;
-    espnow_tx_header(&fall.hdr, ESPNOW_MSG_FALL);
-    fall.a2_peak = info->a2_peak;
-    fall.prob_pct = info->prob_pct;
+/* "FALL" or "HELP": the ESP-NOW message, as the logs (and demo_pulseira.py) name it. */
+static const char *alert_name(alert_kind_t kind){
+    return kind == ALERT_KIND_FALL ? "FALL" : "HELP";
+}
 
-    ESP_LOGW(TAG, "FALL (a2 = %.2f g2, P = %u %%), seq %u", info->a2_peak, info->prob_pct, fall.hdr.seq);
-    can_send_fall(info);
+static alert_kind_t cancel_kind(const cancel_frame_t *cancel){
+    return cancel->hdr.type == ESPNOW_MSG_FALL_CANCEL ? ALERT_KIND_FALL : ALERT_KIND_HELP;
+}
+
+static uint16_t cancel_seq(const cancel_frame_t *cancel){
+    return cancel_kind(cancel) == ALERT_KIND_FALL ? cancel->fall.fall_seq : cancel->help.help_seq;
+}
+
+static bool any_undelivered(const comm_state_t *st){
+    return st->alerts[ALERT_KIND_FALL].undelivered || st->alerts[ALERT_KIND_HELP].undelivered ||
+           st->cancel_undelivered;
+}
+
+static void retry_soon(comm_state_t *st){
+    st->retry_delay_ms = RETRY_FIRST_MS;
+    st->retry_at_ms = now_ms() + RETRY_FIRST_MS;
+    st->retries = 0;
+}
+
+static bool in_window(const comm_state_t *st, int64_t t_ms){
+    return st->window_open && t_ms >= st->window_start_ms && t_ms < st->window_end_ms;
+}
+
+/*
+ * Raises a fall or a help request: opens its cancel window (LED in alert at once, before
+ * any radio work), then sends FALL or HELP until the hub ACKs, looking for it once if
+ * needed, then the fallbacks. fall: the fall's values; NULL for help.
+ */
+static void raise_alert(comm_state_t *st, alert_kind_t kind, const fall_info_t *fall, int64_t at_ms){
+    st->window_open = true;
+    st->window_kind = kind;
+    st->window_start_ms = at_ms;
+    st->window_end_ms = at_ms + (int64_t) CONFIG_GADGET_CANCEL_WINDOW_S * 1000;
+    indicators_set_status(IND_STATUS_ALERT);
+    indicators_buzzer_start((uint32_t) CONFIG_GADGET_CANCEL_WINDOW_S * 1000);
+
+    alert_frame_t frame;
+    if (kind == ALERT_KIND_FALL) {
+        espnow_tx_header(&frame.hdr, ESPNOW_MSG_FALL);
+        frame.fall.a2_peak = fall->a2_peak;
+        frame.fall.prob_pct = fall->prob_pct;
+        st->fall_info = *fall;
+        ESP_LOGW(TAG, "FALL (a2 = %.2f g2, P = %u %%), seq %u", fall->a2_peak, fall->prob_pct, frame.hdr.seq);
+        can_send_fall(fall);
+    } else {
+        espnow_tx_header(&frame.hdr, ESPNOW_MSG_HELP);
+        ESP_LOGW(TAG, "HELP (button held %d s), seq %u", CONFIG_GADGET_HELP_HOLD_S, frame.hdr.seq);
+    }
+    const size_t len = espnow_msg_len(frame.hdr.type);
 
     bool delivered = false;
     if (s_has_hub) {
-        delivered = espnow_tx_send(&fall, sizeof(fall), ESPNOW_TX_RETRIES) == ESP_OK;
+        delivered = espnow_tx_send(&frame, len, ESPNOW_TX_RETRIES) == ESP_OK;
         if (!delivered) {
             espnow_tx_scan();
-            delivered = espnow_tx_send(&fall, sizeof(fall), ESPNOW_TX_RETRIES) == ESP_OK;
+            delivered = espnow_tx_send(&frame, len, ESPNOW_TX_RETRIES) == ESP_OK;
         }
     }
 
-    st->fall_seq = fall.hdr.seq;
-    st->fall_via_mqtt = false;
-    st->fall_undelivered = false;
-    st->cancel_undelivered = false;   /* a new fall supersedes an older cancel still waiting */
+    raised_alert_t *alert = &st->alerts[kind];
+    alert->seq = frame.hdr.seq;
+    alert->via_mqtt = false;
+    alert->undelivered = false;   /* a new alert supersedes an older one of its kind still waiting... */
+    if (st->cancel_undelivered && cancel_kind(&st->cancel_frame) == kind) {
+        st->cancel_undelivered = false;   /* ...and the cancel of that older one */
+    }
     if (!delivered) {
 #ifdef CONFIG_GADGET_MQTT
-        st->fall_via_mqtt = publish_fall_alert(fall.hdr.seq, info, true);
+        alert->via_mqtt = publish_button_alert(kind, alert->seq, fall, true);
 #endif
-        if (st->fall_via_mqtt) {
-            ESP_LOGW(TAG, "%s: alert published over MQTT", s_has_hub ? "hub did not ACK the FALL" : "no hub");
+        if (alert->via_mqtt) {
+            ESP_LOGW(TAG, "%s%s: alert published over MQTT", s_has_hub ? "hub did not ACK the " : "no hub",
+                     s_has_hub ? alert_name(kind) : "");
         } else if (s_has_hub) {
-            /* A fall that reached nobody: the one real error here. Kept and resent until it gets through. */
-            ESP_LOGE(TAG, "FALL not delivered to the hub: trying again from %d s on", RETRY_FIRST_MS / 1000);
-            st->fall_undelivered = true;
-            st->fall_frame = fall;
-            st->fall_info = *info;
-            st->retry_delay_ms = RETRY_FIRST_MS;
-            st->retry_at_ms = now_ms() + RETRY_FIRST_MS;
-            st->retries = 0;
+            /* An alert that reached nobody: the one real error here. Kept and resent until it gets through. */
+            ESP_LOGE(TAG, "%s not delivered to the hub: trying again from %d s on", alert_name(kind),
+                     RETRY_FIRST_MS / 1000);
+            alert->undelivered = true;
+            alert->frame = frame;
+            retry_soon(st);
         }
-        /* Stand-alone without MQTT: the FALL line above and the serial are where it goes. */
+        /* Stand-alone without MQTT: the log line above and the serial are where it goes. */
     }
 }
 
-static void send_fall_cancel(comm_state_t *st){
-    espnow_fall_cancel_t cancel;
-    espnow_tx_header(&cancel.hdr, ESPNOW_MSG_FALL_CANCEL);
-    cancel.fall_seq = st->fall_seq;
+/* "I'm fine": cancels the last alert of this kind, wherever it went. */
+static void cancel_alert(comm_state_t *st, alert_kind_t kind){
+    raised_alert_t *alert = &st->alerts[kind];
+    st->window_open = false;
+    indicators_buzzer_stop();
 
-    ESP_LOGI(TAG, "FALL_CANCEL for seq %u", st->fall_seq);
-    /* The FALL may have reached the hub with its ACK lost: cancel there too, even if it is still queued here. */
-    st->fall_undelivered = false;
-    bool delivered = s_has_hub && espnow_tx_send(&cancel, sizeof(cancel), ESPNOW_TX_RETRIES) == ESP_OK;
+    cancel_frame_t cancel;
+    if (kind == ALERT_KIND_FALL) {
+        espnow_tx_header(&cancel.hdr, ESPNOW_MSG_FALL_CANCEL);
+        cancel.fall.fall_seq = alert->seq;
+    } else {
+        espnow_tx_header(&cancel.hdr, ESPNOW_MSG_HELP_CANCEL);
+        cancel.help.help_seq = alert->seq;
+    }
+    ESP_LOGI(TAG, "%s_CANCEL for seq %u", alert_name(kind), alert->seq);
+
+    /* The alert may have reached the hub with its ACK lost: cancel there too, even if it is still queued here. */
+    alert->undelivered = false;
+    bool delivered = s_has_hub &&
+                     espnow_tx_send(&cancel, espnow_msg_len(cancel.hdr.type), ESPNOW_TX_RETRIES) == ESP_OK;
     if (s_has_hub && !delivered) {
-        ESP_LOGW(TAG, "FALL_CANCEL not delivered to the hub: trying again from %d s on", RETRY_FIRST_MS / 1000);
+        ESP_LOGW(TAG, "%s_CANCEL not delivered to the hub: trying again from %d s on", alert_name(kind),
+                 RETRY_FIRST_MS / 1000);
         st->cancel_undelivered = true;
         st->cancel_frame = cancel;
-        st->retry_delay_ms = RETRY_FIRST_MS;
-        st->retry_at_ms = now_ms() + RETRY_FIRST_MS;
-        st->retries = 0;
+        retry_soon(st);
     }
 #ifdef CONFIG_GADGET_MQTT
     /* Cancel where the alert went: over MQTT if the hub never had it. */
-    if (st->fall_via_mqtt || !delivered) {
-        publish_fall_alert(st->fall_seq, NULL, false);
+    if (alert->via_mqtt || !delivered) {
+        publish_button_alert(kind, alert->seq, NULL, false);
     }
 #endif
 }
 
-/* One more try for a FALL or FALL_CANCEL that reached nobody; the frame goes out unchanged. */
+/* One more try for every alert or cancel that reached nobody; the frames go out unchanged. */
 static void retry_undelivered(comm_state_t *st){
-    if (!st->fall_undelivered && !st->cancel_undelivered) {
+    if (!any_undelivered(st)) {
         return;
     }
     st->retries++;
     if (st->retries % RETRY_SCAN_EVERY == 0) {
         espnow_tx_scan();
     }
-    bool delivered;
-    if (st->fall_undelivered) {
-        delivered = espnow_tx_send(&st->fall_frame, sizeof(st->fall_frame), ESPNOW_TX_RETRIES) == ESP_OK;
+    for (int k = 0; k < ALERT_KIND_COUNT; k++) {
+        raised_alert_t *alert = &st->alerts[k];
+        if (!alert->undelivered) {
+            continue;
+        }
+        bool delivered =
+            espnow_tx_send(&alert->frame, espnow_msg_len(alert->frame.hdr.type), ESPNOW_TX_RETRIES) == ESP_OK;
 #ifdef CONFIG_GADGET_MQTT
-        if (!delivered && publish_fall_alert(st->fall_frame.hdr.seq, &st->fall_info, true)) {
-            st->fall_via_mqtt = true;
+        if (!delivered && publish_button_alert((alert_kind_t) k, alert->seq, &st->fall_info, true)) {
+            alert->via_mqtt = true;
             delivered = true;
         }
 #endif
         if (delivered) {
-            ESP_LOGW(TAG, "FALL seq %u delivered late, after %u retries", st->fall_frame.hdr.seq, st->retries);
-            st->fall_undelivered = false;
-        }
-    } else {
-        delivered = espnow_tx_send(&st->cancel_frame, sizeof(st->cancel_frame), ESPNOW_TX_RETRIES) == ESP_OK;
-        if (delivered) {
-            ESP_LOGI(TAG, "FALL_CANCEL for seq %u delivered late", st->cancel_frame.fall_seq);
-            st->cancel_undelivered = false;
+            ESP_LOGW(TAG, "%s seq %u delivered late, after %u retries", alert_name((alert_kind_t) k), alert->seq,
+                     st->retries);
+            alert->undelivered = false;
         }
     }
-    if (!delivered) {
+    if (st->cancel_undelivered &&
+        espnow_tx_send(&st->cancel_frame, espnow_msg_len(st->cancel_frame.hdr.type), ESPNOW_TX_RETRIES) == ESP_OK) {
+        ESP_LOGI(TAG, "%s_CANCEL for seq %u delivered late", alert_name(cancel_kind(&st->cancel_frame)),
+                 cancel_seq(&st->cancel_frame));
+        st->cancel_undelivered = false;
+    }
+    if (any_undelivered(st)) {
         ESP_LOGD(TAG, "still undelivered after %u retries", st->retries);
         st->retry_delay_ms = st->retry_delay_ms * 2 > RETRY_MAX_MS ? RETRY_MAX_MS : st->retry_delay_ms * 2;
         st->retry_at_ms = now_ms() + st->retry_delay_ms;
@@ -598,44 +699,55 @@ static void log_window(const fp_result_t *r, uint32_t cycles, bool reported){
 #endif
 }
 
-static void handle_event(comm_state_t *st, comm_event_t *ev){
-    int64_t now = now_ms();
-    bool fall = false;
-    fall_info_t info = { 0 };   /* a simulated fall: a2 = 0 and P = 0 mark it in the hub's logs */
+/*
+ * The button (docs/decisoes.md, "Gestos do botão"). at_ms is when the gesture happened,
+ * not when comm_task got to it: a double tap at the end of the window still cancels even
+ * if the radio kept this task busy. A single press means nothing.
+ */
+static void on_gesture(comm_state_t *st, bg_gesture_t gesture, int64_t at_ms){
+    switch (gesture) {
+        case BG_DOUBLE_TAP:
+            if (in_window(st, at_ms)) {
+                cancel_alert(st, st->window_kind);
+                return;
+            }
+#ifdef CONFIG_GADGET_BUTTON_SIMULATES_FALL
+            {
+                ESP_LOGW(TAG, "button: simulated fall");
+                const fall_info_t simulated = { 0 };   /* a2 = 0 and P = 0 mark it in the hub's logs */
+                raise_alert(st, ALERT_KIND_FALL, &simulated, at_ms);
+            }
+#else
+            ESP_LOGI(TAG, "button: double tap, but no alert to cancel");
+#endif
+            return;
 
+        case BG_HOLD:
+            if (in_window(st, at_ms)) {
+                ESP_LOGI(TAG, "button held during an alert: it is already open");
+                return;
+            }
+            raise_alert(st, ALERT_KIND_HELP, NULL, at_ms);   /* "I need help" */
+            return;
+
+        case BG_NONE:
+            return;
+    }
+}
+
+static void handle_event(comm_state_t *st, const comm_event_t *ev){
     switch (ev->kind) {
         case COMM_EV_FALL:
-            fall = true;
-            info = ev->fall;
-            break;
+            raise_alert(st, ALERT_KIND_FALL, &ev->fall, now_ms());
+            return;
 
         case COMM_EV_WINDOW:
             log_window(&ev->window.r, ev->window.cycles, ev->window.reported);
             return;
 
-        case COMM_EV_BUTTON:
-            if (now - st->last_button_ms < BUTTON_DEBOUNCE_MS) {
-                return;
-            }
-            st->last_button_ms = now;
-            if (st->fall_pending && now < st->cancel_deadline_ms) {
-                send_fall_cancel(st);
-                st->fall_pending = false;
-                indicators_buzzer_stop();
-                return;
-            }
-#ifdef CONFIG_GADGET_BUTTON_SIMULATES_FALL
-            ESP_LOGW(TAG, "button: simulated fall");
-            fall = true;
-#endif
-            break;
-    }
-
-    if (fall) {
-        send_fall(st, &info);
-        st->fall_pending = true;
-        st->cancel_deadline_ms = now + (int64_t) CONFIG_GADGET_CANCEL_WINDOW_S * 1000;
-        indicators_buzzer_start((uint32_t) CONFIG_GADGET_CANCEL_WINDOW_S * 1000);
+        case COMM_EV_GESTURE:
+            on_gesture(st, ev->button.gesture, ev->button.at_ms);
+            return;
     }
 }
 
@@ -661,9 +773,9 @@ static void comm_task(void *arg){
         if (xQueueReceive(s_comm_queue, &ev, pdMS_TO_TICKS(COMM_MAX_WAIT_MS)) == pdTRUE) {
             handle_event(&st, &ev);
         }
-        if (atomic_exchange(&s_button_missed, false)) {
-            comm_event_t button = { .kind = COMM_EV_BUTTON };
-            handle_event(&st, &button);
+        int missed = atomic_exchange(&s_gesture_missed, BG_NONE);
+        if (missed != BG_NONE) {
+            on_gesture(&st, (bg_gesture_t) missed, now_ms());
         }
         if (atomic_exchange(&s_mqtt_up_pending, false)) {
 #ifdef CONFIG_GADGET_MQTT
@@ -672,25 +784,23 @@ static void comm_task(void *arg){
         }
 
         int64_t now = now_ms();
-        if (st.fall_pending && now >= st.cancel_deadline_ms) {
-            st.fall_pending = false;   /* the alarm now belongs to the hub and the caregivers */
-        }
         bool imu_ok = sys_events_all(SYS_EV_IMU_OK);
         if (now >= st.next_heartbeat_ms) {
             /* No sensor, no heartbeat: a wearable that cannot detect falls must not look healthy. */
             if (imu_ok) {
                 st.link_ok = send_heartbeat();
                 if (st.link_ok) {
-                    st.retry_at_ms = now;   /* the hub answers again: an undelivered FALL goes now */
+                    st.retry_at_ms = now;   /* the hub answers again: an undelivered alert goes now */
                 }
             }
             st.next_heartbeat_ms = now + ESPNOW_HEARTBEAT_PERIOD_MS;
         }
-        if ((st.fall_undelivered || st.cancel_undelivered) && now >= st.retry_at_ms) {
+        if (any_undelivered(&st) && now >= st.retry_at_ms) {
             retry_undelivered(&st);
         }
 
-        if (st.fall_pending) {
+        /* After the window the alert belongs to the hub and the caregivers; the LED goes back. */
+        if (in_window(&st, now)) {
             indicators_set_status(IND_STATUS_ALERT);
         } else if (!imu_ok) {
             indicators_set_status(IND_STATUS_FAULT);
@@ -704,18 +814,59 @@ static void comm_task(void *arg){
 }
 
 /* ---------------------------------------------------------------------------
- * Boot
+ * Button (core 1): the gestures, timed apart from the radio
  * ------------------------------------------------------------------------- */
 
+static bool button_pressed(void){
+    return gpio_get_level(PIN_BUTTON) == 0;   /* shorted to GND when pressed */
+}
+
+/* Only stamps the edge and wakes button_task, which reads the level once it has settled. */
 static void IRAM_ATTR button_isr(void *arg){
     (void) arg;
-    comm_event_t ev = { .kind = COMM_EV_BUTTON };
+    atomic_store(&s_button_edge_ms, (uint32_t) (esp_timer_get_time() / 1000));
     BaseType_t hp_task_woken = pdFALSE;
-    if (xQueueSendFromISR(s_comm_queue, &ev, &hp_task_woken) != pdTRUE) {
-        /* Queue full: an "I'm fine" press must not vanish. comm_task picks it up within COMM_MAX_WAIT_MS. */
-        atomic_store(&s_button_missed, true);
-    }
+    vTaskNotifyGiveFromISR(s_button_task, &hp_task_woken);
     portYIELD_FROM_ISR(hp_task_woken);
+}
+
+/*
+ * Times the presses (components/button_gesture) and hands each gesture to comm_task
+ * with the time it happened. Not in comm_task: that task can spend seconds resending a
+ * fall (retries, channel scan) right when the resident double taps to cancel it.
+ */
+static void button_task(void *arg){
+    (void) arg;
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
+    const bg_config_t config = {
+        .settle_ms = BG_SETTLE_MS,
+        .tap_max_ms = BG_TAP_MAX_MS,
+        .tap_gap_ms = CONFIG_GADGET_DOUBLE_TAP_GAP_MS,
+        .hold_ms = (uint32_t) CONFIG_GADGET_HELP_HOLD_S * 1000,
+    };
+    button_gesture_t button;
+    bg_init(&button, &config, button_pressed());
+
+    while (1) {
+        uint32_t wait_ms = bg_ms_until_due(&button, (uint32_t) now_ms());
+        if (wait_ms > BUTTON_MAX_WAIT_MS) {
+            wait_ms = BUTTON_MAX_WAIT_MS;
+        }
+        /* One tick more: the rounding of pdMS_TO_TICKS must not wake it just before it is due. */
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(wait_ms) + 1) > 0) {
+            bg_on_edge(&button, (uint32_t) atomic_load(&s_button_edge_ms));
+        }
+        int64_t now = now_ms();
+        bg_gesture_t gesture = bg_tick(&button, (uint32_t) now, button_pressed());
+        if (gesture != BG_NONE) {
+            comm_event_t ev = { .kind = COMM_EV_GESTURE, .button = { .gesture = gesture, .at_ms = now } };
+            if (xQueueSend(s_comm_queue, &ev, 0) != pdTRUE) {
+                /* Queue full: an "I'm fine" or a call for help must not vanish. comm_task takes it on its next pass. */
+                atomic_store(&s_gesture_missed, (int) gesture);
+            }
+        }
+        esp_task_wdt_reset();
+    }
 }
 
 static void init_button(void){
@@ -723,11 +874,11 @@ static void init_button(void){
         .pin_bit_mask = 1ULL << PIN_BUTTON,
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
-        .intr_type = GPIO_INTR_NEGEDGE,   /* pressed = shorted to GND */
+        .intr_type = GPIO_INTR_ANYEDGE,   /* a gesture needs the press and the release */
     };
     ESP_ERROR_CHECK(gpio_config(&button_config));
 
-    /* Button to GND: pull-up, falling edge and glitch filter (slide "ESP32 - GPIO"). */
+    /* Button to GND: pull-up, interrupt and glitch filter (slide "ESP32 - GPIO"). */
     gpio_pin_glitch_filter_config_t filter_config = {
         .clk_src = GLITCH_FILTER_CLK_SRC_DEFAULT,
         .gpio_num = PIN_BUTTON,
@@ -736,9 +887,16 @@ static void init_button(void){
     ESP_ERROR_CHECK(gpio_new_pin_glitch_filter(&filter_config, &filter));
     ESP_ERROR_CHECK(gpio_glitch_filter_enable(filter));
 
+    /* The task before the ISR that wakes it. */
+    ESP_ERROR_CHECK(esp_err_from_pdpass(xTaskCreatePinnedToCore(button_task, "button", STACK_SMALL, NULL,
+                                                                PRIO_MEDIA, &s_button_task, CORE_REALTIME)));
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     ESP_ERROR_CHECK(gpio_isr_handler_add(PIN_BUTTON, button_isr, NULL));
 }
+
+/* ---------------------------------------------------------------------------
+ * Boot
+ * ------------------------------------------------------------------------- */
 
 static void init_nvs(void){
     esp_err_t err = nvs_flash_init();

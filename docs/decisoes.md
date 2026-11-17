@@ -242,6 +242,23 @@ comportamento:
 | **modelo/:** o leitor dos ensaios próprios aceita o formato do protocolo de coleta (`p03_queda_frente_2.csv`, em contagens) e avisa o que ignora | a coleta no pulso seria descartada em silêncio ou lida como se as contagens fossem g |
 | **modelo/:** `DISTANCIA_S` e o biquad vêm do `pipeline.py` para o treino e para o `09`; o `09` e o `10` só gravam depois de calcular tudo; limiar infinito ou uma classe só param a exportação | o modelo exportado podia não corresponder ao gatilho ou ao filtro do firmware, sem aviso, e uma falha no meio deixava os artefatos de rodadas diferentes |
 
+## Gestos do botão (2026-11-17)
+
+Até aqui, um aperto simples no botão cancelava a queda nos 15 s seguintes, e o botão não servia para mais nada.
+Pedido do grupo: um aperto sem querer não pode cancelar uma queda, e o idoso precisa conseguir pedir ajuda
+quando a queda não foi detectada ou quando é outra situação.
+
+| Decisão | Por quê |
+|---|---|
+| **"Estou bem" = dois toques rápidos**, só na janela de 15 s depois de uma queda ou de um pedido de ajuda. Dois toques = dois apertos de menos de 1 s, o segundo começando até 1 s depois de soltar o primeiro | quem cai pode ficar deitado sobre o braço, com o botão apertado. Se segurar cancelasse, a pressão do corpo cancelaria justamente a queda real. Ficar sobre o botão gera um aperto longo, nunca dois toques |
+| **Pedir ajuda = segurar 3 s**, fora de alerta. Sai `HELP`, e o hub abre o alerta `ajuda` (mesmo caminho da queda até o Telegram) | é o gesto comum de SOS (relógios e pingentes de emergência), não exige precisão de tempo (tremor, artrite) e uma batida ou um esbarrão não chega a 3 s. O alerta dispara ainda com o botão apertado, e o LED responde na hora |
+| O pedido de ajuda **pode ser cancelado** pelos mesmos dois toques, na mesma janela de 15 s; depois dela, só o cuidador encerra | cobre o acionamento sem querer (dormir sobre o braço). Um pedido falso custa uma visita do cuidador; um cancelamento falso deixa alguém caído sem socorro, por isso o gesto de cancelar é o mais difícil de acontecer por acidente |
+| Um aperto simples não faz nada em nenhum estado. Segurar durante um alerta não faz nada (já há um alerta aberto). Dois toques sem alerta só simulam uma queda na opção de teste `GADGET_BUTTON_SIMULATES_FALL` (antes era o aperto simples) | um gesto, um significado |
+| Mensagens novas `HELP` (`0x06`) e `HELP_CANCEL` (`0x07`), sem mudar a versão do ESP-NOW; tipo novo `ajuda` no MQTT, com `id` `<pulseira>-<seq>`, como a queda | queda e pedido de ajuda são episódios separados no hub: cancelar um não fecha o outro. Os formatos antigos ficam iguais |
+| O *debounce* de 300 ms (que ignorava o segundo aperto) virou **estabilização de 30 ms**: o nível só conta quando a linha fica 30 ms sem bordas. Ficam o capacitor de 100 nF e o filtro de *glitch* | o bloqueio de 300 ms engolia o segundo toque |
+| Os gestos são medidos numa **task própria** (`button`, núcleo 1), com a lógica no componente puro `button_gesture` (testes no PC) | a `comm` pode passar segundos reenviando uma queda (tentativas e varredura de canal) justamente quando o residente dá os dois toques. A task entrega cada gesto com a hora em que aconteceu, e a janela é julgada por essa hora |
+| Tempos ajustáveis no `menuconfig`: segurar (`GADGET_HELP_HOLD_S`, 3 s) e intervalo entre os toques (`GADGET_DOUBLE_TAP_GAP_MS`, 1 s) | calibrar com os residentes na bancada |
+
 ## "Pulseira" no lugar de "vestível" (2026-11-17)
 
 | Decisão | Por quê |

@@ -19,7 +19,7 @@ Sensor & Mede & Faixa usada & Interface & GPIO & Tensão \\
 \midrule
 \multicolumn{6}{@{}l}{\textit{Pulseira}} \\
 MPU-6050 (módulo GY-521) & aceleração e velocidade angular, 3 eixos & $\pm$8\,g e $\pm$500\,°/s, 16 bits, 200\,Hz & I²C a 400\,kHz + interrupção & 1, 2, 17 & 3,3\,V \\
-Botão & ``estou bem'' & --- & digital, \textit{pull-up} interno & 18 & --- \\
+Botão & ``estou bem'' e pedido de ajuda & --- & digital, \textit{pull-up} interno & 18 & --- \\
 \midrule
 \multicolumn{6}{@{}l}{\textit{Hub do quarto}} \\
 LM35DZ & temperatura do ar & 0 a 57\,°C (limite do ADC) & analógica, 10\,mV/°C, via LM358 & 4 (ADC1) & 5\,V \\
@@ -169,12 +169,50 @@ identificador CAN; a placa tem conectores para duas (quarto e banheiro) e GPIOs 
 para mais seis.
 
 %----------------------------------------------------------------------
-\subsection{Botão e LED}
+\subsection{Botão e LED}\label{sec:botao}
 
-O botão ``estou bem'' da pulseira (GPIO 18) cancela um alerta de queda nos 15\,s seguintes;
-ele usa o \textit{pull-up} interno, um capacitor de 100\,nF em paralelo e o filtro de
-\textit{glitch} do GPIO. O LED é o WS2812 da própria DevKit, controlado pelo periférico RMT.
-No hub, ele pisca verde a 1\,Hz em operação normal, amarelo sem broker e vermelho a 4\,Hz
-com um alerta aberto; na pulseira, um vermelho lento indica que o sensor não responde.
-O buzzer previsto no início foi retirado em outubro: a sinalização local fica só com o
-LED, e o alerta chega ao cuidador pela central.
+O botão da pulseira (GPIO 18) usa o \textit{pull-up} interno, um capacitor de 100\,nF em
+paralelo e o filtro de \textit{glitch} do GPIO. Ele tem dois gestos, e um aperto simples não
+faz nada (Tabela~\ref{tab:gestos}):
+\begin{itemize}
+  \item \textbf{dois toques rápidos} (``estou bem''): cancelam o alerta dos últimos 15\,s, seja
+        uma queda, seja um pedido de ajuda. São dois apertos de menos de 1\,s, o segundo
+        começando até 1\,s depois de soltar o primeiro;
+  \item \textbf{segurar por 3\,s} (``preciso de ajuda''): fora de alerta, abre o alerta
+        \code{ajuda}, que segue o mesmo caminho da queda até o cuidador. Cobre a queda que o
+        modelo não detectou e qualquer outra situação em que o residente precise de alguém.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Gestos do botão da pulseira.}
+\label{tab:gestos}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{6.8cm}@{}}
+\toprule
+Estado da pulseira & Gesto & Efeito \\
+\midrule
+nos 15\,s depois de uma queda ou de um pedido de ajuda (LED vermelho) & dois toques & cancela esse alerta (\code{FALL\_CANCEL} ou \code{HELP\_CANCEL}) \\
+normal & segurar 3\,s & pedido de ajuda (\code{HELP}), com a mesma janela de 15\,s para cancelar \\
+qualquer um & aperto simples & nada \\
+nos 15\,s depois de um alerta & segurar & nada: o alerta já está aberto \\
+normal & dois toques & nada: não há alerta para cancelar \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Os gestos foram escolhidos pelo pior caso de cada um. Quem cai pode ficar deitado sobre o
+braço, com o botão apertado pelo corpo; se segurar cancelasse o alerta, a queda real seria
+cancelada justamente nessa hora. A pressão do corpo produz um aperto longo, nunca dois toques
+separados, e por isso o cancelamento é por dois toques. Para pedir ajuda, segurar é o gesto
+comum dos dispositivos de emergência: não exige precisão de tempo, o que importa para quem
+tem tremor ou artrite, e uma batida ou um esbarrão não chega a 3\,s. Um pedido feito sem
+querer (dormindo sobre o braço, por exemplo) é cancelado pelos mesmos dois toques e, no pior
+caso, custa uma visita do cuidador; um cancelamento sem querer deixaria alguém caído sem
+socorro. Os tempos são ajustáveis no \code{menuconfig}, para calibrar com os residentes.
+
+O LED é o WS2812 da própria DevKit, controlado pelo periférico RMT. No hub, ele pisca verde a
+1\,Hz em operação normal, amarelo sem broker e vermelho a 4\,Hz com um alerta aberto; na
+pulseira, pisca vermelho durante os 15\,s em que um alerta pode ser cancelado, e um vermelho
+lento indica que o sensor não responde. O buzzer previsto no início foi retirado em outubro:
+a sinalização local fica só com o LED, e o alerta chega ao cuidador pela central.

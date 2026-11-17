@@ -47,6 +47,7 @@ ENVIADA, TENTAR_DE_NOVO, RECUSADA = "enviada", "tentar de novo", "recusada"
 
 TIPOS = {
     "queda": "Queda detectada",
+    "ajuda": "Pedido de ajuda (botão da pulseira)",
     "saida_noturna": "Saída noturna sem retorno",
     "banheiro_prolongado": "Permanência prolongada no banheiro",
     "inatividade": "Inatividade prolongada",
@@ -91,9 +92,14 @@ def _numero(valor):
     return float(valor) if math.isfinite(valor) else None
 
 
+PELA_PULSEIRA = "enviado pela própria pulseira, o hub do quarto não respondeu"
+
+
 def detalhe_legivel(tipo, detalhe):
     """O objeto "detalhe" (docs/protocolo.md §1) em uma linha para o cuidador."""
     d = detalhe if isinstance(detalhe, dict) else {}
+    # A pulseira publicou sozinha: o hub não confirmou a queda ou o pedido de ajuda (docs/protocolo.md §1).
+    pela_pulseira = d.get("via") == "pulseira"
     if tipo == "queda":
         partes = []
         a2, prob = _numero(d.get("a2")), _numero(d.get("prob"))
@@ -102,10 +108,11 @@ def detalhe_legivel(tipo, detalhe):
         if prob is not None:
             # Saída do classificador da pulseira (não calibrada); 0 numa queda simulada pelo botão.
             partes.append("confiança do modelo: {:.0f} %".format(100 * prob))
-        if d.get("via") == "pulseira":
-            # A pulseira publicou sozinha: o hub não confirmou a queda (docs/protocolo.md §1).
-            partes.append("enviado pela própria pulseira, o hub do quarto não respondeu")
+        if pela_pulseira:
+            partes.append(PELA_PULSEIRA)
         return "; ".join(partes)
+    if tipo == "ajuda":
+        return PELA_PULSEIRA if pela_pulseira else ""
     if tipo == "saida_noturna":
         return "Porta {} aberta e {} min sem presença no quarto".format(d.get("porta", "?"), d.get("min_sem_presenca", "?"))
     if tipo == "banheiro_prolongado":

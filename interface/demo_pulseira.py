@@ -10,7 +10,8 @@ Mostra tudo numa janela. Com --mqtt-host, também faz o papel do hub para a cent
 docs/protocolo.md:
 - status online;
 - pulseira/<id> com a atividade;
-- o alerta de queda com a P(queda), que aparece no Grafana e no Telegram.
+- o alerta de queda com a P(queda), que aparece no Grafana e no Telegram;
+- o botão da placa: segurar 3 s vira o alerta "ajuda", e dois toques cancelam o último alerta.
 
 A placa decide; este programa só mostra e repassa.
 
@@ -22,7 +23,7 @@ Uso
     python demo_pulseira.py --porta COM5 --gravar sessao.log          # guarda a sessão
     python demo_pulseira.py --reproduzir sessao.log                   # ensaio sem a placa
 
-Na janela: c = "estou bem" (cancela a última queda na central); q = sai.
+Na janela: c = "estou bem" (cancela o último alerta na central, como os dois toques); q = sai.
 """
 
 import argparse
@@ -49,6 +50,7 @@ ANSI = re.compile(r"\x1b\[[0-9;]*m")
 LOG_ESP = re.compile(r"^([IWE]) \((\d+)\) ([\w.-]+): (.*)$")
 PULSEIRA = re.compile(r"wearable ([0-9a-f]{6}), MAC")
 MODELO = re.compile(r"fall pipeline: trigger ([\d.]+) g, (.+?), fall when P >= ([\d.]+)")
+CANCELAMENTO = re.compile(r"(FALL|HELP)_CANCEL for seq \d+")   # os dois toques no botão da placa
 
 # Os atributos que o painel mostra, com o nome do Python (modelo/queda/atributos.py).
 ATRIBUTOS_PAINEL = [("a_max", "pico de |a|", "g", 2), ("queda_livre_min", "queda livre (mín. de |a|)", "g", 2),
@@ -71,6 +73,8 @@ def interpretar_linha(linha):
     - ("amostra", (t_ms, ax, ay, az)): aceleração em g;
     - ("janela", {...}): uma linha FEAT, com os números convertidos;
     - ("pulseira", "a1b2c3"), ("modelo", {...}): do log de boot;
+    - ("ajuda", None): o botão foi segurado (pedido de ajuda);
+    - ("cancelamento", "queda" ou "ajuda"): dois toques no botão cancelaram o último alerta da placa;
     - ("aviso", "texto"): um aviso (W) ou erro (E) do log, para mostrar na janela.
     """
     linha = ANSI.sub("", linha).strip()
@@ -115,8 +119,16 @@ def interpretar_linha(linha):
         except ValueError:                       # números emendados por bytes perdidos ("0.732.5123")
             return None
     m = LOG_ESP.match(linha)
-    if m and m.group(1) in "WE" and not m.group(4).startswith("FALL ("):
-        return ("aviso", m.group(4))
+    if not m:
+        return None
+    mensagem = m.group(4)
+    if mensagem.startswith("HELP ("):
+        return ("ajuda", None)
+    cancelamento = CANCELAMENTO.fullmatch(mensagem)
+    if cancelamento:
+        return ("cancelamento", "queda" if cancelamento.group(1) == "FALL" else "ajuda")
+    if m.group(1) in "WE" and not mensagem.startswith("FALL ("):
+        return ("aviso", mensagem)
     return None
 
 
@@ -158,6 +170,12 @@ def alerta_queda(pulseira, seq, estado, a_pico=None, prob=None, ts=None):
             "origem": f"pulseira/{pulseira}", "detalhe": detalhe, "ts": ts if ts is not None else agora_ms()}
 
 
+def alerta_ajuda(pulseira, seq, estado, ts=None):
+    """O pedido de ajuda (botão segurado) como o hub o publica: sem detalhe."""
+    return {"v": 1, "id": f"{pulseira}-{seq}", "tipo": "ajuda", "estado": estado,
+            "origem": f"pulseira/{pulseira}", "detalhe": {}, "ts": ts if ts is not None else agora_ms()}
+
+
 # ---------------------------------------------------------------------------------------------------------
 # Estado compartilhado entre a leitura (thread) e a janela
 # ---------------------------------------------------------------------------------------------------------
@@ -181,6 +199,7 @@ class Estado:
     disparos: deque = field(default_factory=lambda: deque(maxlen=200))
     ultima: dict = None
     faixa_ate: float = 0.0                                # tempo da sessão até quando mostrar a faixa
+    faixa_tipo: str = "queda"                             # a faixa é da queda ou do pedido de ajuda
     avisos: deque = field(default_factory=lambda: deque(maxlen=3))
     t_ultimo: float = 0.0                                 # tempo da sessão da última amostra
     ativ_soma: float = 0.0                                # para a atividade (RMS de |a| bruto − 1 g)
@@ -235,14 +254,26 @@ class Leitor:
                 if d.queda:
                     e.n_quedas += 1
                     e.faixa_ate = e.t_ultimo + FAIXA_QUEDA_S
+                    e.faixa_tipo = "queda"
+            elif tipo == "ajuda":
+                e.faixa_ate = e.t_ultimo + FAIXA_QUEDA_S
+                e.faixa_tipo = "ajuda"
+            elif tipo == "cancelamento":
+                e.faixa_ate = 0.0                         # "estou bem": a faixa sai
             elif tipo == "pulseira":
                 e.pulseira = dados
             elif tipo == "modelo":
                 e.modelo = dados
             elif tipo == "aviso":
                 e.avisos.append(dados)
-        if tipo == "janela" and dados["queda"] and self.ponte is not None:
+        if self.ponte is None:
+            return
+        if tipo == "janela" and dados["queda"]:
             self.ponte.queda(dados.get("a_pico", 0.0), dados["prob"])
+        elif tipo == "ajuda":
+            self.ponte.ajuda()
+        elif tipo == "cancelamento":
+            self.ponte.cancelar()
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -377,7 +408,7 @@ class Ponte:
         self.base = f"idoso/{args.site}/{args.quarto}"
         # Um seq por sessão que não repete o da anterior: o notificador descarta id + estado repetidos.
         self.seq = int(time.time()) % 50000
-        self.queda_aberta = None
+        self.aberto = None           # (seq, tipo) do último alerta da pulseira: o que o "estou bem" cancela
         self.conectado = False
         self.cli = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"demo-usb-{args.site}-{args.quarto}")
         self.cli.username_pw_set(args.usuario, args.senha)
@@ -421,16 +452,24 @@ class Ponte:
 
     def queda(self, a_pico, prob):
         self.seq += 1
-        alerta = alerta_queda(self.e.pulseira, self.seq, "ativo", a_pico, prob)
-        self.queda_aberta = alerta["id"].rsplit("-", 1)[1]
-        self.publicar("alerta", alerta, False)
+        self.aberto = (self.seq, "queda")
+        self.publicar("alerta", alerta_queda(self.e.pulseira, self.seq, "ativo", a_pico, prob), False)
+
+    def ajuda(self):
+        self.seq += 1
+        self.aberto = (self.seq, "ajuda")
+        self.publicar("alerta", alerta_ajuda(self.e.pulseira, self.seq, "ativo"), False)
 
     def cancelar(self):
-        if self.queda_aberta is None:
-            print("(nenhuma queda aberta para cancelar)")
+        """Como na pulseira: o "estou bem" vale para o último alerta dela, queda ou ajuda."""
+        if self.aberto is None:
+            print("(nenhum alerta aberto para cancelar)")
             return
-        self.publicar("alerta", alerta_queda(self.e.pulseira, self.queda_aberta, "cancelado"), False)
-        self.queda_aberta = None
+        seq, tipo = self.aberto
+        alerta = alerta_queda(self.e.pulseira, seq, "cancelado") if tipo == "queda" else \
+            alerta_ajuda(self.e.pulseira, seq, "cancelado")
+        self.publicar("alerta", alerta, False)
+        self.aberto = None
 
     def encerrar(self):
         self.publicar("status", {"v": 1, "estado": "offline", "ts": agora_ms()}, True)
@@ -486,6 +525,7 @@ def janela(estado, ponte, args, parar):
             modelo = dict(estado.modelo)
             pulseira = estado.pulseira
             mostrar_faixa = t_fim < estado.faixa_ate
+            faixa_tipo = estado.faixa_tipo
             avisos = list(estado.avisos)
             serial_perdida = estado.serial_perdida
         if pontos:
@@ -509,7 +549,10 @@ def janela(estado, ponte, args, parar):
                                                        "central: desconectado")
         titulo.set_text(f"Pulseira {pulseira} — {modelo['classificador']}, queda quando P ≥ "
                         f"{br(modelo['limiar'])}, gatilho {br(modelo['l_on'], 1)} g   |   {fonte}   |   {central}")
-        if mostrar_faixa and disparos:
+        if mostrar_faixa and faixa_tipo == "ajuda":
+            faixa.set_text("PEDIDO DE AJUDA (botão segurado)")
+            faixa.set_visible(True)
+        elif mostrar_faixa and disparos:
             ultima_queda = next((d for d in reversed(disparos) if d.queda), disparos[-1])
             faixa.set_text(f"QUEDA DETECTADA — P = {br(ultima_queda.prob)}")
             faixa.set_visible(True)
@@ -532,7 +575,7 @@ def janela(estado, ponte, args, parar):
             linhas.append(f"  {br(d.t - t_fim, 1):>6} s  pico {br(d.a_pico):>5} g  P {br(d.prob)}  {rotulo}")
         texto_painel.set_text("\n".join(linhas))
         rodape.set_text("Avisos da placa: " + " | ".join(avisos) if avisos else
-                        "c = estou bem (cancela a última queda na central)   q = sair")
+                        "c = estou bem (cancela o último alerta na central)   q = sair")
         return [linha, lon, titulo, faixa, texto_painel, rodape, *marcas]
 
     def tecla(evento):

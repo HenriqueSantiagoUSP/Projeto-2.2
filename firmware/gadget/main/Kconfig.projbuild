@@ -61,12 +61,32 @@ menu "Wearable"
         default 30
 
     config GADGET_CANCEL_WINDOW_S
-        int "Seconds the resident has to cancel a fall with the button"
+        int "Seconds the resident has to cancel a fall or a help request (double tap)"
         range 0 120
         default 15
+        help
+            After a fall or a help request the LED blinks red for this long, and a
+            double tap on the button cancels that alert ("I'm fine"). Later, the alert
+            belongs to the hub and the caregivers.
+
+    config GADGET_HELP_HOLD_S
+        int "Seconds the button must be held to ask for help"
+        range 2 10
+        default 3
+        help
+            Held this long outside an alert, the button raises a help request (HELP ->
+            alert "ajuda"). A bump or a brush never lasts this long.
+
+    config GADGET_DOUBLE_TAP_GAP_MS
+        int "Longest gap between the two taps of a double tap (ms)"
+        range 300 2000
+        default 1000
+        help
+            From releasing the first tap to pressing the second. Each tap must be
+            shorter than 1 s. Generous by default: the residents are elderly.
 
     config GADGET_BUTTON_SIMULATES_FALL
-        bool "Button simulates a fall when none is pending (tests only)"
+        bool "A double tap with no alert open simulates a fall (tests only)"
         default n
         help
             Exercises the whole path wearable -> hub -> central -> Telegram without
