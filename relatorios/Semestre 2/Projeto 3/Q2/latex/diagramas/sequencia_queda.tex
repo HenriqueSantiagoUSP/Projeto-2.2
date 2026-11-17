@@ -1,0 +1,32 @@
+% Sequência de uma queda, do vestível ao Telegram, e do cancelamento.
+\begin{tikzpicture}[font=\scriptsize, >=Stealth]
+  \tikzset{ator/.style={bloco=#1, minimum width=2.3cm, minimum height=0.75cm},
+           msg/.style={->, thick, draw=#1}, msg/.default=black!75,
+           resp/.style={->, thick, dashed, draw=black!45},
+           nota/.style={draw=black!30, fill=yellow!8, align=left, font=\tiny, inner sep=2pt, anchor=west}}
+  \foreach \x/\n/\t/\c in {0/v/Vestível/corvest, 3.4/h/Hub/corhub, 6.8/m/Mosquitto/corcentral,
+                          10.2/n/notificador/corcentral, 13.6/t/Telegram/cinza} {
+    \node[ator=\c] (\n) at (\x,0) {\textbf{\t}};
+    \draw[black!30, thick] (\n.south) -- (\x,-8.6);
+  }
+  % queda
+  \node[nota] at (0.1,-0.85) {pico $\ge$ 2\,g $\to$ janela $\to$\\Random Forest: $P \ge 0{,}73$};
+  \draw[msg=corvest] (0,-1.6) -- node[rotulo, above] {\code{FALL} (ESP-NOW, cifrado)} (3.4,-1.6);
+  \draw[resp] (3.4,-2.0) -- node[rotulo, below] {ACK da camada MAC} (0,-2.0);
+  \node[nota] at (3.5,-2.65) {regra \code{queda}:\\LED vermelho};
+  \draw[msg=corhub] (3.4,-3.3) -- node[rotulo, above] {\code{alerta} \code{ativo} (QoS 1)} (6.8,-3.3);
+  \draw[resp] (6.8,-3.7) -- node[rotulo, below] {PUBACK} (3.4,-3.7);
+  \draw[msg=corcentral] (6.8,-4.3) -- node[rotulo, above] {\code{alerta} \code{ativo}} (10.2,-4.3);
+  \draw[msg=cinza] (10.2,-4.9) -- node[rotulo, above] {``Queda no quarto 101''} (13.6,-4.9);
+  % cancelamento
+  \node[nota] at (0.1,-5.8) {botão ``estou bem''\\(até 15\,s depois)};
+  \draw[msg=corvest] (0,-6.5) -- node[rotulo, above] {\code{FALL\_CANCEL}} (3.4,-6.5);
+  \draw[msg=corhub] (3.4,-7.1) -- node[rotulo, above] {\code{alerta} \code{cancelado}} (6.8,-7.1);
+  \draw[msg=corcentral] (6.8,-7.6) -- (10.2,-7.6);
+  \draw[msg=cinza] (10.2,-8.1) -- node[rotulo, above] {``cancelada''} (13.6,-8.1);
+  % metas
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}, corhub] (-0.35,-1.5) -- (-0.35,-3.4)
+       node[midway, left=5pt, align=right] {pico $\to$ MQTT\\$\le$ 500\,ms\\(RNF02)};
+  \draw[decorate, decoration={brace, amplitude=4pt}, cinza] (14.0,-3.3) -- (14.0,-5.0)
+       node[midway, right=5pt, align=left] {alerta $\to$\\Telegram\\$\le$ 5\,s (RNF04)};
+\end{tikzpicture}

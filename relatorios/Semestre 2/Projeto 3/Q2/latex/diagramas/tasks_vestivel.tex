@@ -1,0 +1,33 @@
+% Vestível: sampling (núcleo 1) roda o pipeline; comm (núcleo 0) cuida do rádio.
+\begin{tikzpicture}[font=\scriptsize]
+  \tikzset{etapa/.style={draw=corvest, fill=corvest!8, rounded corners=2pt, align=center, minimum height=0.8cm,
+                         minimum width=1.55cm, inner sep=2pt},
+           fila/.style={draw=black!60, fill=white, minimum width=0.9cm, minimum height=0.42cm, font=\tiny,
+                        path picture={\foreach \k in {1,2,3} \draw[black!40] ($(path picture bounding box.west)!\k/4!(path picture bounding box.east)$) ++(0,-0.2) -- ++(0,0.4);}}}
+  \node[draw=black!50, fill=black!4, rounded corners=1pt, align=center, minimum height=0.8cm] (mpu) at (-0.7,0)
+       {MPU-6050\\FIFO (200\,Hz)};
+  \node[etapa] (f) at (2.4,0) {passa-baixa\\20\,Hz (6 eixos)};
+  \node[etapa] (g) at (4.4,0) {gatilho\\$\amag \ge 2$\,g};
+  \node[etapa] (j) at (6.4,0) {janela\\$-$1,0 a +0,8\,s};
+  \node[etapa] (a) at (8.4,0) {23\\atributos};
+  \node[etapa] (c) at (10.4,0) {Random\\Forest};
+  \node[etapa] (d) at (12.4,0) {$P \ge$ limiar?\\cooldown 30\,s};
+  \draw[seta] (mpu) -- node[rotulo, below=9pt] {I²C, a cada 50\,ms} (f);
+  \foreach \u/\v in {f/g, g/j, j/a, a/c, c/d} {\draw[seta] (\u) -- (\v);}
+  \begin{scope}[on background layer]
+    \node[draw=corvest, dashed, rounded corners, fit=(f)(d), inner sep=3mm,
+          label={[font=\scriptsize\bfseries, text=corvest]above:\textbf{sampling}: núcleo 1, prioridade ALTA}] (samp) {};
+  \end{scope}
+  % comm
+  \node[fila] (q) at (12.4,-1.9) {};
+  \node[bloco=corvest, minimum width=3.0cm] (comm) at (9.4,-1.9) {\textbf{comm}: núcleo 0, MÉDIA\\ESP-NOW, heartbeat, botão};
+  \draw[seta] (d) -- node[rotulo, right] {queda} (q);
+  \draw[seta] (q) -- (comm);
+  \node[draw=black!50, fill=black!4, rounded corners=1pt, align=center] (bt) at (5.6,-1.9) {botão\\(ISR)};
+  \draw[seta] (bt) -- (comm);
+  \node[bloco=corhub, minimum width=2.2cm] (hub) at (9.4,-3.5) {hub\\(ESP-NOW cifrado)};
+  \draw[sem fio=corvest] (comm) -- node[rotulo, right] {\code{FALL}, \code{FALL\_CANCEL}, \code{HEARTBEAT}} (hub);
+  \node[draw=black!40, dashed, rounded corners, align=center, font=\tiny] (op) at (5.6,-3.5)
+       {opcionais: MQTT direto\\e CAN de bancada};
+  \draw[seta=black!40, dashed] (comm.west) ++(0,-0.3) -| (op.north);
+\end{tikzpicture}

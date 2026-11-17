@@ -1,0 +1,153 @@
+%======================================================================
+\section{Esquemático completo}\label{ap:esquema}
+%======================================================================
+As folhas do esquemático da PCB v1, na ordem do arquivo do KiCad, recortadas no circuito
+(sem a moldura e o carimbo). A folha principal está na Figura~\ref{fig:esquema_raiz}; o arquivo
+completo, em PDF, fica em \code{hardware/placas/v1/esquema.pdf}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[scale=1.3]{figuras/esquema_p2.png}
+\caption{Folha do LM35: sensor, LM358 (as duas metades) e filtro RC.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.56\linewidth}
+  \centering
+  \includegraphics[scale=1.3]{figuras/esquema_p3.png}
+  \caption{CAN: módulo transceptor (J1) e conector do barramento (J7).}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.40\linewidth}
+  \centering
+  \includegraphics[scale=1.3]{figuras/esquema_p4.png}
+  \caption{PIR HC-SR501 (J2), com R4 em série.}
+\end{subfigure}
+\caption{Folhas do CAN e do PIR.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.24\linewidth}
+  \centering
+  \includegraphics[scale=1.3]{figuras/esquema_p5.png}
+  \caption{Porta 1 (J3).}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.24\linewidth}
+  \centering
+  \includegraphics[scale=1.3]{figuras/esquema_p6.png}
+  \caption{Porta 2 (J4).}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.40\linewidth}
+  \centering
+  \includegraphics[scale=1.3]{figuras/esquema_p7.png}
+  \caption{Botão ``estou bem'' (SW1).}
+\end{subfigure}
+
+\vspace{4mm}
+\begin{subfigure}[b]{0.40\linewidth}
+  \centering
+  \includegraphics[scale=1.3]{figuras/esquema_p8.png}
+  \caption{MPU-6050 (J5).}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.40\linewidth}
+  \centering
+  \includegraphics[scale=1.3]{figuras/esquema_p9.png}
+  \caption{Entrada USB-C (J6).}
+\end{subfigure}
+\caption{Folhas das portas, do botão, do MPU-6050 e da alimentação.}
+\end{figure}
+
+%======================================================================
+\section{Mapa de pinos completo}\label{ap:pinos}
+%======================================================================
+\begin{table}[H]
+\centering
+\caption{Mapa de pinos da PCB v1 (\code{firmware/common/pcb/include/pcb\_pins.h}).}
+\label{tab:pinos_completo}
+\small
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{5.0cm}l>{\raggedright\arraybackslash}p{5.2cm}@{}}
+\toprule
+GPIO & Função & Placa & Observação \\
+\midrule
+1 & I²C SDA (MPU-6050) & vestível & par do ULP; ADC1, canal 0, usado como digital \\
+2 & I²C SCL & vestível & par do ULP; ADC1, canal 1 \\
+4 & LM35 (saída do LM358) & hub & ADC1, canal 3 \\
+5 & reservado: bateria de um vestível próprio & --- & ADC1, canal 4; sem divisor nesta PCB \\
+6, 7 & reserva analógica & --- & ADC1, canais 5 e 6 \\
+8 & PIR HC-SR501 & hub & ADC1, canal 7, usado como digital \\
+9, 10 & portas 3 e 4 (opcionais) & hub & ADC1, canais 8 e 9 \\
+11, 12 & portas 1 (quarto) e 2 (banheiro) & hub & ADC2, mas digitais \\
+13, 14 & CAN TX e RX & os dois & no vestível, só em bancada \\
+15, 16 & não ligar: cristal de 32\,kHz & --- & reserva \\
+17 & interrupção do MPU-6050 & vestível & RTC GPIO \\
+18 & botão ``estou bem'' & vestível & RTC GPIO; \textit{pull-up} interno e filtro de \textit{glitch} \\
+21 & livre (era o buzzer) & --- & \\
+38 ou 48 & LED WS2812 & os dois & o da DevKit (v1.1 ou v1.0), escolhido no \code{menuconfig} \\
+39--42 & expansão (por exemplo, portas 5 a 8) & --- & só enquanto o JTAG por pinos não for usado \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Para acrescentar uma porta, basta uma linha na tabela \code{BOARD\_DOORS} do hub: o firmware
+cria a entrada, o tópico \code{porta/<id>} e o identificador CAN. São até 8 portas, uma por
+identificador (\code{0x0F3} a \code{0x0FA}); o build falha se passar disso.
+
+%======================================================================
+\section{Lista de materiais}\label{ap:bom}
+%======================================================================
+\begin{table}[H]
+\centering
+\caption{Lista de materiais da PCB v1 (gerada do KiCad).}
+\label{tab:bom}
+\footnotesize
+\input{tabelas/bom}
+\end{table}
+
+Além das peças da placa: a ESP32-S3-DevKitC-1, os módulos HC-SR501, GY-521 (MPU-6050),
+WCMCU-230 (SN65HVD230) e USB-C, os reed switches MC-38 com fio até as portas e, por placa, um
+carregador USB-A ou um \textit{power bank} com cabo USB-A $\to$ C.
+
+%======================================================================
+\section{Como reproduzir}\label{ap:reproducao}
+%======================================================================
+Tudo está no repositório do projeto. Os comandos abaixo partem da raiz dele.
+
+\paragraph{Firmware} (ESP-IDF 6.0.1, alvo \code{esp32s3}). Os comandos rodam na pasta da
+placa: \code{firmware/room} para o hub e \code{firmware/gadget} para o vestível.
+\begin{lstlisting}
+idf.py menuconfig          # Wi-Fi, broker, chaves do ESP-NOW, MAC do par
+idf.py build
+idf.py -p COMx flash monitor
+\end{lstlisting}
+Demonstração com uma placa (vestível sem hub):
+\begin{lstlisting}
+idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig \
+       -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" build flash
+python interface/demo_vestivel.py --porta COMx
+\end{lstlisting}
+
+\paragraph{Testes no computador} (gcc do MSYS2 no Windows):
+\begin{lstlisting}
+sh firmware/room/components/rules/test_host/run_tests.sh
+sh firmware/room/components/hub_config/test_host/run_tests.sh
+sh firmware/gadget/components/fall_pipeline/test_host/run_tests.sh
+sh firmware/gadget/components/signal_proc/test_host/run_tests.sh
+\end{lstlisting}
+
+\paragraph{Central} (Docker):
+\begin{lstlisting}
+cd interface
+copy .env.example .env     # e troque as senhas
+docker compose up -d       # Mosquitto, Telegraf, InfluxDB, Grafana (:3000), notificador
+python simulador.py --host <IP da máquina> --senha <senha do hub>
+\end{lstlisting}
+
+\paragraph{Modelo de queda e este relatório} (Python 3.12 com o \code{uv}, em \code{modelo/}):
+\begin{lstlisting}
+uv run python experimentos/09_exportar_vestivel.py   # modelo do vestível e vetores de teste
+uv run python experimentos/12_relatorio_q2.py        # figuras, tabelas e números deste relatório
+\end{lstlisting}
+Depois, em \code{relatorios/Semestre 2/Projeto 3/Q2/latex/}: \code{pdflatex main.tex}, duas
+vezes. O script também exporta os renders, as camadas e as folhas do esquema da PCB pelo
+\code{kicad-cli} e pelo \code{pdftoppm}, e roda o ERC e o DRC.

@@ -1,0 +1,28 @@
+% Blocos da PCB única: o que cada placa usa em volta da DevKit.
+\begin{tikzpicture}[font=\scriptsize]
+  \node[draw=black!70, fill=black!5, thick, rounded corners=2pt, minimum width=3.0cm, minimum height=6.6cm,
+        align=center, font=\footnotesize] (dk) at (0,0) {\textbf{ESP32-S3}\\\textbf{DevKitC-1}\\(U1, encaixada)\\[4pt]LED WS2812\\(GPIO 38/48)};
+
+  % lado esquerdo (J1 da DevKit): analógico e entradas do quarto, CAN, alimentação
+  \tikzset{esq/.style={bloco=#1, text width=4.3cm, align=left, anchor=east}, dir/.style={bloco=#1, text width=4.1cm, align=left, anchor=west}}
+  \node[esq=corhub] (an) at (-2.6,2.4) {\textbf{GPIO 4}: LM35DZ $\to$ LM358 (G = 5,55) $\to$ filtro RC (U2, U3, R1--R3, C3)};
+  \node[esq=corhub] (pir) at (-2.6,1.0) {\textbf{GPIO 8}: PIR HC-SR501 (J2), com R4 em série};
+  \node[esq=corhub] (portas) at (-2.6,-0.2) {\textbf{GPIO 11, 12}: portas 1 e 2, reed MC-38 (J3, J4)};
+  \node[esq=corambas] (can) at (-2.6,-1.6) {\textbf{GPIO 13, 14}: transceptor CAN SN65HVD230 (J1) e barramento CANH, CANL, GND (J7)};
+  \node[esq=cinza] (pwr) at (-2.6,-3.0) {\textbf{5V}: USB-C (J6) $\to$ C8 $\to$ D1 1N5819};
+  % lado direito (J3 da DevKit): I2C, botão, pontos de teste
+  \node[dir=corvest] (mpu) at (2.6,2.0) {\textbf{GPIO 1, 2 (I²C) e 17 (INT)}: MPU-6050 (J5); par do ULP, INT em RTC GPIO};
+  \node[dir=corvest] (bt) at (2.6,0.5) {\textbf{GPIO 18}: botão ``estou bem'' (SW1)};
+  \node[dir=cinza] (tp) at (2.6,-1.0) {pontos de teste: 5V, 3V3, GND, saída do LM358, CANH, CANL};
+  \node[dir=cinza] (livre) at (2.6,-2.5) {livres: 6, 7 (analógico), 9, 10 (portas 3 e 4), 21 e 39--42 (expansão)};
+
+  \foreach \n in {an,pir,portas,can,pwr} {\draw[thick, black!60] (\n.east) -- (\n.east -| dk.west);}
+  \foreach \n in {mpu,bt,tp,livre} {\draw[thick, black!60] (\n.west) -- (\n.west -| dk.east);}
+
+  % legenda
+  \node[anchor=north, align=left, font=\scriptsize] at (0,-3.7) {%
+    \tikz\fill[corhub!40] (0,0) rectangle (0.3,0.2); só o hub \quad
+    \tikz\fill[corvest!40] (0,0) rectangle (0.3,0.2); só o vestível \quad
+    \tikz\fill[corambas!40] (0,0) rectangle (0.3,0.2); os dois (no vestível, só em bancada) \quad
+    \tikz\fill[cinza!40] (0,0) rectangle (0.3,0.2); comum};
+\end{tikzpicture}

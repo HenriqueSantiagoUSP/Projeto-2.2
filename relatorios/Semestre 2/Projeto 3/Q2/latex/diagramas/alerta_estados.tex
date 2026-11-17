@@ -1,0 +1,13 @@
+% Ciclo de vida de um episódio de alerta no hub.
+\begin{tikzpicture}[font=\scriptsize, >=Stealth]
+  \tikzset{estado/.style={draw=#1, fill=#1!10, thick, rounded corners=8pt, minimum width=2.2cm, minimum height=0.9cm, align=center}}
+  \node[estado=cinza] (ok) at (0,0) {normal\\(sem episódio)};
+  \node[estado=corvest] (at) at (5.0,0) {\textbf{ativo}\\LED vermelho};
+  \node[estado=corcentral] (res) at (10.6,1.4) {\textbf{resolvido}};
+  \node[estado=corcentral] (can) at (10.6,-1.4) {\textbf{cancelado}};
+  \draw[->, thick] (ok) -- node[rotulo, above=2pt] {condição da regra} node[rotulo, below=2pt] {publica \code{ativo}} (at);
+  \draw[->, thick] (at.east) ++(0,0.2) -- node[rotulo, above=3pt, sloped] {a condição acabou} (res.west);
+  \draw[->, thick] (at.east) ++(0,-0.2) -- node[rotulo, below=3pt, sloped] {``estou bem'' (só queda)} (can.west);
+  \draw[->, thick, black!50] (res.north) to[out=150, in=40] node[rotulo, above] {publica \code{resolvido} e volta ao normal} (ok.north);
+  \draw[->, thick, black!50] (can.south) to[out=210, in=-40] node[rotulo, below] {publica \code{cancelado} e volta ao normal} (ok.south);
+\end{tikzpicture}

@@ -1,0 +1,261 @@
+%======================================================================
+\section{Firmware}\label{sec:firmware}
+%======================================================================
+\subsection{Ambiente e organização}
+
+O firmware das duas placas é escrito em C com o ESP-IDF 6.0.1~\cite{espidf}, que já traz o
+FreeRTOS, as pilhas de Wi-Fi e TCP/IP, o cliente MQTT e os drivers dos periféricos. São dois
+projetos, um por placa, e um conjunto de componentes comuns que as duas compilam
+(Tabela~\ref{tab:componentes}). Cada placa passa os seus pinos e tópicos aos componentes por
+uma estrutura de configuração; nada é copiado de uma placa para a outra.
+
+\begin{table}[H]
+\centering
+\caption{Componentes do firmware.}
+\label{tab:componentes}
+\small
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{11.6cm}@{}}
+\toprule
+Componente & Responsabilidade \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Comuns (\code{firmware/common/})}} \\
+\code{pcb} & mapa de pinos da PCB única, conferido na compilação \\
+\code{protocol} & o contrato em C: tópicos MQTT, identificadores CAN, mensagens ESP-NOW \\
+\code{rtos\_util} & prioridades nomeadas, núcleos e tamanhos de pilha das tasks \\
+\code{sys\_events} & \textit{event group} com o estado do sistema: rede, hora, MQTT, CAN \\
+\code{net} & Wi-Fi STA, reconexão com espera crescente, SNTP \\
+\code{mqtt\_link} & cliente MQTT 3.1.1 com \textit{Last Will}, fila de saída e novas tentativas \\
+\code{can} & transporte TWAI: fila de transmissão, recuperação de \textit{bus-off}, filtro e diretório de IDs \\
+\code{indicators} & LED WS2812 numa task própria \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Hub (\code{firmware/room/})}} \\
+\code{sensors} & eventos das entradas com filtro de \textit{glitch} e \textit{debounce}; drivers do PIR, das portas e do LM35 \\
+\code{rules} & motor de regras em C puro, testado no computador \\
+\code{hub\_config} & configuração em JSON recebida por MQTT, validada e gravada na NVS \\
+\code{espnow\_link} & recepção ESP-NOW: validação, descarte de reenvios, remetente pareado \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Vestível (\code{firmware/gadget/})}} \\
+\code{mpu6050} & driver do sensor: configuração, FIFO, detecção de sensor perdido \\
+\code{fall\_pipeline} & pipeline de queda em C puro, gerado e testado contra o Python \\
+\code{signal\_proc} & buffer circular, momentos com ESP-DSP e nível de atividade \\
+\code{espnow\_tx} & envio ESP-NOW: varredura de canal, confirmação, reenvio \\
+\code{battery} & leitura de um divisor no ADC (para uma placa futura com LiPo) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A configuração de cada placa (rede, broker, chaves, MAC do par, opcionais) é feita no
+\code{menuconfig} e fica no \code{sdkconfig}, que não vai para o repositório: senhas e chaves
+nunca entram no git. O que vale para todos (watchdog, partições) fica num
+\code{sdkconfig.defaults} versionado.
+
+\subsection{Tasks, núcleos e recursos compartilhados}\label{sec:tasks}
+
+As tasks seguem o padrão das aulas de RTOS~\cite{slides}: prioridades nomeadas, nunca acima de 20 (a task
+do Wi-Fi roda em 23), e cada task fixada num núcleo. O núcleo 0 fica com o rádio e tudo o
+que fala com ele; o núcleo 1, com o tempo real (Tabela~\ref{tab:tasks}).
+
+\begin{table}[H]
+\centering
+\caption{Tasks das duas placas.}
+\label{tab:tasks}
+\small
+\begin{tabular}{@{}llll>{\raggedright\arraybackslash}p{6.6cm}@{}}
+\toprule
+Placa & Task & Núcleo & Prioridade & Função \\
+\midrule
+hub & \code{sensors\_task} & 1 & ALTA (15) & estabiliza e lê as portas e o PIR \\
+hub & \code{lm35\_task} & 1 & BAIXA (5) & temperatura a cada 30\,s \\
+hub & \code{hub\_task} & 0 & MÉDIA (10) & regras, publicação, LED \\
+hub & \code{espnow\_task} & 0 & MÉDIA (10) & valida e encaminha as mensagens do vestível \\
+as duas & \code{can\_rx}, \code{can\_tx} & 0 & MÉDIA (10) & recepção e transmissão CAN \\
+as duas & \code{indicators} & 0 & MÍNIMA (2) & LED \\
+vestível & \code{sampling} & 1 & ALTA (15) & FIFO do MPU-6050 e pipeline de queda \\
+vestível & \code{comm} & 0 & MÉDIA (10) & ESP-NOW, botão, heartbeat, opcionais \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Os recursos compartilhados seguem regras simples, que evitam corridas e travamentos:
+\begin{itemize}
+  \item \textbf{Filas, sempre por valor.} Quem produz um evento nunca toca o estado de quem
+        consome. Interrupções e \textit{callbacks} de rádio só enfileiram ou notificam.
+  \item \textbf{Event group} para o estado do sistema (rede, hora, MQTT, CAN), com um único
+        escritor por bit.
+  \item \textbf{Notificação de task} onde um aviso não pode se perder: o \textit{callback} de
+        estado do TWAI só acorda a \code{can\_tx}, que lê o estado ela mesma.
+  \item \textbf{Mutex} só para somar um lote de atividade no vestível, e seção crítica
+        (\code{portMUX}) só para poucas instruções.
+  \item Nenhuma task segura duas travas ao mesmo tempo, e as tasks vigiadas pelo
+        \textit{watchdog} de 30\,s só esperam com tempo limite.
+\end{itemize}
+
+\subsection{Hub do quarto}
+
+\paragraph{Fluxo.} Tudo o que acontece no quarto vira um evento na fila do hub, e uma única
+task, a \code{hub\_task}, roda as regras e publica (Figura~\ref{fig:tasks_hub}). Por isso o
+motor de regras não precisa de travas. As mudanças de porta e de presença e cada temperatura
+saem por MQTT e pelo CAN; as mensagens do vestível chegam pela \code{espnow\_task}, que as
+valida antes (versão, tipo, tamanho, remetente pareado e reenvios).
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{\input{diagramas/tasks_hub}}
+\caption{Tasks e filas do hub. A \code{hub\_task} é a única que chama as regras e publica.}
+\label{fig:tasks_hub}
+\end{figure}
+
+\paragraph{Regras.}\label{sec:regras} O motor de regras (Tabela~\ref{tab:regras}) é C puro,
+sem dependência do ESP-IDF, e roda também no computador, onde é testado. Cada alerta é um
+\textbf{episódio}: publicado uma vez como \code{ativo} e encerrado como \code{resolvido} ou
+\code{cancelado}, sem repetição (Figura~\ref{fig:alerta_estados}). Sem hora válida, as regras
+com janela de horário ficam suspensas, e o \code{status} do hub informa
+\code{"hora":false}. A inatividade só vale de dia porque, à noite, o residente dormindo não
+aciona o PIR.
+
+\begin{table}[H]
+\centering
+\caption{Regras de alerta do hub (valores padrão, ajustáveis por MQTT).}
+\label{tab:regras}
+\small
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{4.9cm}>{\raggedright\arraybackslash}p{3.8cm}>{\raggedright\arraybackslash}p{1.9cm}@{}}
+\toprule
+Tipo & Dispara quando & Resolve quando & Padrão \\
+\midrule
+\code{queda} & chega uma \code{FALL} do vestível & ``estou bem'' (\code{cancelado}) & --- \\
+\code{saida\_noturna} & a porta de saída abre à noite e passam N\,min sem presença & a presença volta & 22h--6h, 15\,min \\
+\code{banheiro\_prolongado} & a porta do banheiro fecha e passam N\,min sem presença e sem a saída abrir & a porta do banheiro abre & 40\,min \\
+\code{inatividade} & de dia, N\,min sem presença e sem a saída abrir & a presença volta & 120\,min \\
+\code{temperatura} & fora da faixa por 10\,min seguidos & dentro da faixa (histerese de 0,5\,°C) por 10\,min & 18--28\,°C \\
+\code{vestivel\_offline} & 90\,s sem mensagens do vestível & a próxima mensagem & --- \\
+\code{bateria\_baixa} & bateria do vestível abaixo do limite & acima de 3,6\,V & 3,5\,V \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\resizebox{0.9\linewidth}{!}{\input{diagramas/alerta_estados}}
+\caption{Ciclo de vida de um episódio de alerta.}
+\label{fig:alerta_estados}
+\end{figure}
+
+\paragraph{Configuração sem recompilar.} Os parâmetros das regras chegam pelo tópico
+\code{config/desejada}, em JSON. O hub valida tudo, grava na NVS e responde em
+\code{config/aplicada}; uma configuração inválida é recusada inteira, e a anterior continua
+valendo. No boot, o hub usa a NVS ou, se ela estiver vazia, os valores padrão:
+\begin{lstlisting}[language=json]
+{"v":1, "noite":{"inicio":"22:00","fim":"06:00"},
+ "portas":{"quarto":"saida","banheiro":"banheiro"},
+ "saida_noturna_min":15, "banheiro_min":40, "inatividade_min":120,
+ "temperatura":{"min":18,"max":28,"histerese":0.5,"persistencia_min":10},
+ "vestivel_offline_s":90, "bateria_baixa_mV":3500}
+\end{lstlisting}
+
+\subsection{Vestível}
+
+\paragraph{Aquisição.} A task \code{sampling} lê a FIFO do MPU-6050 a cada 50\,ms e passa
+cada amostra pelo pipeline de queda (Figura~\ref{fig:tasks_vestivel};
+Seção~\ref{sec:queda}). Se a FIFO transbordar ou a leitura falhar no meio, a FIFO é zerada e
+o pipeline recomeça: uma janela nunca junta trechos dos dois lados de uma lacuna. Dez leituras
+seguidas sem amostra (0,5\,s) significam que o sensor parou (um MPU que reinicia volta
+dormindo); o vestível passa então a procurar o sensor a cada 5\,s.
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{\input{diagramas/tasks_vestivel}}
+\caption{O vestível: a task \code{sampling} roda o pipeline amostra a amostra no núcleo 1, e a
+\code{comm} cuida do rádio no núcleo 0.}
+\label{fig:tasks_vestivel}
+\end{figure}
+
+\paragraph{Comunicação e interação.} A \code{comm} manda a \code{FALL} na hora em que o
+pipeline decide queda, e o LED fica em alerta durante a janela de cancelamento de 15\,s; se o
+botão for apertado nesse tempo, sai uma \code{FALL\_CANCEL}. A cada 30\,s sai um
+\code{HEARTBEAT} com a bateria e o nível de atividade, o valor RMS de $\amag - 1$\,g desde o
+heartbeat anterior. Os detalhes do enlace estão na Seção~\ref{sec:espnow}.
+
+\paragraph{Modos.}
+\begin{itemize}
+  \item \textbf{Normal}: ESP-NOW até o hub.
+  \item \textbf{Coleta}: cada amostra bruta e cada janela classificada (com os 23 atributos e
+        a probabilidade) vão para a serial. É assim que vai ser formado o conjunto de dados
+        no pulso (Seção~\ref{sec:queda}).
+  \item \textbf{Sem hub}: com o MAC do hub vazio na configuração, o ESP-NOW não é ligado e as
+        quedas vão só para o log. É o modo de bancada e de demonstração com uma placa só,
+        ligada ao computador pela USB (Seção~\ref{sec:demo}).
+  \item \textbf{Opcionais}, desligados por padrão: MQTT direto ao broker, como reserva se o
+        hub não confirmar uma queda, e CAN de bancada.
+\end{itemize}
+
+\subsection{Robustez}\label{sec:ausente}
+
+Uma regra vale para as duas placas: \textbf{uma peça ausente gera um aviso, não um erro}.
+Sensor, CAN, Wi-Fi ou broker que faltam dão um único aviso no log quando a falta é percebida e
+uma informação quando voltam; as novas tentativas ficam em silêncio, com espera crescente até
+60\,s. Nada opcional pode derrubar a placa:
+\begin{itemize}
+  \item \textbf{Vestível sem MPU-6050}: segue rodando, com o LED vermelho lento, e \textbf{não
+        manda heartbeat}, para não parecer saudável sem detectar quedas; o hub o declara
+        offline em 90\,s.
+  \item \textbf{Hub com sensor não instalado}: um PIR solto lê ``ninguém'' e uma porta solta
+        lê ``aberta'', e nada no sinal os distingue de um caso real. Por isso os sensores
+        instalados são declarados no \code{menuconfig}. Sem PIR, a inatividade e a saída
+        noturna ficam suspensas; uma porta ausente não é lida.
+  \item \textbf{Rede}: o Wi-Fi reconecta com espera de 1 a 60\,s; o cliente MQTT só inicia
+        com a rede de pé e é reiniciado se o início falhar.
+  \item \textbf{Queda que não chegou}: a \code{FALL} é guardada e reenviada igual até ser
+        entregue (Seção~\ref{sec:espnow}).
+  \item \textbf{Configuração errada não compila}: pino repetido ou proibido, chave do ESP-NOW
+        com tamanho diferente de 16 caracteres ou MAC mal escrito fazem o build falhar, com a
+        mensagem do problema.
+\end{itemize}
+
+\subsection{Testes no computador}
+
+A lógica que não depende de hardware é C puro e roda também no computador, compilada com o
+gcc. Cada componente tem uma bateria de testes (Tabela~\ref{tab:testes}); os do pipeline de
+queda comparam o C, janela a janela, com o Python que treinou o modelo.
+
+\begin{table}[H]
+\centering
+\caption{Testes automáticos que rodam no computador (sem placa).}
+\label{tab:testes}
+\small
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{8.8cm}r@{}}
+\toprule
+Componente & O que verifica & Verificações \\
+\midrule
+\code{rules} (hub) & cada regra dispara e resolve como especificado, episódios sem repetição, queda depois de o vestível reiniciar, sensores ausentes & 62 \\
+\code{hub\_config} (hub) & validação do JSON da configuração, recusa de valores inválidos & 60 \\
+\code{fall\_pipeline} (vestível) & filtro, gatilho e, em 26 janelas de 8 trechos da SisFall, os mesmos picos, atributos e probabilidades do Python & 885 \\
+\code{signal\_proc} (vestível) & buffer circular, atributos, nível de atividade & 25 \\
+\midrule
+notificador (central) & formatação, reenvio ao Telegram, dados inesperados & 19 testes \\
+\code{demo\_vestivel.py} & leitura da serial, reconexão, linhas estragadas & 15 testes \\
+\code{modelo/} (Python) & blocos do pipeline contra os exemplos das aulas, leitura dos dados & 30 testes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Uso de memória}
+
+A Tabela~\ref{tab:memoria} mostra o tamanho de cada firmware, medido pelo \code{idf.py size}.
+A partição de aplicação tem 1,5\,MB. A maior parte da imagem é a pilha de Wi-Fi, TCP/IP e TLS;
+a floresta do modelo de queda ocupa \rfKB\,kB.
+
+\begin{table}[H]
+\centering
+\caption{Uso de memória (ESP-IDF 6.0.1, \code{idf.py size}).}
+\label{tab:memoria}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Firmware & Imagem (bytes) & Partição livre & RAM interna usada \\
+\midrule
+Hub & 992\,672 & 35\,\% & 112\,135 B (32,8\,\%) \\
+Vestível com ESP-NOW & 960\,688 & 37\,\% & 130\,615 B (38,2\,\%) \\
+Vestível sem hub (bancada) & 383\,184 & 75\,\% & 86\,203 B (25,2\,\%) \\
+\bottomrule
+\end{tabular}
+\end{table}

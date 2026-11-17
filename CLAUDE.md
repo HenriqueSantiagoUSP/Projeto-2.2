@@ -203,6 +203,7 @@ uv run python experimentos/08_relatorio_latex.py          # figuras e tabelas do
 uv run python experimentos/09_exportar_vestivel.py        # modelo do vestível (fall_model.c) + vetores de paridade
 uv run python experimentos/10_figuras_apresentacao.py     # figuras, tabelas e números da apresentação Beamer do Q1
 uv run python experimentos/11_svm_vestivel.py             # SVM × Random Forest × logística na configuração do vestível
+uv run python experimentos/12_relatorio_q2.py             # gráficos, tabelas e PCB (kicad-cli) do relatório do Q2 (relatorios/.../Q2/latex)
 ```
 
 Os dados ficam em `dados/` (fora do git): a SisFall em `dados/publicos/` e os ensaios próprios em
