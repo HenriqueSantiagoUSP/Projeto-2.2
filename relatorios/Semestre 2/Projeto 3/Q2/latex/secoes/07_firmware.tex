@@ -71,7 +71,8 @@ hub & \code{espnow\_task} & 0 & MÉDIA (10) & valida e encaminha as mensagens da
 as duas & \code{can\_rx}, \code{can\_tx} & 0 & MÉDIA (10) & recepção e transmissão CAN \\
 as duas & \code{indicators} & 0 & MÍNIMA (2) & LED \\
 pulseira & \code{sampling} & 1 & ALTA (15) & FIFO do MPU-6050 e pipeline de queda \\
-pulseira & \code{comm} & 0 & MÉDIA (10) & ESP-NOW, botão, heartbeat, opcionais \\
+pulseira & \code{button} & 1 & MÉDIA (10) & gestos do botão (dois toques, segurar) \\
+pulseira & \code{comm} & 0 & MÉDIA (10) & ESP-NOW, alertas do botão, heartbeat, opcionais \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -122,7 +123,8 @@ aciona o PIR.
 \toprule
 Tipo & Dispara quando & Resolve quando & Padrão \\
 \midrule
-\code{queda} & chega uma \code{FALL} da pulseira & ``estou bem'' (\code{cancelado}) & --- \\
+\code{queda} & chega uma \code{FALL} da pulseira & dois toques no botão (\code{cancelado}) & --- \\
+\code{ajuda} & o residente segura o botão por 3\,s (chega um \code{HELP}) & dois toques no botão (\code{cancelado}) & --- \\
 \code{saida\_noturna} & a porta de saída abre à noite e passam N\,min sem presença & a presença volta & 22h--6h, 15\,min \\
 \code{banheiro\_prolongado} & a porta do banheiro fecha e passam N\,min sem presença e sem a saída abrir & a porta do banheiro abre & 40\,min \\
 \code{inatividade} & de dia, N\,min sem presença e sem a saída abrir & a presença volta & 120\,min \\
@@ -164,16 +166,34 @@ dormindo); a pulseira passa então a procurar o sensor a cada 5\,s.
 \begin{figure}[H]
 \centering
 \resizebox{\linewidth}{!}{\input{diagramas/tasks_pulseira}}
-\caption{A pulseira: a task \code{sampling} roda o pipeline amostra a amostra no núcleo 1, e a
-\code{comm} cuida do rádio no núcleo 0.}
+\caption{A pulseira: a task \code{sampling} roda o pipeline amostra a amostra no núcleo 1, a
+\code{button} mede os gestos do botão, e a \code{comm} cuida do rádio no núcleo 0.}
 \label{fig:tasks_pulseira}
 \end{figure}
 
 \paragraph{Comunicação e interação.} A \code{comm} manda a \code{FALL} na hora em que o
-pipeline decide queda, e o LED fica em alerta durante a janela de cancelamento de 15\,s; se o
-botão for apertado nesse tempo, sai uma \code{FALL\_CANCEL}. A cada 30\,s sai um
-\code{HEARTBEAT} com a bateria e o nível de atividade, o valor RMS de $\amag - 1$\,g desde o
-heartbeat anterior. Os detalhes do enlace estão na Seção~\ref{sec:espnow}.
+pipeline decide queda, e o LED fica em alerta durante a janela de cancelamento de 15\,s; dois
+toques no botão nesse tempo mandam uma \code{FALL\_CANCEL}. Segurar o botão por 3\,s, fora de
+alerta, manda um \code{HELP} (pedido de ajuda), com a mesma janela para cancelar
+(\code{HELP\_CANCEL}); os gestos estão na Seção~\ref{sec:botao} e na
+Figura~\ref{fig:botao_gestos}. A cada 30\,s sai um \code{HEARTBEAT} com a bateria e o nível de
+atividade, o valor RMS de $\amag - 1$\,g desde o heartbeat anterior. Os detalhes do enlace
+estão na Seção~\ref{sec:espnow}.
+
+Os gestos são medidos por uma task própria, a \code{button}, no núcleo 1, com a lógica num
+componente em C puro (\code{button\_gesture}) testado no computador. A ISR do botão só anota a
+hora da borda e acorda a task, que lê o nível quando ele estabiliza e entrega cada gesto à
+\code{comm} junto com a hora em que aconteceu. A medição fica fora da \code{comm} porque esta
+pode passar segundos reenviando uma queda, com tentativas e varredura de canal, justamente
+quando o residente dá os dois toques para cancelá-la; e a janela de 15\,s é julgada pela hora
+do gesto, não pela hora em que a \code{comm} o atende.
+
+\begin{figure}[H]
+\centering
+\resizebox{0.92\linewidth}{!}{\input{diagramas/botao_gestos}}
+\caption{Os gestos do botão na pulseira.}
+\label{fig:botao_gestos}
+\end{figure}
 
 \paragraph{Modos.}
 \begin{itemize}
@@ -222,17 +242,18 @@ queda comparam o C, janela a janela, com o Python que treinou o modelo.
 \caption{Testes automáticos que rodam no computador (sem placa).}
 \label{tab:testes}
 \small
-\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{8.8cm}r@{}}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{8.5cm}r@{}}
 \toprule
 Componente & O que verifica & Verificações \\
 \midrule
-\code{rules} (hub) & cada regra dispara e resolve como especificado, episódios sem repetição, queda depois de a pulseira reiniciar, sensores ausentes & 62 \\
+\code{rules} (hub) & cada regra dispara e resolve como especificado, episódios sem repetição, queda e pedido de ajuda (também depois de a pulseira reiniciar), sensores ausentes & 82 \\
 \code{hub\_config} (hub) & validação do JSON da configuração, recusa de valores inválidos & 60 \\
 \code{fall\_pipeline} (pulseira) & filtro, gatilho e, em 26 janelas de 8 trechos da SisFall, os mesmos picos, atributos e probabilidades do Python & 885 \\
 \code{signal\_proc} (pulseira) & buffer circular, atributos, nível de atividade & 25 \\
+\code{button\_gesture} (pulseira) & dois toques, segurar, aperto simples e médio, repique, gesto atendido com atraso, volta do contador & 42 \\
 \midrule
-notificador (central) & formatação, reenvio ao Telegram, dados inesperados & 19 testes \\
-\code{demo\_pulseira.py} & leitura da serial, reconexão, linhas estragadas & 15 testes \\
+notificador (central) & formatação, reenvio ao Telegram, dados inesperados & 22 testes \\
+\code{demo\_pulseira.py} & leitura da serial, reconexão, linhas estragadas, botão da placa & 19 testes \\
 \code{modelo/} (Python) & blocos do pipeline contra os exemplos das aulas, leitura dos dados & 30 testes \\
 \bottomrule
 \end{tabular}

@@ -129,6 +129,7 @@ episódio: publicado uma vez como `ativo` e encerrado como `resolvido` ou `cance
 | `tipo` | Dispara quando | Resolve quando | Padrão |
 |---|---|---|---|
 | `queda` | chega `FALL` da pulseira (LED em alerta) | `FALL_CANCEL` → `cancelado` | — |
+| `ajuda` | chega `HELP` da pulseira: o residente segurou o botão (LED em alerta) | `HELP_CANCEL` → `cancelado` | — |
 | `saida_noturna` | a porta `saida` abre no período noturno e passam N min sem presença no quarto | a presença volta | 22h–06h, 15 min |
 | `banheiro_prolongado` | a porta `banheiro` fecha e passam N min sem presença no quarto e sem a `saida` abrir | a porta do banheiro abre | 40 min |
 | `inatividade` | no período diurno, N min sem presença e sem a `saida` abrir | a presença volta | 120 min (calibrar) |
@@ -177,16 +178,27 @@ Wearable, mais os menus comuns Network (Wi-Fi), MQTT e CAN bus (TWAI) quando os 
   SisFall (cintura, ±8 g): é **provisório até retreinar com os dados do pulso** ([roadmap](roadmap.md), fase 8).
   No modo de coleta, cada janela vai para a serial com os atributos e P (`FEAT:`).
 - **Comunicação** ([`protocolo.md`](protocolo.md) §3): varredura de canal, heartbeat a cada 30 s com bateria
-  e atividade, `FALL` (com o pico e a P(queda) do modelo) com reenvio até o ACK.
+  e atividade, `FALL` (com o pico e a P(queda) do modelo) e `HELP` (pedido de ajuda) com reenvio até o ACK.
 - **MQTT (opcional, desligado por padrão):** a pulseira se associa ao Wi-Fi do hub e publica a própria
-  telemetria; se o hub não confirmar uma queda, publica o alerta ela mesma, com o mesmo `id`
+  telemetria; se o hub não confirmar uma queda ou um pedido de ajuda, publica o alerta ela mesma, com o mesmo `id`
   ([`protocolo.md`](protocolo.md) §1). Custa bateria, por isso é opção.
 - **CAN (opcional, só bancada):** quedas (com a P do modelo) e heartbeats também como quadros `0x0FD`/`0x0FE`, para cumprir o
   requisito da disciplina e ajudar nos testes. O produto não tem transceptor.
-- **Interação:** botão "estou bem" e LED. A pulseira envia `FALL` na hora, e o LED fica em alerta durante a
-  janela de cancelamento (15 s); se o botão for apertado nesse tempo, envia `FALL_CANCEL`. Não há buzzer
-  (retirado em 2026-10-23). Em teste, o botão pode
-  simular uma queda (`menuconfig`).
+- **Interação:** um botão e o LED. Os gestos (desde 2026-11-17; o porquê está em [`decisoes.md`](decisoes.md),
+  *Gestos do botão*):
+
+  | Estado da pulseira | Gesto | Efeito |
+  |---|---|---|
+  | janela de 15 s depois de uma queda ou de um pedido de ajuda (LED em alerta) | dois toques rápidos | cancela esse alerta (`FALL_CANCEL` ou `HELP_CANCEL`) |
+  | normal | segurar 3 s | pedido de ajuda (`HELP` → alerta `ajuda`), com a mesma janela de 15 s para cancelar |
+  | qualquer um | aperto simples | nada |
+  | janela aberta | segurar | nada: já há um alerta aberto |
+
+  Dois toques = dois apertos de menos de 1 s, o segundo começando até 1 s depois de soltar o primeiro. A
+  pulseira envia `FALL` ou `HELP` na hora, e o LED fica em alerta durante a janela. Depois dela, o alerta é do
+  hub e dos cuidadores. Os gestos são medidos pela task `button` (componente `button_gesture`), fora da `comm`,
+  que pode passar segundos reenviando uma queda justamente quando o residente quer cancelá-la. Não há buzzer
+  (retirado em 2026-10-23). Em teste, dois toques sem alerta aberto podem simular uma queda (`menuconfig`).
 - **Energia:** no protótipo, power bank na entrada USB-C da placa, sem medição de bateria; a pulseira informa
   "bateria desconhecida" (`0xFFFF`). O firmware já sabe ler um divisor no ADC1 (`GADGET_BATTERY_SENSE`), para a
   placa própria da pulseira com LiPo.
@@ -255,16 +267,18 @@ rádio e tudo o que fala com ele; o núcleo 1, com o tempo real.
 | as duas | `can_rx`, `can_tx` | 0 | MEDIA | recepção e despacho; transmissão e estado do nó |
 | as duas | `indicators` | 0 | MINIMA | LED |
 | pulseira | `sampling` | 1 | ALTA | FIFO do MPU-6050 (e as novas tentativas sem ele), pipeline de queda |
-| pulseira | `comm` | 0 | MEDIA | ESP-NOW, MQTT e CAN opcionais, botão, heartbeat |
+| pulseira | `button` | 1 | MEDIA | gestos do botão (dois toques, segurar), fora do caminho do rádio |
+| pulseira | `comm` | 0 | MEDIA | ESP-NOW, MQTT e CAN opcionais, alertas do botão, heartbeat |
 
 Como os recursos são compartilhados:
 
 - **Filas, sempre por valor:** ISR → `sensors_task`; sensores, ESP-NOW e MQTT → `hub_task`; qualquer task →
-  `can_tx`; ISR do TWAI → `can_rx`; `sampling`, botão e MQTT → `comm`. Quem produz nunca toca o estado de quem
-  consome.
+  `can_tx`; ISR do TWAI → `can_rx`; `sampling`, `button` e MQTT → `comm`. Quem produz nunca toca o estado de
+  quem consome.
 - **Event group (`sys_events`):** rede, hora, MQTT e CAN. Cada bit tem um único escritor.
-- **Notificação de task:** o callback de estado do TWAI só avisa a `can_tx`, que lê o estado ela mesma; uma
-  notificação nunca se perde, ao contrário de uma fila cheia.
+- **Notificação de task:** o callback de estado do TWAI só avisa a `can_tx`, que lê o estado ela mesma, e a
+  ISR do botão só avisa a `button`, que lê o nível quando ele estabiliza; uma notificação nunca se perde, ao
+  contrário de uma fila cheia.
 - **Mutex** (com herança de prioridade): só a atividade da pulseira, entre `sampling` e `comm`, e só pelo tempo
   de somar um lote.
 - **Seção crítica (`portMUX`):** o estado pedido ao LED e ao buzzer (um prazo de 64 bits não é escrito numa

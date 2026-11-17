@@ -1,0 +1,23 @@
+% Gestos do botão na pulseira: os dois estados e o que cada gesto faz.
+\begin{tikzpicture}[font=\scriptsize, >=Stealth]
+  \tikzset{estado/.style={draw=#1, fill=#1!10, thick, rounded corners=8pt, minimum width=3.0cm,
+                          minimum height=1.1cm, align=center}}
+  \node[estado=cinza] (n) at (0,0) {\textbf{normal}\\LED verde};
+  \node[estado=corvest] (j) at (8.4,0) {\textbf{janela de 15\,s}\\LED vermelho piscando};
+  % entrada na janela
+  \draw[->, thick, corvest] (n.north east) to[out=35, in=145]
+       node[rotulo, above, align=center] {segurar 3\,s: sai \code{HELP} (pedido de ajuda)\\ou queda detectada: sai \code{FALL}}
+       (j.north west);
+  % cancelamento
+  \draw[->, thick, corcentral] (j.west) -- node[rotulo, above] {dois toques (``estou bem'')}
+       node[rotulo, below, align=center] {sai \code{FALL\_CANCEL} ou \code{HELP\_CANCEL}:\\o alerta é cancelado} (n.east);
+  % fim da janela
+  \draw[->, thick, black!55] (j.south west) to[out=-145, in=-35]
+       node[rotulo, below, align=center] {15\,s sem cancelar: o LED volta ao normal,\\e o alerta fica aberto para os cuidadores}
+       (n.south east);
+  % gestos sem efeito
+  \draw[->, black!45] (n.west) ++(0,0.25) arc[start angle=60, end angle=300, radius=0.32cm]
+       node[rotulo, left=6pt, align=right, pos=0.5] {aperto simples\\ou dois toques:\\nada};
+  \draw[->, black!45] (j.east) ++(0,-0.25) arc[start angle=-120, end angle=120, radius=0.32cm]
+       node[rotulo, right=6pt, align=left, pos=0.5] {aperto simples\\ou segurar:\\nada};
+\end{tikzpicture}

@@ -56,7 +56,7 @@ tomaria, mesmo que hoje não haja problema.
 | 11, 12 | portas 1 (quarto) e 2 (banheiro) | hub | ADC2, mas digital: sem problema com o Wi-Fi |
 | 13, 14 | CAN TX / RX | os dois | na pulseira, só em bancada (`GADGET_CAN`) |
 | 17 | INT do MPU-6050 | pulseira | RTC GPIO |
-| 18 | botão "estou bem" | pulseira | RTC GPIO; pull-up interno e filtro de glitch |
+| 18 | botão da pulseira (dois toques = "estou bem"; segurar = ajuda) | pulseira | RTC GPIO; pull-up interno e filtro de glitch |
 | 21 | livre: o buzzer saiu em 2026-10-23 | — | |
 | 39–42 | expansão (ex.: portas 5 a 8) | — | só enquanto o JTAG por pinos não for usado |
 | 15, 16 | não ligar: cristal de 32 kHz | — | |

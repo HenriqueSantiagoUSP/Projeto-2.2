@@ -35,6 +35,7 @@
 
 /* "tipo" values of an alert. */
 #define MQTT_ALERT_FALL           "queda"
+#define MQTT_ALERT_HELP           "ajuda"
 #define MQTT_ALERT_NIGHT_EXIT     "saida_noturna"
 #define MQTT_ALERT_BATHROOM       "banheiro_prolongado"
 #define MQTT_ALERT_INACTIVITY     "inatividade"

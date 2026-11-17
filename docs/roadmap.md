@@ -104,7 +104,8 @@ Princípios que definem a ordem:
   Até 2026-11-10 era a segmentação provisória de a² com histerese (L<sub>on</sub> 6,25 g², L<sub>off</sub>
   2,25 g²). O modelo é provisório até ser retreinado com os dados do pulso (fase 8).
 - Cooldown de 30 s após uma queda; `FALL` com reenvio até o ACK.
-- Botão "estou bem" (`FALL_CANCEL`), com o LED em alerta durante a janela de cancelamento.
+- Botão "estou bem" (`FALL_CANCEL`), com o LED em alerta durante a janela de cancelamento. Desde 2026-11-17,
+  por dois toques, e segurar 3 s pede ajuda (`HELP`, alerta `ajuda`).
 - Leitura da bateria e alerta `bateria_baixa`.
 - *Light sleep* entre leituras do FIFO, depois de medir o consumo em placa: a estratégia depende do número
   medido.

@@ -3,7 +3,7 @@
 # GADGET_CAN), and the linker drops them when they are not.
 idf_component_register(
     SRCS "main.c"
-    PRIV_REQUIRES "board" "mpu6050" "fall_pipeline" "signal_proc" "espnow_tx" "battery"
+    PRIV_REQUIRES "board" "mpu6050" "fall_pipeline" "signal_proc" "button_gesture" "espnow_tx" "battery"
                   "indicators" "protocol" "rtos_util" "sys_events" "net" "mqtt_link" "can"
                   "esp_driver_gpio" "esp_driver_i2c" "esp_timer" "esp_app_format" "esp_system"
                   "nvs_flash"

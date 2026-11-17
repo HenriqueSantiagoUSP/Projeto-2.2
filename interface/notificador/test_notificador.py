@@ -68,6 +68,23 @@ class TestFormatar(unittest.TestCase):
         a = interpretar("idoso/butanta/quarto101/alerta", alerta_json(estado="cancelado", detalhe={}))
         self.assertIn("Cancelado pelo residente", formatar(a))
 
+    def test_pedido_de_ajuda(self):
+        a = interpretar("idoso/butanta/quarto101/alerta", alerta_json(id="a1b2c3-7", tipo="ajuda", detalhe={}))
+        texto = formatar(a)
+        self.assertIn("ALERTA: Pedido de ajuda (botão da pulseira)", texto)
+        self.assertIn("Quarto quarto101 (butanta)", texto)
+        self.assertEqual(len(texto.splitlines()), 3)   # sem linha de detalhe
+
+    def test_pedido_de_ajuda_enviado_pela_pulseira(self):
+        a = interpretar("idoso/butanta/quarto101/alerta", alerta_json(tipo="ajuda", detalhe={"via": "pulseira"}))
+        self.assertIn("pela própria pulseira", formatar(a))
+
+    def test_pedido_de_ajuda_cancelado(self):
+        a = interpretar("idoso/butanta/quarto101/alerta",
+                        alerta_json(tipo="ajuda", estado="cancelado", detalhe={"via": "pulseira"}))
+        texto = formatar(a)
+        self.assertIn("Cancelado pelo residente: Pedido de ajuda", texto)
+
     def test_temperatura(self):
         a = interpretar("idoso/butanta/quarto101/alerta",
                         alerta_json(tipo="temperatura", detalhe={"valor": 29.14, "limite": 28}))

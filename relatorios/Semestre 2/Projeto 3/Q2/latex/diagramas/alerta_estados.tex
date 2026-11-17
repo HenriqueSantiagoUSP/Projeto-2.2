@@ -7,7 +7,7 @@
   \node[estado=corcentral] (can) at (10.6,-1.4) {\textbf{cancelado}};
   \draw[->, thick] (ok) -- node[rotulo, above=2pt] {condição da regra} node[rotulo, below=2pt] {publica \code{ativo}} (at);
   \draw[->, thick] (at.east) ++(0,0.2) -- node[rotulo, above=3pt, sloped] {a condição acabou} (res.west);
-  \draw[->, thick] (at.east) ++(0,-0.2) -- node[rotulo, below=3pt, sloped] {``estou bem'' (só queda)} (can.west);
+  \draw[->, thick] (at.east) ++(0,-0.2) -- node[rotulo, below=3pt, sloped] {dois toques (queda e ajuda)} (can.west);
   \draw[->, thick, black!50] (res.north) to[out=150, in=40] node[rotulo, above] {publica \code{resolvido} e volta ao normal} (ok.north);
   \draw[->, thick, black!50] (can.south) to[out=210, in=-40] node[rotulo, below] {publica \code{cancelado} e volta ao normal} (ok.south);
 \end{tikzpicture}

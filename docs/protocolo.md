@@ -100,15 +100,16 @@ e `pulseira/<id>/mqtt` são publicados pela **própria pulseira**. A ACL impede 
 
 Desligado por padrão (`menuconfig` → Wearable → *Also join the Wi-Fi and talk to the central over MQTT*). O
 caminho principal continua sendo ESP-NOW → hub → MQTT; o enlace direto serve para telemetria e como **reserva da
-queda**:
+queda e do pedido de ajuda**:
 
 - a pulseira se associa ao mesmo Wi-Fi do hub, então o ESP-NOW já está no canal certo e a varredura de canais
   não é usada (§3);
-- se o hub não confirmar o `FALL` nem depois de procurá-lo de novo, a pulseira publica ela mesma o `alerta` de
-  `queda`, com o **mesmo `id`** que o hub usaria (`<pulseira>-<seq>`) e `"via":"pulseira"` no `detalhe`. Se o
-  hub também tiver recebido, o notificador descarta a cópia (mesmo `id` + `estado`);
-- o "estou bem" segue o mesmo caminho: se a queda saiu pelo MQTT, ou se o `FALL_CANCEL` não for confirmado, a
-  pulseira publica o `cancelado` com o mesmo `id`;
+- se o hub não confirmar o `FALL` (ou o `HELP`) nem depois de procurá-lo de novo, a pulseira publica ela mesma o
+  `alerta` de `queda` (ou de `ajuda`), com o **mesmo `id`** que o hub usaria (`<pulseira>-<seq>`) e
+  `"via":"pulseira"` no `detalhe`. Se o hub também tiver recebido, o notificador descarta a cópia (mesmo `id` +
+  `estado`);
+- o "estou bem" segue o mesmo caminho: se o alerta saiu pelo MQTT, ou se o `FALL_CANCEL` (ou o `HELP_CANCEL`) não
+  for confirmado, a pulseira publica o `cancelado` com o mesmo `id`;
 - **sem hub configurado** (MAC do hub vazio, bancada ou demonstração), a pulseira não liga o ESP-NOW e publica o
   alerta direto, sem tentar o hub antes.
 
@@ -125,13 +126,14 @@ USB e publica no papel do hub (usuário `hub`, `status` com `"fw":"demo-usb"`).
 |---|---|
 | `id` | identifica o episódio; o mesmo `id` aparece no `ativo` e no `resolvido`/`cancelado` correspondente |
 | `tipo` | ver tabela abaixo |
-| `estado` | `"ativo"`, `"resolvido"` (a condição acabou) ou `"cancelado"` (o residente cancelou na pulseira) |
+| `estado` | `"ativo"`, `"resolvido"` (a condição acabou) ou `"cancelado"` (o residente cancelou na pulseira, com dois toques no botão) |
 | `origem` | o que gerou: `pulseira/<id>`, `porta/<id>`, `presenca`, `temperatura` |
 | `detalhe` | objeto com dados do tipo (abaixo) |
 
 | `tipo` | `detalhe` | Regra |
 |---|---|---|
 | `queda` | `{"a2": 7.88, "prob": 0.97}`: `a2` é o \|a\|² filtrado no pico do gatilho (g²); `prob` é a P(queda) do classificador da pulseira (0–1, não calibrada; 0 numa queda simulada pelo botão); `"via":"pulseira"` quando publicado pela própria pulseira | [`arquitetura.md`](arquitetura.md), seção Regras |
+| `ajuda` | `{}`: o residente segurou o botão da pulseira por 3 s (pedido de ajuda); `"via":"pulseira"` quando publicado pela própria pulseira | idem |
 | `saida_noturna` | `{"porta":"quarto","min_sem_presenca":15}` | idem |
 | `banheiro_prolongado` | `{"porta":"banheiro","min":40}` | idem |
 | `inatividade` | `{"min":120}` | idem |
@@ -139,7 +141,8 @@ USB e publica no papel do hub (usuário `hub`, `status` com `"fw":"demo-usb"`).
 | `pulseira_offline` | `{"pulseira":"a1b2c3","ultimo_contato_s":90}` | idem |
 | `bateria_baixa` | `{"pulseira":"a1b2c3","bateria_mV":3480}` | idem |
 
-Formato do `id`: para `queda`, `<pulseira>-<seq da mensagem FALL>`; para os demais, `<tipo>-<ts de início em s>`.
+Formato do `id`: para `queda` e `ajuda`, `<pulseira>-<seq da mensagem FALL ou HELP>`; para os demais,
+`<tipo>-<ts de início em s>`.
 Quem consome descarta `id` + `estado` repetidos: com QoS 1, a mesma mensagem pode chegar duas vezes.
 
 ### `config/desejada` e `config/aplicada`
@@ -182,7 +185,8 @@ Estado: **implementado** nas duas placas. Transporte comum em `firmware/common/c
 `can_ids.c`); IDs e payloads do grupo `0xF` em `firmware/common/protocol/include/protocol_can.h`. O hub envia
 presença, temperatura e portas. A pulseira só usa CAN **em bancada**, para cumprir o requisito da disciplina e
 ajudar nos testes (`menuconfig` → Wearable → *CAN bus*, desligado por padrão): no produto ele fala com o hub por
-ESP-NOW e não tem transceptor.
+ESP-NOW e não tem transceptor. Por isso o CAN da pulseira leva só quedas e heartbeats; o botão ("estou bem" e
+pedido de ajuda) vai só por ESP-NOW.
 
 | Item | Valor |
 |---|---|
@@ -272,8 +276,14 @@ Estrutura empacotada (`packed`), little endian. Cabeçalho de 8 bytes em toda me
 | `PING` | `0x01` | — | varredura de canal |
 | `HEARTBEAT` | `0x02` | `uint16 battery_mv`, `uint16 activity_mg` | a cada 30 s |
 | `FALL` | `0x03` | `float a2_peak` (\|a\|² filtrado no pico do gatilho, g²), `uint8 prob_pct` (P(queda) do classificador, %; 0 = simulada pelo botão) | o classificador da pulseira decidiu queda (fora do cooldown de 30 s) |
-| `FALL_CANCEL` | `0x04` | `uint16 fall_seq` (o `seq` da queda cancelada) | botão "estou bem" |
+| `FALL_CANCEL` | `0x04` | `uint16 fall_seq` (o `seq` da queda cancelada) | dois toques no botão ("estou bem") nos 15 s depois da queda |
 | `CONFIG` | `0x05` | reservado (hub → pulseira) | fase futura |
+| `HELP` | `0x06` | — (o cabeçalho basta: o `seq` nomeia o pedido) | o botão segurado por 3 s fora de alerta (pedido de ajuda) |
+| `HELP_CANCEL` | `0x07` | `uint16 help_seq` (o `seq` do pedido cancelado) | dois toques no botão nos 15 s depois do pedido |
+
+Os gestos do botão estão em [`arquitetura.md`](arquitetura.md) (*Pulseira*, Interação) e o porquê deles em
+[`decisoes.md`](decisoes.md) (*Gestos do botão*). `HELP` e `HELP_CANCEL` entraram sem mudar a `version`: os
+formatos antigos continuam iguais, e um hub antigo só descartaria, com log, o tipo que não conhece.
 
 `activity_mg` é o RMS de (\|a\| − 1 g) desde o heartbeat anterior, em mg; o hub o publica como `atividade`, em
 g. `battery_mv = 0xFFFF` significa bateria não medida: o hub publica `pulseira/<id>` sem `bateria_mV` e não
@@ -284,21 +294,24 @@ diferente do esperado para o tipo.
 
 - Uma mensagem só conta como entregue quando o callback de envio do ESP-NOW retorna `ESP_NOW_SEND_SUCCESS`
   (ACK de camada MAC do hub).
-- `FALL` e `FALL_CANCEL`: até 10 tentativas, 50 ms entre elas, mesmo `seq`. Se todas falharem, a pulseira
-  refaz a varredura de canal e tenta de novo. Se ainda assim falhar e o MQTT da pulseira estiver ligado, ela
-  publica o alerta direto no broker (§1, *Pulseira com MQTT*).
+- `FALL`, `HELP` e os dois cancelamentos: até 10 tentativas, 50 ms entre elas, mesmo `seq`. Se todas falharem,
+  a pulseira refaz a varredura de canal e tenta de novo. Se ainda assim falhar e o MQTT da pulseira estiver
+  ligado, ela publica o alerta direto no broker (§1, *Pulseira com MQTT*).
 - Se nem assim a mensagem chegar a lugar nenhum, a pulseira guarda o quadro e o reenvia **igual** (mesmo
-  `seq` e mesmo `uptime_ms`, então o hub vê uma só queda): 2 s depois, com a espera dobrando até 30 s, e na
-  hora em que um heartbeat volta a ser entregue. Repete até entregar (pelo hub ou pelo MQTT). Uma queda nova
-  substitui a anterior na espera; um `FALL_CANCEL` tira a queda da espera e é enviado mesmo assim, porque o
-  quadro pode ter chegado ao hub com o ACK perdido.
+  `seq` e mesmo `uptime_ms`, então o hub vê um só alerta): 2 s depois, com a espera dobrando até 30 s, e na
+  hora em que um heartbeat volta a ser entregue. Repete até entregar (pelo hub ou pelo MQTT). A queda e o
+  pedido de ajuda esperam cada um no seu lugar; um alerta novo substitui o anterior **do mesmo tipo** na
+  espera. Um cancelamento tira o seu alerta da espera e é enviado mesmo assim, porque o quadro pode ter
+  chegado ao hub com o ACK perdido. Só um cancelamento espera por vez: se um mais antigo se perder, o alerta
+  dele fica aberto, que é o lado seguro.
 - `HEARTBEAT` e `PING`: sem reenvio.
 - Duplicatas: o hub guarda o último (`seq`, `uptime_ms`) de cada pulseira e descarta a mensagem que repete os
   dois. Um reenvio repete o quadro inteiro, uptime incluído; comparar o uptime evita confundir com reenvio a
   primeira mensagem de uma pulseira que reiniciou e recomeçou o `seq`.
 - As regras do hub fazem a mesma comparação para a queda: uma `FALL` com o `seq` **e** o `uptime_ms` da queda
   aberta é a mesma queda (um reenvio que chegou depois de outra mensagem). Com outro `uptime_ms`, é uma queda
-  nova de uma pulseira que reiniciou, e vira outro alerta.
+  nova de uma pulseira que reiniciou, e vira outro alerta. O `HELP` segue a mesma regra. Queda e pedido de
+  ajuda são episódios separados: cancelar um não fecha o outro.
 - Valores de tentativas e intervalos são iniciais; ajustar nos testes.
 
 ### Varredura de canal
@@ -330,6 +343,8 @@ dos sensores locais e o que recebe por ESP-NOW, carimbando `ts` com a própria h
 | LM35 local | `temperatura` | regra `temperatura` |
 | ESP-NOW `FALL` | `alerta` `queda` / `ativo` | LED em alerta |
 | ESP-NOW `FALL_CANCEL` | `alerta` `queda` / `cancelado` | LED volta ao normal |
+| ESP-NOW `HELP` | `alerta` `ajuda` / `ativo` | LED em alerta |
+| ESP-NOW `HELP_CANCEL` | `alerta` `ajuda` / `cancelado` | LED volta ao normal |
 | ESP-NOW `HEARTBEAT` | `pulseira/<id>` online | regra `bateria_baixa` |
 | 90 s sem mensagens da pulseira | `pulseira/<id>` offline | `alerta` `pulseira_offline` |
 | Conexão ao broker / Last Will | `status` | — |

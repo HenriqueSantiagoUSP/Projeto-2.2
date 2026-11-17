@@ -42,6 +42,7 @@ typedef enum {
 
 typedef enum {
     ALERT_FALL,
+    ALERT_HELP,             /* the resident held the wearable's button */
     ALERT_NIGHT_EXIT,
     ALERT_BATHROOM,
     ALERT_INACTIVITY,
@@ -103,15 +104,24 @@ typedef struct {
     char id[RULES_ALERT_ID_LEN];
 } rules_episode_t;
 
+/*
+ * An alert raised on the wearable itself: a fall or a help request. It is named after the
+ * seq of the message that opened it ("<wearable>-<seq>"), and only the resident (a cancel
+ * from the wearable) or, later, a caregiver closes it.
+ */
 typedef struct {
-    char            id[RULES_WEARABLE_ID_LEN];
-    uint64_t        last_seen_ms;
-    bool            fall_open;
-    uint16_t        fall_seq;
-    uint32_t        fall_uptime_ms;   /* with fall_seq, tells a resend from a new fall after a restart */
-    rules_episode_t fall;
-    rules_episode_t offline;
-    rules_episode_t low_battery;
+    uint16_t        seq;
+    uint32_t        uptime_ms;   /* with seq, tells a resend from a new alert after a restart */
+    rules_episode_t episode;
+} rules_wearable_alert_t;
+
+typedef struct {
+    char                   id[RULES_WEARABLE_ID_LEN];
+    uint64_t               last_seen_ms;
+    rules_wearable_alert_t fall;
+    rules_wearable_alert_t help;
+    rules_episode_t        offline;
+    rules_episode_t        low_battery;
 } rules_wearable_t;
 
 /* A timed rule that a door event arms and a later observation clears. */
@@ -186,6 +196,9 @@ void rules_on_battery(rules_t *rules, const char *wearable, uint16_t battery_mv,
 void rules_on_fall(rules_t *rules, const char *wearable, uint16_t seq, uint32_t uptime_ms, float a2, float prob,
                    const rules_clock_t *now);
 void rules_on_fall_cancel(rules_t *rules, const char *wearable, uint16_t fall_seq, const rules_clock_t *now);
+/* A HELP message (the resident held the button), with the same resend rule as FALL. */
+void rules_on_help(rules_t *rules, const char *wearable, uint16_t seq, uint32_t uptime_ms, const rules_clock_t *now);
+void rules_on_help_cancel(rules_t *rules, const char *wearable, uint16_t help_seq, const rules_clock_t *now);
 
 /* Evaluates the timed rules; call at least once per second. */
 void rules_tick(rules_t *rules, const rules_clock_t *now);
@@ -194,7 +207,7 @@ void rules_tick(rules_t *rules, const rules_clock_t *now);
 bool rules_wearable_offline(const rules_t *rules, const char *wearable);
 
 /*
- * True while any episode is open. A fall stays open until the resident cancels it:
+ * True while any episode is open. A fall or a help request stays open until the resident cancels it:
  * nothing on the hub can tell that help arrived (caregiver acknowledgement is future work).
  */
 bool rules_any_active(const rules_t *rules);

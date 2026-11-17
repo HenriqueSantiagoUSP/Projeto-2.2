@@ -57,7 +57,8 @@ O simulador publica estados, sinais de vida da pulseira e, sob comando, alertas:
 | Tecla + ENTER | Efeito |
 |---|---|
 | (só ENTER) | queda |
-| `c` | cancela a última queda ("estou bem") |
+| `a` | pedido de ajuda (o botão da pulseira segurado) |
+| `c` | cancela a última queda ou o último pedido de ajuda ("estou bem", os dois toques) |
 | `s` / `b` / `t` | saída noturna / banheiro prolongado / temperatura alta |
 | `r` | resolve os alertas abertos |
 | `o` | pulseira sem sinal (de novo: volta) |
@@ -92,11 +93,14 @@ Abra o Grafana (painel **Quartos**) e acompanhe; os alertas aparecem na tabela e
 A janela mostra:
 - o \|a\| filtrado rolando, com a linha do gatilho;
 - cada disparo com a P(queda) da placa (azul: não é queda; laranja: queda);
-- uma faixa grande "QUEDA DETECTADA";
+- uma faixa grande "QUEDA DETECTADA" ou "PEDIDO DE AJUDA" (o botão da placa segurado por 3 s);
 - os atributos da última janela (pico, queda livre, quietude, inclinação);
 - os avisos da placa.
 
-Teclas: `c` = "estou bem" (publica o `cancelado` da última queda); `q` = sai.
+Com a central, o botão da placa também chega a ela: segurar 3 s publica o alerta `ajuda`, e dois toques publicam o
+`cancelado` do último alerta.
+
+Teclas: `c` = "estou bem" (publica o `cancelado` do último alerta, como os dois toques); `q` = sai.
 
 Ao abrir a porta, o programa reinicia a placa, para ler no boot o id da pulseira e o modelo (`--sem-reset`
 desliga isso).

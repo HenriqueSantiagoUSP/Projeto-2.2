@@ -40,7 +40,7 @@ static const char *TAG = "main";
 
 #define HUB_QUEUE_DEPTH     32
 #define HUB_TICK_MS         1000    /* rules run at least this often */
-#define FALL_BUZZER_MS      60000   /* local alarm on a fall; FALL_CANCEL stops it earlier */
+#define FALL_BUZZER_MS      60000   /* local alarm on a fall or a help request; the cancel stops it earlier */
 #define JSON_MAX            384
 
 /* Every door needs a CAN nibble of its own (docs/protocolo.md §2). */
@@ -210,6 +210,8 @@ static void publish_alert(const rules_alert_t *alert){
                 }
             }
             break;
+        case ALERT_HELP:
+            break;   /* the id and the origin say who asks: no detail */
         case ALERT_NIGHT_EXIT:
             snprintf(detail, sizeof(detail), "\"porta\":\"%s\",\"min_sem_presenca\":%u",
                      alert->door_id, alert->minutes);
@@ -286,7 +288,7 @@ static void on_alert(const rules_alert_t *alert, void *ctx){
 
     publish_alert(alert);
 
-    if (alert->type == ALERT_FALL) {
+    if (alert->type == ALERT_FALL || alert->type == ALERT_HELP) {
         if (alert->state == ALERT_ACTIVE) {
             indicators_buzzer_start(FALL_BUZZER_MS);
         } else {
@@ -381,6 +383,14 @@ static void handle_espnow(const espnow_rx_msg_t *msg, const rules_clock_t *now){
         case ESPNOW_MSG_FALL_CANCEL:
             ESP_LOGI(TAG, "FALL_CANCEL from %s for seq %u", msg->wearable, msg->fall_cancel.fall_seq);
             rules_on_fall_cancel(&s_rules, msg->wearable, msg->fall_cancel.fall_seq, now);
+            break;
+        case ESPNOW_MSG_HELP:
+            ESP_LOGW(TAG, "HELP from %s (button held), seq %u", msg->wearable, msg->seq);
+            rules_on_help(&s_rules, msg->wearable, msg->seq, msg->uptime_ms, now);
+            break;
+        case ESPNOW_MSG_HELP_CANCEL:
+            ESP_LOGI(TAG, "HELP_CANCEL from %s for seq %u", msg->wearable, msg->help_cancel.help_seq);
+            rules_on_help_cancel(&s_rules, msg->wearable, msg->help_cancel.help_seq, now);
             break;
         default:
             break;

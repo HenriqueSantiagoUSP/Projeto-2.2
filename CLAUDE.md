@@ -6,8 +6,8 @@ Butantã). Dois ESP32-S3, que no protótipo são a mesma PCB com firmwares difer
 
 - o **hub** (ou hub do quarto, `firmware/room/`): a placa fixa no quarto. Lê portas, presença e temperatura,
   roda as regras de alerta, recebe a pulseira por ESP-NOW, publica por MQTT e é o nó CAN do quarto;
-- a **pulseira** (`firmware/gadget/`): o dispositivo que o residente usa no pulso, com o MPU-6050 e o botão
-  "estou bem". Detecta a queda e avisa o hub.
+- a **pulseira** (`firmware/gadget/`): o dispositivo que o residente usa no pulso, com o MPU-6050 e um botão
+  (dois toques = "estou bem", cancela o alerta; segurar 3 s = pedido de ajuda). Detecta a queda e avisa o hub.
 
 **Nomes:** na documentação, nos relatórios, nos painéis e no MQTT é sempre **pulseira** (desde 2026-11-17;
 antes, "vestível"). No código C, que é em inglês, ela é `gadget`/`wearable`, e o hub é `room`/`hub`.
@@ -113,6 +113,7 @@ sh firmware/room/components/rules/test_host/run_tests.sh         # regras do hub
 sh firmware/room/components/hub_config/test_host/run_tests.sh    # JSON da config (precisa de 1 build do room)
 sh firmware/gadget/components/fall_pipeline/test_host/run_tests.sh # pipeline de queda: gatilho, filtro, paridade com o Python
 sh firmware/gadget/components/signal_proc/test_host/run_tests.sh # buffer circular, atributos, atividade
+sh firmware/gadget/components/button_gesture/test_host/run_tests.sh # gestos do botão: dois toques, segurar
 ```
 
 Para compilar os caminhos opcionais da pulseira sem mexer no `sdkconfig` dela, use um build de teste com outro

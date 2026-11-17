@@ -46,10 +46,10 @@ comunicação sem fio funcionando com os sensores, para 24/11.
 | 1 | Contrato em código (`firmware/common/protocol`, agora com `protocol_can.h`) e componentes comuns (`rtos_util`, `sys_events`, `net`, `mqtt_link`, `can`, `indicators`) | feito | build (hub e pulseira) |
 | 2 | Hub: debounce corrigido, portas modulares, LM35 com `adc_cali` + curva MMQ, aquecimento do PIR | código pronto | build |
 | 3 | Hub: Wi-Fi STA + `WIFI_PS_NONE` + backoff, SNTP, MQTT 3.1.1 com senha, Last Will, outbox, config em NVS, watchdog de 30 s | código pronto | build; validação da config em testes no PC (60 verificações) |
-| 4 | Hub: motor de regras, `alerta`, buzzer, LED de status | código pronto | build; regras em testes no PC (16 cenários, 54 verificações) |
-| 5 | Central: Mosquitto com ACL (agora com o usuário `pulseira`), Telegraf, InfluxDB, Grafana, notificador, simulador novo | feito | ponta a ponta (sem placa); notificador em testes no PC (12 testes) |
+| 4 | Hub: motor de regras, `alerta`, buzzer, LED de status | código pronto | build; regras em testes no PC (22 cenários, 82 verificações) |
+| 5 | Central: Mosquitto com ACL (agora com o usuário `pulseira`), Telegraf, InfluxDB, Grafana, notificador, simulador novo | feito | ponta a ponta (sem placa); notificador em testes no PC (22 testes) |
 | 6 | Pulseira: MPU-6050 a 200 Hz pelo FIFO, modo de coleta, ESP-NOW com varredura e heartbeat; MQTT e CAN opcionais | código pronto | build (padrão e com MQTT + CAN + coleta ligados) |
-| 7 | Pulseira: pipeline de queda (filtro, gatilho de 2,0 g, 23 atributos, Random Forest ou regressão logística) + cooldown, botão "estou bem", bateria. Até 2026-11-10 era o detector provisório com histerese | código pronto, **sem light sleep**; modelo provisório (SisFall, cintura) | build; `fall_pipeline` (885 verificações, com paridade C × Python em 26 janelas) e `signal_proc` (25 verificações) no PC |
+| 7 | Pulseira: pipeline de queda (filtro, gatilho de 2,0 g, 23 atributos, Random Forest ou regressão logística) + cooldown, botão (dois toques = "estou bem"; segurar 3 s = pedido de ajuda, desde 2026-11-17), bateria. Até 2026-11-10 era o detector provisório com histerese | código pronto, **sem light sleep**; modelo provisório (SisFall, cintura) | build; `fall_pipeline` (885 verificações, com paridade C × Python em 26 janelas), `signal_proc` (25) e `button_gesture` (42) no PC |
 | 8 | Coleta de dados | protocolo escrito ([`coleta-de-dados.md`](coleta-de-dados.md)); SisFall e 18 ensaios próprios (cintura, ±2 g, fora do protocolo) descritos em [`dados/README.md`](../dados/README.md); falta a coleta no pulso | leitura e contagem pelo `modelo/` |
 | 9 | Avaliação | não iniciada | — |
 
@@ -70,6 +70,44 @@ A lista de pendências e próximos passos fica em [`pendencias.md`](pendencias.m
 Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
+
+### 2026-11-17 — gestos do botão: dois toques cancelam, segurar pede ajuda
+
+- **Pedido:** o botão não pode cancelar uma queda por um aperto sem querer, e deve servir também para pedir ajuda
+  quando não há alerta (a queda que o modelo não viu, ou outra situação), também sem brecha para acidente.
+- **Decidido com o usuário:** dois toques rápidos cancelam ("estou bem"); segurar 3 s pede ajuda; o pedido
+  de ajuda pode ser cancelado pelos mesmos dois toques nos 15 s seguintes. O porquê está em
+  [`decisoes.md`](decisoes.md) (*Gestos do botão*).
+- **Feito:**
+  - **componente novo** `firmware/gadget/components/button_gesture`: lógica pura dos gestos (estabilização de
+    30 ms, dois toques, segurar), com testes no PC (42 verificações). Quatro erros plantados de propósito numa
+    cópia foram todos pegos pelos testes;
+  - **pulseira:** task `button` (núcleo 1) acordada pela ISR (as duas bordas), que entrega cada gesto à `comm`
+    com a hora em que aconteceu. A `comm` passou a tratar "alertas do botão" (queda e ajuda): `HELP` e
+    `HELP_CANCEL`, reenvio e reserva por MQTT iguais aos da queda, cada tipo esperando no seu lugar. Saiu o
+    bloqueio de 300 ms, que engoliria o segundo toque. Kconfig novos: `GADGET_HELP_HOLD_S` e
+    `GADGET_DOUBLE_TAP_GAP_MS`; a queda simulada de teste passou a ser dois toques sem alerta;
+  - **contrato:** `HELP` (`0x06`) e `HELP_CANCEL` (`0x07`) no ESP-NOW, sem mudar a versão; tipo `ajuda` no
+    MQTT, com `id` `<pulseira>-<seq>` ([`protocolo.md`](protocolo.md));
+  - **hub:** regras `rules_on_help`/`rules_on_help_cancel` (a queda e a ajuda dividem a lógica de episódio),
+    `espnow_link` e `main.c`; 20 verificações novas nas regras;
+  - **central:** o notificador escreve "Pedido de ajuda (botão da pulseira)"; o simulador ganhou o comando `a`;
+    a demo repassa o botão da placa (segurar e dois toques) e mostra a faixa "PEDIDO DE AJUDA";
+  - **documentos:** `protocolo.md`, `requisitos.md` (RF05 reescrito, RF20 novo), `arquitetura.md`,
+    `decisoes.md`, `roadmap.md`, os READMEs da pulseira, da central e do hardware, e o `CLAUDE.md`;
+  - **relatório do Q2:** requisitos, sensores (subseção do botão com a tabela de gestos e o porquê),
+    condicionamento, firmware (task `button`, figura nova dos gestos, contagens dos testes), sem fio (mensagens
+    e alerta `ajuda`), verificação (linha "Botão" no plano) e quatro diagramas.
+- **Verificado:**
+  - build sem avisos do hub e da pulseira (padrão, demo e com MAC, MQTT, CAN, coleta e queda simulada);
+  - testes de host: `button_gesture` 42, regras 82, `hub_config` 60, `fall_pipeline` 885, `signal_proc` 25;
+  - notificador 22 testes, demo 19;
+  - o simulador publicou `ajuda` ativo e cancelado (sem broker, com a publicação interceptada);
+  - uma janela da demo, tocando uma sessão gravada com um pedido de ajuda, mostrou a faixa nova;
+  - relatório do Q2: 68 páginas, sem erros, sem referência indefinida e sem *overfull*; as páginas mudadas
+    conferidas na imagem.
+- **Não verificado:** nada disso rodou na placa. Os gestos entraram como item de bancada em
+  [`pendencias.md`](pendencias.md) ("Pulseira gravada e conferida").
 
 ### 2026-11-17 — relatório do Q2 como relatório final
 

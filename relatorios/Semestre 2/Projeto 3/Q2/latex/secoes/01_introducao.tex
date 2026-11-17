@@ -4,7 +4,8 @@
 \noindent\colorbox{lightblue!60}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\small
 \textbf{\color{uspblue}Termos usados neste relatório}\\[3pt]
 \textbf{Pulseira}: o dispositivo que o residente usa no pulso. É um ESP32-S3 com o
-acelerômetro e giroscópio MPU-6050 e um botão; detecta a queda e avisa o hub sem fio.\\[2pt]
+acelerômetro e giroscópio MPU-6050 e um botão (dois toques cancelam um alerta; segurar por 3\,s
+pede ajuda); detecta a queda e avisa o hub sem fio.\\[2pt]
 \textbf{Hub} (ou hub do quarto): a placa fixa em cada quarto, também com ESP32-S3. Lê as
 portas, a presença e a temperatura, roda as regras de alerta, recebe a pulseira e envia tudo
 à central.\\[2pt]

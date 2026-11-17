@@ -14,7 +14,8 @@ Pedidos e prazos em [`relatorios/README.md`](../relatorios/README.md), Projeto 3
 
 - [ ] **Q2 (17/11):** relatório com sensores, condicionamento de sinais, interface CAN, interface sem fio e a
   placa desenvolvida (primeira interação de entrega).
-  - Pronto: o relatório final, em `relatorios/Semestre 2/Projeto 3/Q2/latex/` (65 páginas).
+  - Pronto: o relatório final, em `relatorios/Semestre 2/Projeto 3/Q2/latex/` (68 páginas, com os gestos do
+    botão desde 2026-11-17).
   - Falta:
     - a revisão do grupo;
     - as fotos nos quadros tracejados: a PCB fabricada, o monitor serial do ESP-NOW, o Grafana, o Telegram e a
@@ -71,7 +72,18 @@ Tudo isto já está no código e compila; falta rodar na placa.
     - uma batida passa de 3,46 g sem ficar cortada num teto plano;
   - descoberta do canal do hub;
   - heartbeat aparecendo no Grafana;
-  - queda simulada pelo botão chegando ao Telegram;
+  - queda simulada (dois toques sem alerta, com `GADGET_BUTTON_SIMULATES_FALL`) chegando ao Telegram;
+  - **gestos do botão** ([`decisoes.md`](decisoes.md), *Gestos do botão*):
+    - um aperto simples não faz nada, com ou sem alerta;
+    - dois toques nos 15 s depois de uma queda: `FALL_CANCEL`, alerta `cancelado` no Telegram, LED volta ao
+      normal;
+    - segurar 3 s fora de alerta: o LED vai a vermelho ainda com o botão apertado, e o alerta `ajuda` chega ao
+      Telegram; dois toques nos 15 s seguintes o cancelam;
+    - segurar durante um alerta, e dois toques fora dele, não fazem nada;
+    - ficar com o botão apertado por 30 s dá um pedido só; ligar a placa com o botão apertado não dá nenhum;
+    - calibrar com alguém mais velho os 3 s e o intervalo de 1 s entre os toques (`menuconfig`);
+    - com o hub desligado, dois toques logo depois de uma queda ainda cancelam (a `comm` estará ocupada
+      reenviando, e a task `button` mede o gesto à parte);
   - **pipeline de queda na placa:**
     - no boot, a linha `fall pipeline: trigger 2.00 g, random forest, fall when P >= 0.73`;
     - balançar ou bater a placa gera `trigger at sample …: peak … g, P(fall) …`;
@@ -253,6 +265,15 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 ## Concluído
 
 O mais recente no topo.
+
+- [x] **2026-11-17 — Gestos do botão da pulseira:** dois toques = "estou bem" (cancela a queda ou o pedido de
+  ajuda nos 15 s); segurar 3 s = pedido de ajuda (`HELP` → alerta `ajuda`); aperto simples não faz nada. No
+  firmware das duas placas, no contrato, na central, na documentação e no relatório do Q2. Detalhes em
+  [`decisoes.md`](decisoes.md) (*Gestos do botão*) e no diário.
+  - Verificado: builds sem avisos (hub; pulseira padrão, demo e com todas as opções); testes de host
+    (`button_gesture` 42, regras 82, `hub_config` 60, `fall_pipeline` 885, `signal_proc` 25); notificador 22 e
+    demo 19 testes; uma janela da demo renderizada com a faixa nova; relatório recompilado.
+  - Falta a bancada: item "Pulseira gravada e conferida", gestos do botão.
 
 - [x] **2026-11-17 — "Pulseira" no lugar de "vestível" em todo o projeto,** inclusive no contrato MQTT
   (tópicos, alerta `pulseira_offline`, usuário do broker). Detalhes em [`decisoes.md`](decisoes.md) e no diário.

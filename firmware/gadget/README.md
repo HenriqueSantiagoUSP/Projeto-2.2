@@ -27,9 +27,15 @@ documentação do ESP-IDF v6.0.1.
   atributos, P(queda) e o custo em ciclos. Serve para formar o conjunto de dados do modelo
   ([`docs/coleta-de-dados.md`](../../docs/coleta-de-dados.md)).
 - **ESP-NOW:** varredura de canal, heartbeat a cada 30 s com bateria e atividade, `FALL` (com o pico e a
-  P(queda)) com reenvio até o ACK, `FALL_CANCEL` pelo botão "estou bem" dentro da janela de 15 s em que o LED fica em alerta (não há buzzer).
+  P(queda)) e `HELP` com reenvio até o ACK.
+- **Botão** (task `button`, componente `button_gesture`; o porquê em
+  [`docs/decisoes.md`](../../docs/decisoes.md), *Gestos do botão*):
+  - **dois toques rápidos** dentro da janela de 15 s em que o LED fica em alerta = "estou bem": cancela a queda
+    (`FALL_CANCEL`) ou o pedido de ajuda (`HELP_CANCEL`);
+  - **segurar 3 s** fora de alerta = pedido de ajuda (`HELP` → alerta `ajuda`), com a mesma janela para cancelar;
+  - um aperto simples não faz nada. Não há buzzer.
 - **MQTT (opcional):** associa ao Wi-Fi do hub, publica `pulseira/<id>/telemetria` e, se o hub não confirmar
-  uma queda, publica o alerta ela mesma ([`docs/protocolo.md`](../../docs/protocolo.md) §1).
+  uma queda ou um pedido de ajuda, publica o alerta ela mesma ([`docs/protocolo.md`](../../docs/protocolo.md) §1).
 - **CAN (opcional, só bancada):** quedas (pico e P) e heartbeats como quadros `0x0FD`/`0x0FE`, para o
   requisito da disciplina e para testes. A pulseira de verdade não tem transceptor.
 - **Ainda não:** *light sleep* (depende de medir o consumo em placa).
@@ -45,7 +51,8 @@ documentação do ESP-IDF v6.0.1.
 | Fall trigger | L<sub>on</sub> do gatilho em centésimos de g (200 = 2,0 g, o valor do treino). Mudar afasta as janelas das do treino: revise com os dados do pulso e retreine |
 | Fall classifier | Random Forest (padrão) ou regressão logística |
 | Cooldown, cancel window | 30 s e 15 s por padrão |
-| Button simulates a fall | só para testes: o botão gera uma queda e permite testar todo o caminho até o Telegram |
+| Help hold, double tap gap | segurar 3 s pede ajuda; até 1 s entre os dois toques (padrões) |
+| Double tap simulates a fall | só para testes: dois toques sem alerta aberto geram uma queda e permitem testar todo o caminho até o Telegram |
 | Data collection mode | liga a saída CSV e as linhas `FEAT:` (uma por disparo do gatilho) |
 | Battery divider | **desligado por padrão**: a PCB do protótipo não tem divisor (a pulseira roda com power bank), e a bateria vai como "desconhecida". Ligue só numa placa com LiPo e divisor no GPIO 5 |
 | Also join the Wi-Fi and talk to the central over MQTT | liga o MQTT direto (padrão: desligado). Preencha também **Network (Wi-Fi)** e **MQTT** (usuário `pulseira`, senha `MQTT_PULSEIRA_PASSWORD` do `interface/.env`, mesmo site e quarto do hub) |
@@ -106,14 +113,16 @@ diferentes dos de uma pessoa caindo.
 ## Componentes e tasks
 
 Próprios, em `components/`: `board`, `mpu6050`, `fall_pipeline` e `signal_proc` (os dois dependem de
-`espressif/esp-dsp`, baixado do registro no primeiro build), `espnow_tx`, `battery`. Comuns, em
+`espressif/esp-dsp`, baixado do registro no primeiro build), `button_gesture` (os gestos, lógica pura com testes
+no PC), `espnow_tx`, `battery`. Comuns, em
 [`firmware/common/`](../common/README.md): `pcb`, `protocol`, `rtos_util`, `sys_events`, `net`, `mqtt_link`, `can`,
 `indicators`.
 
 | Task | Núcleo | Prioridade | Função |
 |---|---|---|---|
 | `sampling` | 1 | ALTA | FIFO do MPU-6050 (e as novas tentativas quando ele falta), pipeline de queda (filtro, gatilho, janela, atributos, classificador) |
-| `comm` | 0 | MEDIA | ESP-NOW, MQTT e CAN opcionais, botão, heartbeat |
+| `button` | 1 | MEDIA | gestos do botão: a ISR só a acorda; ela mede os apertos e manda cada gesto à `comm` |
+| `comm` | 0 | MEDIA | ESP-NOW, MQTT e CAN opcionais, alertas e cancelamentos do botão, heartbeat |
 | `can_rx`, `can_tx` | 0 | MEDIA | só com o CAN ligado |
 | `indicators` | 0 | MINIMA | LED |
 
@@ -133,4 +142,5 @@ Testes no PC (Git Bash, gcc do MSYS2 no PATH):
 ```bash
 sh components/fall_pipeline/test_host/run_tests.sh   # gatilho, filtro, janela e paridade com o Python
 sh components/signal_proc/test_host/run_tests.sh     # buffer circular, momentos, atividade
+sh components/button_gesture/test_host/run_tests.sh  # gestos do botão: dois toques, segurar
 ```

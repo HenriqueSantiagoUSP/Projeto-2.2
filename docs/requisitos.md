@@ -17,7 +17,8 @@ detecção de queda. Outros cômodos e áreas comuns ficam fora por enquanto.
 | RF02 | Detectar queda na própria pulseira. Desde 2026-11-11: gatilho em picos de \|a\| ≥ 2,0 g + classificador (Random Forest) sobre 23 atributos da janela. O modelo, treinado na SisFall (cintura), é **provisório até retreinar com os dados do pulso** (antes: a² > 6,25 g²) | S1 P1 RF02/RF03 |
 | RF03 | Enviar `FALL` ao hub imediatamente, com reenvio até a confirmação | S1 P1 RF04 |
 | RF04 | Após uma queda, não gerar outra por 30 s (cooldown) | S1 P1 RF05 |
-| RF05 | Botão "estou bem" cancela a queda (`FALL_CANCEL`) | novo |
+| RF05 | Dois toques rápidos no botão ("estou bem") cancelam a queda ou o pedido de ajuda nos 15 s seguintes (`FALL_CANCEL`/`HELP_CANCEL`); um aperto simples não faz nada. Desde 2026-11-17 (antes: um aperto simples) | novo |
+| RF20 | Segurar o botão por 3 s, fora de alerta, pede ajuda (`HELP` → alerta `ajuda`) | novo (2026-11-17) |
 | RF06 | Enviar heartbeat a cada 30 s com tensão da bateria e nível de atividade | novo (substitui S1 P1 RF06) |
 | RF07 | Modo de coleta que grava amostras brutas para formar o conjunto de dados | novo |
 
