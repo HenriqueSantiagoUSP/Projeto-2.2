@@ -3,6 +3,9 @@
 Primeira PCB do projeto: uma placa-base para as duas placas (hub e vestível), com a ESP32-S3-DevKitC-1 encaixada.
 Fonte em [`../../fontes/esquematico/`](../../fontes/esquematico/); decisões em [`../../README.md`](../../README.md).
 
+**Situação:** fabricada e em mãos; falta montar e testar (roteiro em
+[`docs/pendencias.md`](../../../docs/pendencias.md), Hardware).
+
 | Arquivo | O quê |
 |---|---|
 | `placa-v1-jlcpcb.zip` | **o que se envia à JLCPCB**: Gerbers + furação |

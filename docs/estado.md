@@ -25,7 +25,11 @@ das duas placas agora segue os slides de [`aulas/`](../aulas/README.md) e o ESP-
 O próximo passo é gravar as placas e verificar em bancada (ver [`pendencias.md`](pendencias.md)). O mapa de pinos é o da
 **PCB única** das duas placas ([`hardware/README.md`](../hardware/README.md)). A **PCB v1** está desenhada,
 conferida (ERC e DRC sem erros) e com os arquivos de fabricação em
-[`hardware/placas/v1/`](../hardware/placas/v1/README.md). Falta encomendar e montar.
+[`hardware/placas/v1/`](../hardware/placas/v1/README.md). Ela já foi fabricada e está em mãos; falta montar
+e testar.
+
+**S2 P3:** o Q1 (modelos) foi entregue e apresentado. Os próximos são o Q2, um relatório para 17/11, e o Q3, a
+comunicação sem fio funcionando com os sensores, para 24/11.
 
 **Modelo de queda:**
 - **2026-11-09 (S2 P3 Q1):** o pipeline e 22 métodos foram desenvolvidos e comparados **no PC**
@@ -66,6 +70,22 @@ A lista de pendências e próximos passos fica em [`pendencias.md`](pendencias.m
 Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
+
+### 2026-11-16 — pendências em dia: Q1 entregue, PCB em mãos, `aulas/` fora do git
+
+- **Informado pelo grupo:**
+  - o S2 P3 Q1 foi entregue e apresentado;
+  - a PCB v1 foi entregue no S2 P2 (16/10), fabricada e está em mãos;
+  - `aulas/` não entra no git.
+- **Feito:**
+  - `pendencias.md`:
+    - nova seção "Entregas da disciplina", com o Q2 (17/11) e o Q3 (24/11), que não estavam na lista;
+    - saíram o "primeiro commit" e o "antena fora de cobre", que a v1 já tem;
+    - a conferência da ordem dos pinos passou para o primeiro passo da montagem;
+    - entrou a falta de um remoto para o repositório e o fim de linha da cópia de trabalho;
+  - `aulas/` no `.gitignore` e fora do índice (os arquivos continuam no disco); decisão em
+    [`decisoes.md`](decisoes.md).
+- **Verificado:** `git check-ignore aulas/README.md` e os 18 arquivos ainda na pasta.
 
 ### 2026-11-13 — erros não tratados: revisão de código e correções
 
