@@ -1,0 +1,26 @@
+% Topologia: estrela ESP-NOW (vestíveis -> hub), estrela Wi-Fi (hubs -> AP) e barramento CAN da sala.
+\begin{tikzpicture}[font=\footnotesize]
+  \node[bloco=corcentral, minimum width=2.4cm] (ap) at (0,0) {ponto de acesso\\Wi-Fi da ILPI};
+  \node[bloco=corcentral, minimum width=2.4cm] (cen) at (5.0,0) {central\\(PC ou Raspberry Pi)};
+  \draw[thick, corcentral] (ap) -- node[rotulo, above=2pt] {Ethernet} (cen);
+
+  \foreach \i/\x/\nome in {1/-4.6/quarto 101, 2/0/quarto 102, 3/4.6/quarto 103} {
+    \node[bloco=corhub, minimum width=2.1cm] (hub\i) at (\x,-2.6) {hub\\\nome};
+    \node[bloco=corvest, minimum width=1.5cm, font=\scriptsize] (v\i) at (\x-1.0,-4.3) {vestível};
+    \draw[sem fio=corvest] (v\i) -- (hub\i);
+  }
+  \draw[sem fio=corhub] (hub1) -- node[rotulo, sloped, above=1pt] {Wi-Fi STA (MQTT)} (ap);
+  \draw[sem fio=corhub] (hub2) -- (ap);
+  \draw[sem fio=corhub] (hub3) -- (ap);
+  \node[font=\scriptsize, text=corvest, anchor=east] at (-5.7,-3.45) {ESP-NOW};
+
+  % barramento CAN
+  \draw[very thick, corambas] (-6.4,-5.4) -- (6.4,-5.4);
+  \node[font=\scriptsize, text=corambas, anchor=west, align=left] at (6.75,-5.4) {CAN\\da sala};
+  \foreach \i in {1,2,3} {\draw[thick, corambas] ($(hub\i.south)+(0.6,0)$) -- ++(0,-2.35);}
+  \foreach \x/\g in {-2.3/0xD, 2.3/0xA} {
+    \node[bloco=corambas, minimum width=1.6cm, font=\scriptsize] (g\g) at (\x,-6.4) {grupo \g};
+    \draw[thick, corambas] (g\g.north) -- (\x,-5.4);
+  }
+  \foreach \x in {-6.4,6.4} {\node[draw=corambas, fill=white, inner sep=1.2pt, font=\tiny] at (\x,-5.4) {120\,$\Omega$};}
+\end{tikzpicture}

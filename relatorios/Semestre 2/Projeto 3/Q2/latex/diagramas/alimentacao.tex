@@ -1,0 +1,10 @@
+% Entrada de alimentação da PCB: módulo USB-C -> +5V -> D1 -> DevKit; periféricos de 5 V direto.
+\begin{circuitikz}[font=\footnotesize]
+  \node[draw, thick, minimum width=1.9cm, minimum height=2.0cm, align=center] (usb) at (0,0) {módulo\\USB-C\\(J6)};
+  \draw ($(usb.east)+(0,0.5)$) node[anchor=south west, font=\tiny] {V} -- ++(2.0,0) coordinate (v5) node[circ] {} node[above] {+5V};
+  \draw ($(usb.east)+(0,-0.5)$) node[anchor=north west, font=\tiny] {G} -- ++(0.6,0) -- ++(0,-0.4) node[ground] {};
+  \draw (v5) to[C, l={$C_8$ \SI{10}{\micro\farad}}] ++(0,-2.0) node[ground] {};
+  \draw (v5) -- ++(1.4,0) coordinate (n1) node[circ] {} to[D, l={$D_1$ 1N5819}] ++(2.4,0) coordinate (dk)
+        -- ++(0.6,0) node[right, align=left] {pino 5V da DevKit\\(o regulador de 3,3\,V dela alimenta\\o MPU-6050 e o transceptor CAN)};
+  \draw (n1) -- ++(0,1.2) -- ++(3.0,0) node[right, align=left] {LM35, LM358 e PIR (5\,V)};
+\end{circuitikz}

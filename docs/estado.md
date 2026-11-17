@@ -71,6 +71,39 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-16 — relatório do Q2 (primeira versão do relatório final)
+
+- **Pedido:** o relatório do Q2 no esquema LaTeX do Q1 (pastas de figuras, imagens e tabelas), como primeira
+  versão do relatório final. Tem o projeto inteiro, com figuras, gráficos e diagramas, e espaço para as fotos
+  que ainda não existem.
+- **Decidido com o usuário:**
+  - os modelos entram num capítulo resumido, que cita o Q1;
+  - para a bancada, só o plano de testes, sem tabelas de resultado vazias.
+- **Feito:**
+  - **onde está:** `relatorios/Semestre 2/Projeto 3/Q2/latex/`, com 66 páginas, 13 seções e 4 apêndices, um
+    arquivo por seção em `secoes/` e 11 diagramas em `diagramas/`;
+  - **o script** `modelo/experimentos/12_relatorio_q2.py`:
+    - gráficos: LM35 com os 22 pontos do S1 P2 e os resíduos, faixa do ADC, Bode do RC, resposta do biquad e
+      cenários do MPU;
+    - cópias de figuras do Q1, a lista de materiais com a função de cada peça e a tabela dos classificadores;
+    - `numeros.tex`;
+    - pelo `kicad-cli` e pelo `pdftoppm`: renders 3D, camadas de cobre, cada folha do esquema recortada,
+      ERC e DRC;
+  - **fotos:** cinco reaproveitadas dos relatórios anteriores (bancada e protoboard do LM35, simulação SPICE,
+    PCB do S1, CAN de 28/08). Para as 11 que faltam, a macro `\fotoouespaco` desenha um quadro com o nome do
+    arquivo; a lista fica no topo do `main.tex`;
+  - **tamanho dos firmwares**, medido para o relatório:
+    - hub: 992 672 bytes, 35 % da partição livre;
+    - vestível com ESP-NOW (build de teste no scratchpad): 960 688 bytes, 37 %;
+    - vestível sem hub: 383 184 bytes, 75 %.
+- **Verificado:**
+  - asserts do script: o ajuste reproduz `lm35.h` e o biquad bate com o `fall_model.c`;
+  - DRC: 0 erros, 0 sem ligação, 0 divergências; ERC: 0;
+  - `pdflatex` sem erros, sem *overfull* e sem referência indefinida;
+  - as páginas conferidas na imagem;
+  - a macro das fotos testada com e sem arquivo.
+- **Não verificado:** nada novo em placa. O relatório diz isso e separa o verificado do plano de testes.
+
 ### 2026-11-16 — pendências em dia: Q1 entregue, PCB em mãos, `aulas/` fora do git
 
 - **Informado pelo grupo:**

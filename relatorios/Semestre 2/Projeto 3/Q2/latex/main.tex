@@ -1,0 +1,303 @@
+% ============================================================
+%  Projeto Integrativo 3 — Projeto 3, entrega Q2
+%  Primeira versão do relatório final: sensores, condicionamento,
+%  PCB, CAN, interface sem fio, firmware, modelos e central.
+%  Escola Politécnica da USP
+%
+%  Compilar: pdflatex main.tex (duas vezes, por causa do sumário).
+%
+%  Gráficos (figuras/), tabelas geradas e números (tabelas/numeros.tex) saem de
+%  modelo/experimentos/12_relatorio_q2.py; renders e camadas da PCB, do kicad-cli,
+%  pelo mesmo script. Os diagramas ficam em diagramas/ (TikZ), um por arquivo.
+%
+%  FOTOS A ACRESCENTAR: salve em imagens/ com estes nomes (.jpg ou .png) e
+%  recompile; enquanto o arquivo não existe, aparece um quadro tracejado.
+%    pcb_fabricada_cima      PCB v1 nua, face de cima
+%    pcb_fabricada_baixo     PCB v1 nua, face de baixo (plano de GND)
+%    pcb_montada_hub         PCB montada como hub (LM35, LM358, PIR, CAN)
+%    pcb_montada_vestivel    PCB montada como vestível (MPU-6050, botão)
+%    vestivel_no_pulso       o vestível preso ao corpo
+%    bancada_can             as duas placas ligadas pelo barramento CAN
+%    serial_can              monitor serial com os quadros CAN entre as placas
+%    serial_espnow           monitor serial do hub recebendo o vestível por ESP-NOW
+%    grafana_quartos         painel "Quartos" do Grafana com dados
+%    telegram_alerta         alerta de queda chegando no Telegram
+%    demo_vestivel           janela do demo_vestivel.py durante uma queda
+% ============================================================
+\documentclass[12pt,a4paper]{article}
+
+% --- Encoding & Language ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazilian]{babel}
+\usepackage{lmodern}
+\usepackage{textcomp}
+
+% --- Colors ---
+\usepackage[table]{xcolor}
+\definecolor{uspblue}{RGB}{0,84,166}
+\definecolor{lightblue}{RGB}{220,235,248}
+\definecolor{corhub}{RGB}{42,120,214}
+\definecolor{corvest}{RGB}{235,104,52}
+\definecolor{corcentral}{RGB}{27,175,122}
+\definecolor{corambas}{RGB}{98,80,214}
+\definecolor{cinza}{RGB}{137,135,129}
+
+% --- TOC (antes do parskip, que também mexe no sumário) ---
+\usepackage{tocloft}
+\renewcommand{\cftsecfont}{\bfseries\color{uspblue}}
+\renewcommand{\cftsecpagefont}{\bfseries\color{uspblue}}
+\setlength{\cftbeforesecskip}{4pt}
+
+% --- Layout ---
+\usepackage[
+  a4paper,
+  top=3cm, bottom=2cm,
+  left=3cm, right=2cm,
+  headheight=25pt
+]{geometry}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+
+% --- Math ---
+\usepackage{amsmath,amssymb}
+
+% --- Tables ---
+\usepackage{booktabs,makecell,array,tabularx}
+\usepackage{siunitx}
+\sisetup{output-decimal-marker={,}, exponent-product=\times, group-digits=false,
+         retain-explicit-plus=false}
+
+% --- Images & diagrams ---
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,shapes.multipart,fit,calc,backgrounds,decorations.pathreplacing}
+\usepackage[siunitx,european resistors,american inductors]{circuitikz}
+\ctikzset{bipoles/length=0.9cm}
+
+% --- Code ---
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{uspblue!40},
+  backgroundcolor=\color{lightblue!35},
+  xleftmargin=2pt, xrightmargin=2pt,
+  aboveskip=6pt, belowskip=6pt,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ã}{{\~a}}1 {õ}{{\~o}}1
+           {ç}{{\c{c}}}1 {ê}{{\^e}}1 {â}{{\^a}}1 {ô}{{\^o}}1 {à}{{\`a}}1 {|}{{\textbar}}1,
+}
+\lstdefinelanguage{json}{
+  morestring=[b]",
+  stringstyle=\color{uspblue!80!black},
+  literate=*{:}{{\textcolor{cinza}{:}}}1 {,}{{\textcolor{cinza}{,}}}1,
+}
+\lstdefinestyle{c}{language=C, keywordstyle=\color{uspblue}\bfseries, commentstyle=\color{cinza}\itshape}
+
+% --- Headers & Footers ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{uspblue}{EPUSP - Projeto Integrativo 3}}
+\fancyhead[R]{\small\textcolor{uspblue}{\thepage}}
+\fancyfoot[C]{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{uspblue}\leaders\hrule height \headrulewidth\hfill}}
+
+% --- Section Styling ---
+\usepackage{titlesec}
+\titleformat{\section}
+  {\large\bfseries\color{uspblue}}
+  {\thesection.}{0.6em}{}
+  [\vspace{-5pt}\textcolor{uspblue}{\rule{\linewidth}{0.4pt}}\vspace{1pt}]
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{uspblue!80!black}}
+  {\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries}
+  {\thesubsubsection}{0.6em}{}
+\newcommand{\sectionbreak}{\clearpage}   % cada seção começa numa página nova
+
+% --- Caption ---
+\usepackage{caption}
+\captionsetup{
+  font=small,
+  labelfont={bf,color=uspblue},
+  labelsep=period,
+}
+\captionsetup[table]{position=top}
+
+% --- Lists ---
+\usepackage{enumitem}
+\setlist[itemize]{noitemsep, topsep=4pt}
+\setlist[enumerate]{noitemsep, topsep=4pt}
+
+% --- Hyperref (por último) ---
+\usepackage[
+  colorlinks=true,
+  linkcolor=uspblue,
+  urlcolor=uspblue,
+  citecolor=uspblue,
+  bookmarks=true,
+  pdftitle={Projeto Integrativo 3 - Projeto 3 - Q2},
+  pdfauthor={Dimitri Garcia, Henrique Guimarães Margarido, Henrique Santiago},
+]{hyperref}
+
+% --- Macros ---
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\amag}{|a|}
+\newcommand{\wmag}{|\omega|}
+% Docentes da disciplina: preencha para a linha aparecer na contracapa.
+\newcommand{\docentes}{}
+
+% Foto que o grupo acrescenta: \fotoouespaco{arquivo sem extensão}{largura}{descrição}.
+% Se imagens/<arquivo>.jpg, .jpeg ou .png existir, entra a foto; se não, um quadro tracejado.
+\newcommand{\quadrofoto}[3]{%
+  \begin{tikzpicture}
+    \node[draw=uspblue, dashed, very thick, fill=lightblue!45, rounded corners=3pt,
+          minimum width=\dimexpr #2-2pt\relax, minimum height=\dimexpr #2*55/100\relax, inner sep=6pt] {%
+      \parbox{\dimexpr #2-1.2cm\relax}{\centering\small\color{uspblue}
+        \textbf{Inserir foto:} #3\\[4pt]\footnotesize\texttt{imagens/\detokenize{#1}.jpg}}};
+  \end{tikzpicture}}
+\newcommand{\fotoouespaco}[3]{%
+  \IfFileExists{imagens/#1.jpg}{\includegraphics[width=#2]{imagens/#1.jpg}}{%
+  \IfFileExists{imagens/#1.jpeg}{\includegraphics[width=#2]{imagens/#1.jpeg}}{%
+  \IfFileExists{imagens/#1.png}{\includegraphics[width=#2]{imagens/#1.png}}{%
+  \quadrofoto{#1}{#2}{#3}}}}}
+
+% Camada de cobre exportada pelo kicad-cli (A4 inteira), recortada na placa:
+% \camada{recorte}{largura}{arquivo}; o recorte vem de numeros.tex (\pcbTrimF, \pcbTrimB).
+\newcommand{\camada}[3]{%
+  \edef\camadaaux{\noexpand\includegraphics[trim=#1, clip, width=#2]{#3}}\camadaaux}
+
+% Estilos comuns dos diagramas
+\tikzset{
+  bloco/.style={draw=#1, fill=#1!10, rounded corners=3pt, align=center, font=\footnotesize,
+                minimum height=0.9cm, inner sep=4pt, thick},
+  bloco/.default=uspblue,
+  seta/.style={-{Stealth[length=2.2mm]}, thick, draw=#1},
+  seta/.default=black!70,
+  rotulo/.style={font=\scriptsize, fill=white, inner sep=1.5pt},
+  sem fio/.style={-{Stealth[length=2.2mm]}, thick, dashed, draw=#1},
+  sem fio/.default=black!70,
+}
+
+\input{tabelas/numeros.tex}
+
+\begin{document}
+	\pagenumbering{Alph}
+	% ============================================================
+	%  CAPA
+	% ============================================================
+	\begin{titlepage}
+		\centering
+
+		\includegraphics[scale=0.25]{imagens/Logo-Escola-Politecnica.jpg}
+
+		\vspace{0.3cm}
+
+		{\Large\bfseries UNIVERSIDADE DE S\~AO PAULO}\\[0.3cm]
+		{\large ESCOLA POLIT\'ECNICA}\\[0.2cm]
+
+		\vspace{1.4cm}
+
+		\begin{tabular}{p{10cm}l}
+			DIMITRI GARCIA & NUSP 1682224 \\
+			HENRIQUE GUIMAR\~AES MARGARIDO & NUSP 5797753 \\
+			HENRIQUE SANTIAGO & NUSP 16872729 \\
+		\end{tabular}
+
+		\vspace{1.3cm}
+		\textcolor{uspblue}{\rule{\linewidth}{1.5pt}}
+		\vspace{0.3cm}
+
+		{\LARGE\bfseries\color{uspblue} PROJETO 3 --- ENTREGA Q2}\\[0.5cm]
+		{\large\itshape Rede de sensores para o monitoramento de idosos em ILPIs:\\[0.2cm]
+			sensores, condicionamento, placa, rede CAN e interface sem fio}\\[0.3cm]
+		{\normalsize Primeira versão do relatório final}
+
+		\vspace{0.4cm}
+		\textcolor{uspblue}{\rule{\linewidth}{1.5pt}}
+
+		\vfill
+		\begin{tabular}{p{3.5cm}l}
+			\textbf{Disciplina:} & 0323221 - Projeto Integrativo 3 \\[0.2cm]
+			\textbf{Data:} & 17 de novembro de 2026 \\[0.2cm]
+			\textbf{Local:} & S\~ao Paulo \\
+		\end{tabular}
+
+		\vfill
+		\phantom{fim}
+	\end{titlepage}
+
+	% ============================================================
+	%  CONTRACAPA
+	% ============================================================
+	\begin{titlepage}
+		\centering
+
+		{\large DIMITRI GARCIA\\HENRIQUE GUIMAR\~AES MARGARIDO\\HENRIQUE SANTIAGO\\}
+
+		\vspace{4cm}
+		{\LARGE{PROJETO 3 --- ENTREGA Q2}} \\
+		\vspace{2cm}
+		\begin{flushright}
+			\begin{minipage}{0.55\textwidth}
+				Entrega referente à disciplina 0323221 - Projeto Integrativo 3 (2026),
+				Projeto 3, quesito Q2: relatório com os sensores, a eletrônica de
+				condicionamento de sinais, a interface com a rede CAN, a interface sem fio
+				e a placa desenvolvida. Primeira versão do relatório final. \\[0.5cm]
+				Sistema de monitoramento não invasivo de idosos em Instituições de Longa
+				Permanência: hub do quarto e vestível com ESP32-S3, sensores de porta,
+				presença, temperatura e movimento, PCB única de duas camadas, barramento
+				CAN, ESP-NOW e MQTT, detecção de queda embarcada e central com Mosquitto,
+				InfluxDB, Grafana e Telegram.
+				\ifx\docentes\empty\else\\[0.5cm]\textbf{Docentes:} \docentes.\fi
+			\end{minipage}
+		\end{flushright}
+
+		\vfill
+		{\small Escola Polit\'ecnica da USP --- S\~ao Paulo, 17 de novembro de 2026}
+	\end{titlepage}
+	\pagenumbering{arabic}
+
+	% ============================================================
+	%  RESUMO
+	% ============================================================
+	\section*{Resumo}
+	\input{secoes/00_resumo}
+
+	\newpage
+	\tableofcontents
+	\thispagestyle{fancy}
+	\newpage
+	\listoffigures
+	\thispagestyle{fancy}
+	\newpage
+
+	\input{secoes/01_introducao}
+	\input{secoes/02_requisitos}
+	\input{secoes/03_arquitetura}
+	\input{secoes/04_sensores}
+	\input{secoes/05_condicionamento}
+	\input{secoes/06_pcb}
+	\input{secoes/07_firmware}
+	\input{secoes/08_can}
+	\input{secoes/09_sem_fio}
+	\input{secoes/10_queda}
+	\input{secoes/11_central}
+	\input{secoes/12_verificacao}
+	\input{secoes/13_conclusoes}
+
+	\input{secoes/referencias}
+
+	\appendix
+	\input{secoes/apendices}
+\end{document}

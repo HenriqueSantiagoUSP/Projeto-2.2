@@ -1,0 +1,41 @@
+% Hub: fontes de eventos -> fila do hub -> hub_task (única que roda as regras e publica).
+\begin{tikzpicture}[font=\scriptsize, node distance=4mm]
+  \tikzset{task/.style={bloco=#1, minimum width=2.5cm, minimum height=0.8cm},
+           isr/.style={draw=black!50, fill=black!4, rounded corners=1pt, align=center, minimum width=2.1cm, minimum height=0.7cm},
+           fila/.style={draw=black!60, fill=white, minimum width=0.9cm, minimum height=0.42cm, font=\tiny,
+                        path picture={\foreach \k in {1,2,3} \draw[black!40] ($(path picture bounding box.west)!\k/4!(path picture bounding box.east)$) ++(0,-0.2) -- ++(0,0.4);}}}
+  % fontes
+  \node[isr] (isr) at (0,3.0) {ISR do GPIO\\(portas, PIR)};
+  \node[task=corhub] (sens) at (4.0,3.0) {\textbf{sensors\_task}\\núcleo 1, ALTA};
+  \node[task=corhub] (lm) at (4.0,1.8) {\textbf{lm35\_task}\\núcleo 1, BAIXA};
+  \node[task=corambas] (esp) at (4.0,0.6) {\textbf{espnow\_task}\\núcleo 0, MÉDIA};
+  \node[isr] (espcb) at (-0.2,0.6) {callback de\\recepção ESP-NOW};
+  \node[isr] (mq) at (4.0,-0.6) {MQTT\\\code{config/desejada}};
+  \node[fila] (q1) at (1.95,3.0) {};
+  \node[fila] (q0) at (1.95,0.6) {};
+  \draw[seta] (isr) -- (q1); \draw[seta] (q1) -- (sens);
+  \draw[seta] (espcb) -- (q0); \draw[seta] (q0) -- (esp);
+  % fila do hub e hub_task
+  \node[fila, minimum width=1.4cm, minimum height=0.55cm] (qh) at (6.9,1.2) {};
+  \node[font=\tiny, above=0pt of qh] {fila do hub};
+  \node[task=corhub, minimum width=2.8cm, minimum height=1.2cm] (hub) at (9.5,1.2) {\textbf{hub\_task}\\núcleo 0, MÉDIA\\regras + publicação};
+  \foreach \n in {sens,lm,esp,mq} {\draw[seta] (\n.east) -- ++(0.3,0) |- (qh.west);}
+  \draw[seta] (qh) -- (hub);
+  % saídas
+  \node[bloco=corcentral, minimum width=2.2cm] (mqtt) at (13.0,2.6) {MQTT\\(estados, alertas)};
+  \node[bloco=cinza, minimum width=2.2cm] (led) at (13.0,1.2) {LED\\(\code{indicators})};
+  \node[fila] (qc) at (12.0,-0.2) {};
+  \node[task=corambas, minimum width=2.1cm] (ctx) at (13.8,-0.2) {\textbf{can\_tx}\\TWAI};
+  \draw[seta] (hub.east) -- ++(0.3,0) |- (mqtt.west);
+  \draw[seta] (hub.east) -- (led.west);
+  \draw[seta] (hub.east) -- ++(0.3,0) |- (qc.west);
+  \draw[seta] (qc) -- (ctx);
+  % recepção CAN
+  \node[isr] (twai) at (6.9,-1.6) {ISR do TWAI};
+  \node[fila] (qr) at (8.9,-1.6) {};
+  \node[task=corambas, minimum width=2.1cm] (crx) at (10.9,-1.6) {\textbf{can\_rx}\\log};
+  \draw[seta] (twai) -- (qr); \draw[seta] (qr) -- (crx);
+  % legenda
+  \node[fila, anchor=west] (lf) at (0,-1.6) {};
+  \node[anchor=west, font=\tiny] at (lf.east) {fila (por valor)};
+\end{tikzpicture}

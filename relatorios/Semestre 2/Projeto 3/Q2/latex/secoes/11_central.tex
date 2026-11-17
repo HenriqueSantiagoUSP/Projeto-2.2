@@ -1,0 +1,83 @@
+%======================================================================
+\section{Central}\label{sec:central}
+%======================================================================
+A central recebe o que os hubs publicam, guarda o histórico, mostra os quartos e avisa o
+cuidador. Ela não decide nada: as regras e os alertas chegam prontos das placas. Tudo roda em
+contêineres Docker, descritos num único arquivo do Docker Compose, num PC ou num Raspberry Pi 4
+(Tabela~\ref{tab:central}).
+
+\begin{table}[H]
+\centering
+\caption{Serviços da central.}
+\label{tab:central}
+\small
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{11.8cm}@{}}
+\toprule
+Serviço & Função \\
+\midrule
+Mosquitto & broker MQTT com usuário e senha por cliente e ACL por tópico (Seção~\ref{sec:mqtt}) \\
+Telegraf & assina \code{idoso/\#} e grava cada mensagem no InfluxDB, com o site, o quarto e o identificador como \textit{tags}; sem código próprio \\
+InfluxDB & banco de séries temporais, com retenção de 30 dias \\
+Grafana & painel ``Quartos'', com seletor de quarto; o painel é versionado em JSON no repositório \\
+Notificador & programa em Python que assina \code{idoso/+/+/alerta} e envia cada alerta ao Telegram do cuidador \\
+\midrule
+Simulador & programa em Python que faz o papel de um hub, para testar a central sem hardware \\
+\code{demo\_vestivel.py} & demonstração do vestível com uma placa só, pela USB (Seção~\ref{sec:demo}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Painel}
+
+O painel ``Quartos'' mostra, para o quarto escolhido: o estado do hub (online ou offline, pelo
+\textit{Last Will}), a presença, a temperatura atual e o histórico, as portas, o estado da
+pulseira, a linha do tempo de portas e presença, a tabela de alertas (com a probabilidade de
+queda dada pelo vestível), a bateria e o nível de atividade da pulseira
+(Figura~\ref{fig:grafana}). As consultas foram testadas com o simulador; a aparência com dados
+reais ainda vai ser conferida.
+
+\begin{figure}[H]
+\centering
+\fotoouespaco{grafana_quartos}{0.95\linewidth}{captura do painel ``Quartos'' do Grafana com dados do hub (ou do simulador)}
+\caption{Painel ``Quartos'' no Grafana.}
+\label{fig:grafana}
+\end{figure}
+
+\subsection{Notificador}
+
+O notificador transforma cada alerta numa mensagem legível (tipo, quarto e horário) e a manda
+pelo Telegram. Ele foi feito para não perder alertas:
+\begin{itemize}
+  \item a sessão MQTT é persistente: os alertas publicados enquanto ele estava fora do ar
+        chegam quando ele volta;
+  \item se o Telegram não aceitar a mensagem (sem internet, por exemplo), ele espera e tenta de
+        novo, com espera crescente até 60\,s; só uma mensagem recusada pelo próprio Telegram
+        é descartada;
+  \item \code{id} e \code{estado} repetidos (QoS 1) são descartados;
+  \item um alerta com dados inesperados vira uma mensagem simples, em vez de derrubar o
+        programa.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\fotoouespaco{telegram_alerta}{0.42\linewidth}{captura do celular com um alerta de queda no Telegram}
+\caption{Alerta de queda chegando ao cuidador pelo Telegram.}
+\label{fig:telegram}
+\end{figure}
+
+\subsection{Demonstração com uma placa}\label{sec:demo}
+
+Para mostrar o modelo de queda funcionando sem montar o sistema todo, o vestível tem um perfil
+de demonstração: sem hub, com o modo de coleta ligado e a serial a 921\,600\,baud. No
+computador, o \code{demo\_vestivel.py} lê a serial e mostra, ao vivo, o $\amag$ filtrado, cada
+disparo do gatilho com a probabilidade dada pelo modelo e uma faixa ``QUEDA DETECTADA'' quando
+o vestível decide queda. Opcionalmente, ele faz o papel do hub e publica o alerta no broker,
+no mesmo formato, e o alerta aparece no Grafana e no Telegram. Se o link USB cair, a leitura
+reabre a porta sozinha.
+
+\begin{figure}[H]
+\centering
+\fotoouespaco{demo_vestivel}{0.85\linewidth}{janela do demo\_vestivel.py durante uma queda simulada}
+\caption{A janela da demonstração com uma placa.}
+\label{fig:demo}
+\end{figure}

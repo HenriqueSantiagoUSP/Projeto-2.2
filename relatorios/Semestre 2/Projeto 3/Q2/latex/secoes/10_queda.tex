@@ -1,0 +1,157 @@
+%======================================================================
+\section{Processamento: detecção de queda}\label{sec:queda}
+%======================================================================
+Esta seção resume o relatório do Q1~\cite{q1}, que desenvolveu e comparou os modelos no
+computador, e descreve a versão que roda no vestível.
+
+\subsection{Por que um modelo}
+
+O primeiro detector do vestível era um limiar: queda quando $\amag$ passa de 2,5\,g. Ele pega
+as quedas, mas também correr, pular, subir escada depressa e sentar com força. Na base
+pública SisFall, com o sensor na faixa do vestível, esse limiar deu \textbf{69,9 alarmes falsos
+por hora} de atividade. O que separa uma queda de uma corrida não é o tamanho do pico, e sim
+o que vem antes e depois dele: a queda livre ($\amag$ abaixo de 1\,g) logo antes do impacto e,
+depois, o corpo parado em outra posição (Figura~\ref{fig:janela}).
+
+\subsection{Dados}
+
+\begin{itemize}
+  \item \textbf{SisFall}~\cite{sisfall}: \sisPessoas{} pessoas (23 jovens e 15 idosos), 4505
+        ensaios a 200\,Hz, com o sensor na cintura: 2707 atividades de 19 tipos (14,5\,h) e
+        1798 quedas de 15 tipos. Os sinais foram saturados em $\pm$8\,g para imitar o
+        vestível.
+  \item \textbf{Nossos ensaios}: os 18 do primeiro semestre (Seção~\ref{sec:mpu}), na cintura e
+        em $\pm$2\,g, usados só como teste.
+\end{itemize}
+
+\subsection{Pipeline}
+
+Todos os métodos compartilham o mesmo pipeline, e é ele que roda no vestível:
+\begin{enumerate}
+  \item \textbf{Filtro}: passa-baixa de 20\,Hz nos 6 eixos (Seção~\ref{sec:cond_digital}).
+  \item \textbf{Gatilho}: um pico de $\amag$ filtrado de \gatilhoLon\,g ou mais, emitido depois de
+        0,5\,s sem um valor maior. Ele deixa passar \gatilhoPassam\,\% das quedas e dispara
+        $\sim$\gatilhoDisparosH{} vezes por hora de atividade: o gatilho só acorda o
+        classificador (Figura~\ref{fig:pipeline}).
+  \item \textbf{Janela}: de $-1{,}0$ a $+0{,}8$\,s em volta do pico.
+  \item \textbf{Atributos}: \nAtributos{} medidas no tempo: estatísticas de $\amag$ e de
+        $\wmag$, a queda livre antes do impacto, a quietude e a média de $\amag$ no fim da
+        janela, a mudança de inclinação e a correlação entre os eixos.
+  \item \textbf{Classificador}: decide queda ou não queda, com uma probabilidade.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figuras/fig_pipeline.png}
+\caption{O pipeline numa queda da SisFall: o sinal filtrado, o nível do gatilho e a janela
+classificada em volta do impacto.}
+\label{fig:pipeline}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figuras/fig_janela.png}
+\caption{A janela de uma queda e o que os atributos medem: a queda livre antes do impacto, o
+impacto e o corpo parado em outra posição (a gravidade muda de eixo).}
+\label{fig:janela}
+\end{figure}
+
+\subsection{Comparação}
+
+O Q1 comparou 22 métodos: os das aulas (modelos autorregressivos AR e ARX, correlação com
+sinais de referência, DTW, atributos no tempo e em frequência, distâncias) e os usuais na
+literatura (regras, regressão logística, árvore, SVM, Random Forest e redes convolucionais).
+A avaliação é por pessoa: nenhuma pessoa aparece no treino e no teste ao mesmo tempo. A métrica
+é o número de alarmes falsos por hora de atividade com cerca de 94\,\% das quedas detectadas
+(Figura~\ref{fig:resumo}). O AR descreve bem a atividade normal, mas, usado como detector de
+anomalia, dispara em qualquer movimento brusco; os métodos de atributos com um classificador
+foram muito melhores.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figuras/fig_resumo.png}
+\caption{Alarmes falsos por hora de atividade de alguns dos métodos comparados no Q1, com a
+fração de quedas detectadas entre parênteses. Cenário A: $\pm$8\,g, como o vestível.}
+\label{fig:resumo}
+\end{figure}
+
+\subsection{O modelo do vestível}
+
+Na configuração exata do vestível (gatilho causal, os \nAtributos{} atributos no tempo,
+$\pm$8\,g), três classificadores ficaram na disputa (Tabela~\ref{tab:modelos_vestivel}). As
+diferenças entre eles cabem no erro da estimativa: os intervalos de 95\,\% das diferenças,
+obtidos sorteando pessoas, passam pelo zero. O \textbf{Random Forest}~\cite{breiman} ficou: não precisa
+padronizar os atributos, a probabilidade que vai no alerta é a fração de árvores que votaram
+queda, e ele mostra quais atributos pesam (Figura~\ref{fig:importancia}). O SVM só entraria no
+firmware se ganhasse com folga, porque exigiria outro classificador em C e outros testes.
+
+\begin{table}[H]
+\centering
+\caption{Classificadores na configuração do vestível (SisFall, validação por pessoa).}
+\label{tab:modelos_vestivel}
+\small
+\input{tabelas/modelos_vestivel}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{figuras/fig_importancia.png}
+\caption{Importância dos atributos no Random Forest do vestível.}
+\label{fig:importancia}
+\end{figure}
+
+O modelo tem 60 árvores de profundidade até 10 (\rfNos{} nós) e decide queda quando
+$P \ge \rfLimiar$. No pipeline completo, sobre toda a SisFall, ele dá \rfAlarmes{} alarme falso
+por hora de atividade e detecta \rfQuedas\,\% das quedas com no máximo um alarme falso por hora
+(Figura~\ref{fig:funil}).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figuras/fig_funil_vestivel.png}
+\caption{O pipeline do vestível na SisFall: das quedas, quantas passam no gatilho e quantas o
+Random Forest confirma; das atividades, quantos disparos e quantos alarmes falsos por hora.}
+\label{fig:funil}
+\end{figure}
+
+\subsection{A versão embarcada}
+
+O modelo vai para o firmware como código C gerado: um script Python exporta a floresta como
+tabelas de nós (\rfBytes{} bytes de flash), os coeficientes do filtro, o gatilho e o limiar, e
+gera junto os vetores de teste. O pipeline em C roda amostra a amostra na task
+\code{sampling}, com o filtro do ESP-DSP e um buffer circular por eixo; a janela só é
+classificada quando o gatilho dispara. O custo em ciclos de cada classificação é medido e vai
+para o log.
+
+A garantia de que o C faz o mesmo que o Python é o teste de paridade: em 26 janelas de 8
+trechos da SisFall, o C acha os mesmos picos, calcula os atributos dentro da tolerância e dá
+a mesma probabilidade, até $10^{-6}$ (885 verificações, Tabela~\ref{tab:testes}). A paridade
+\emph{na placa}, com o sinal real do sensor, ainda vai ser conferida com o modo de coleta.
+
+\subsection{Nos nossos ensaios e limitações}
+
+Nos 18 ensaios do primeiro semestre, o Random Forest treinado só na SisFall não deu nenhum
+alarme ao andar ou correr e pegou as quedas de frente e de costas, mas perdeu as três quedas de
+joelhos (Figura~\ref{fig:proprios}). São poucos ensaios, de uma pessoa só, mas o tipo de
+queda que falhou fica marcado para a coleta.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figuras/fig_proprios_ensaios.png}
+\caption{Os 18 ensaios do primeiro semestre com o Random Forest treinado na SisFall.}
+\label{fig:proprios}
+\end{figure}
+
+O modelo é \textbf{provisório}. Os dados de treino têm o sensor na cintura, e o vestível vai no
+pulso (Figura~\ref{fig:pulso}), onde o braço se move muito mais e o impacto chega diferente.
+
+\begin{figure}[H]
+\centering
+\fotoouespaco{vestivel_no_pulso}{0.6\linewidth}{o vestível (MPU-6050) preso ao pulso para a coleta}
+\caption{O vestível no pulso.}
+\label{fig:pulso}
+\end{figure} O próximo passo é a coleta
+no pulso, com várias pessoas e com o firmware atual ($\pm$8\,g), seguindo o protocolo de coleta
+do projeto: os ensaios gravados pelo modo de coleta entram direto no treino, e o mesmo script
+gera o novo modelo e os novos vetores de teste. Com esses dados, também vale reavaliar os
+atributos de frequência, que na cintura melhoraram o resultado mas exigiriam uma FFT no
+firmware.

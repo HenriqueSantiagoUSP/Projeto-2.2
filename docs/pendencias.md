@@ -14,6 +14,12 @@ Pedidos e prazos em [`relatorios/README.md`](../relatorios/README.md), Projeto 3
 
 - [ ] **Q2 (17/11):** relatório com sensores, condicionamento de sinais, interface CAN, interface sem fio e a
   placa desenvolvida (primeira interação de entrega).
+  - Pronto: a primeira versão do relatório final, em `relatorios/Semestre 2/Projeto 3/Q2/latex/` (66 páginas).
+  - Falta:
+    - a revisão do grupo;
+    - as fotos nos quadros tracejados: a PCB fabricada e montada, o vestível no pulso, a bancada CAN, os
+      monitores seriais, o Grafana, o Telegram e a demo. A lista está no topo do `main.tex`;
+    - preencher `\docentes`, se o grupo quiser.
 - [ ] **Q3 (24/11):** apresentação em sala da comunicação sem fio funcionando com os sensores. Depende da
   bancada abaixo: vestível → ESP-NOW → hub → MQTT → central.
 
@@ -246,6 +252,20 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-16 — Relatório do Q2 escrito** (primeira versão do relatório final,
+  `relatorios/Semestre 2/Projeto 3/Q2/latex/`, 66 páginas). A entrega segue em "Entregas da disciplina".
+  - Gerado por `modelo/experimentos/12_relatorio_q2.py`: gráficos dos sensores, tabelas, números e PCB (renders,
+    camadas, folhas do esquema, ERC e DRC).
+  - Diagramas em TikZ/circuitikz; espaços marcados para as fotos que o grupo vai tirar.
+  - Verificado:
+    - o ajuste dos 22 pontos do LM35 reproduz a curva do firmware (`assert` no script);
+    - o biquad do gráfico é o do `fall_model.c`;
+    - o DRC rodado de novo deu 0 erros, 0 ligações faltando e 0 divergências (2 avisos de serigrafia); o
+      ERC, 0;
+    - o tamanho dos firmwares saiu do `idf.py size` (hub, vestível sem hub e um build de teste com ESP-NOW);
+    - `pdflatex` sem erros, sem *overfull* e sem referência indefinida;
+    - as páginas conferidas na imagem;
+    - a macro das fotos testada com e sem o arquivo.
 - [x] **2026-11-16 — S2 P3 Q1 entregue e apresentado** (relatório em LaTeX e 22 slides). Informado pelo grupo.
 - [x] **2026-11-16 — PCB v1 entregue (S2 P2, 16/10), fabricada e em mãos.** Informado pelo grupo. A montagem
   e os testes seguem em Hardware.

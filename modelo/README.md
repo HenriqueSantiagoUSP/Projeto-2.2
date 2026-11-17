@@ -70,6 +70,10 @@ uv run python experimentos/10_figuras_apresentacao.py
 uv run python experimentos/11_svm_vestivel.py
 ```
 
+```bash
+uv run python experimentos/12_relatorio_q2.py
+```
+
 A ordem importa:
 1. `02_gatilho.py` escolhe o L_on, que os outros scripts leem.
 2. `05_figuras.py` e `06_resumo.py` só leem as tabelas.
@@ -92,6 +96,16 @@ A ordem importa:
 7. `11_svm_vestivel.py` roda depois do `09`. Ele avalia o SVM na configuração do vestível, ao lado do Random
    Forest e da regressão logística, com intervalos de confiança por pessoa, e leva ~30 s. Não muda o modelo
    exportado.
+8. `12_relatorio_q2.py` roda depois do `09` e do `11`. Ele prepara o relatório do Q2
+   (`relatorios/Semestre 2/Projeto 3/Q2/latex/`):
+   - os gráficos dos sensores: o LM35 com os 22 pontos do S1, a faixa do ADC, o filtro RC, o biquad e os
+     cenários do MPU;
+   - cópias de figuras do Q1;
+   - a lista de materiais e a tabela dos classificadores;
+   - `tabelas/numeros.tex`;
+   - a PCB, pelo `kicad-cli` (renders, camadas, ERC e DRC) e pelo `pdftoppm` (folhas do esquema).
+
+   Sem o `kicad-cli`, ele avisa e segue. Depois, compile lá com `pdflatex main.tex`, duas vezes.
 
 A primeira leitura da SisFall leva ~1 min e fica em cache em `dados/cache/`. A comparação completa, com as
 duas CNNs, leva ~3 min por cenário.
@@ -128,7 +142,8 @@ duas CNNs, leva ~3 min por cenário.
 | `experimentos/09_exportar_vestivel.py` | treina os classificadores do vestível com o gatilho causal e gera `fall_model.h`/`.c`, os vetores de teste de paridade e `resultados/vestivel.json` |
 | `experimentos/11_svm_vestivel.py` | SVM (RBF) na configuração do vestível (gatilho causal, 23 atributos no tempo, ±8 g) contra o Random Forest 60 × 10 e a regressão logística: métricas, tamanho, operações por janela e bootstrap por pessoa. Grava `resultados/svm_vestivel.json` |
 | `experimentos/10_figuras_apresentacao.py` | figuras em tamanho de slide (`ap_*.png`), tabelas e números da apresentação Beamer do Q1. Inclui o sinal antes e depois do filtro, a árvore de decisão, a fronteira árvore × floresta e os votos das 60 árvores |
-| `experimentos/_estilo.py` | paleta, parâmetros do matplotlib e nomes dos atributos, comuns ao `07` e ao `10` |
+| `experimentos/12_relatorio_q2.py` | gráficos, tabelas, números e exportações da PCB do relatório do Q2 (primeira versão do relatório final); confere que o ajuste do LM35 reproduz a curva do firmware e que o biquad é o do `fall_model.c` |
+| `experimentos/_estilo.py` | paleta, parâmetros do matplotlib e nomes dos atributos, comuns ao `07`, ao `10` e ao `12` |
 
 ## Principais resultados
 

@@ -1,0 +1,63 @@
+%======================================================================
+\section{Introdução}\label{sec:intro}
+%======================================================================
+\subsection{O problema}
+
+Numa Instituição de Longa Permanência para Idosos (ILPI), poucos cuidadores acompanham
+muitos residentes, e à noite a proporção piora. A referência do projeto é a ILPI Butantã,
+com cerca de 60 residentes e um turno noturno com poucos cuidadores. Os riscos que mais
+preocupam nesse cenário acontecem quando ninguém está olhando: uma queda no quarto ou no
+banheiro, um residente que sai do quarto de madrugada, alguém que entra no banheiro e não
+sai, um quarto quente demais no verão. Em todos eles, o que faz diferença é o tempo até um
+cuidador chegar.
+
+A proposta é uma rede de sensores que acompanha o quarto de forma \textbf{não invasiva}:
+sem câmera e sem exigir nada do residente além de usar uma pulseira. Os sensores ficam na
+porta, no teto e na parede; a pulseira detecta a queda; e o cuidador recebe o aviso no
+celular, com o quarto e o tipo do evento.
+
+\subsection{Objetivos}
+
+\paragraph{Objetivo geral.} Projetar, construir e avaliar uma rede de sensores que detecta
+quedas e situações de risco no quarto de um residente de ILPI e avisa o cuidador, com o
+processamento feito nos próprios dispositivos.
+
+\paragraph{Objetivos específicos.}
+\begin{itemize}
+  \item Selecionar e caracterizar os sensores de porta, presença, temperatura e movimento.
+  \item Projetar o condicionamento do sensor de temperatura e validá-lo em simulação e em bancada.
+  \item Projetar uma placa de circuito impresso única para o hub e o vestível.
+  \item Integrar o hub ao barramento CAN da sala, com os módulos dos outros grupos.
+  \item Ligar o vestível ao hub sem fio e o hub à central, com um contrato de mensagens
+        documentado (MQTT).
+  \item Detectar quedas no vestível com um modelo treinado e embarcado, e gerar os alertas
+        de tempo no hub.
+  \item Guardar o histórico, mostrar o estado dos quartos e notificar o cuidador.
+\end{itemize}
+
+\subsection{O que esta entrega cobre}
+
+O quesito Q2 do Projeto 3 pede um relatório com todas as informações dos sensores, da
+eletrônica de condicionamento de sinais, da interface com a rede CAN, da interface sem fio
+e da placa desenvolvida, como primeira interação de entrega. Este documento vai além
+disso e já tem a forma do relatório final: inclui os requisitos, a arquitetura, o
+firmware, a detecção de queda (resumida do relatório do Q1~\cite{q1}) e a central.
+
+Sobre o estado do projeto, uma ressalva que vale para o documento todo: o firmware das duas
+placas está escrito e compila, e a lógica que não depende de hardware (regras, pipeline de
+queda, configuração, notificador) é testada automaticamente no computador. Mas o sistema
+ainda \textbf{não foi verificado em bancada} com a placa nova montada. A
+Seção~\ref{sec:verificacao} diz o que foi verificado e em que nível, e lista os testes que
+faltam. Onde há uma foto que ainda vamos tirar (a placa fabricada e montada, o barramento
+CAN entre as placas, o painel com dados reais), o documento deixa um quadro marcado.
+
+\subsection{Organização}
+
+A Seção~\ref{sec:requisitos} lista os requisitos; a Seção~\ref{sec:arquitetura}, a
+arquitetura. As Seções~\ref{sec:sensores} e~\ref{sec:condicionamento} tratam dos sensores e
+do condicionamento; a Seção~\ref{sec:pcb}, da placa; a Seção~\ref{sec:firmware}, do
+firmware. As interfaces de comunicação estão nas Seções~\ref{sec:can} (CAN)
+e~\ref{sec:semfio} (sem fio). A Seção~\ref{sec:queda} resume a detecção de queda, a
+Seção~\ref{sec:central} descreve a central, a Seção~\ref{sec:verificacao} a verificação e o
+plano de testes, e a Seção~\ref{sec:conclusoes} conclui. Os apêndices trazem o esquema
+completo, o mapa de pinos, a lista de materiais e como reproduzir tudo.

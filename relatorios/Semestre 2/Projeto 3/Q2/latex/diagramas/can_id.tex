@@ -1,0 +1,31 @@
+% Quadro CAN clássico com ID de 11 bits e o formato 0x0GS do identificador.
+\begin{tikzpicture}[font=\scriptsize]
+  \tikzset{campo/.style={draw=black!60, fill=#1, minimum height=0.7cm, align=center, inner sep=1pt},
+           campo/.default=white}
+  % quadro
+  \def\y{0}
+  \node[campo=black!8, minimum width=0.7cm, anchor=west] (sof) at (0,\y) {SOF\\1};
+  \node[campo=corambas!20, minimum width=3.3cm, anchor=west] (id) at (sof.east) {identificador\\11 bits};
+  \node[campo=black!8, minimum width=0.7cm, anchor=west] (rtr) at (id.east) {RTR\\1};
+  \node[campo=black!8, minimum width=1.0cm, anchor=west] (ide) at (rtr.east) {IDE, r0\\2};
+  \node[campo=black!8, minimum width=0.9cm, anchor=west] (dlc) at (ide.east) {DLC\\4};
+  \node[campo=corhub!15, minimum width=3.0cm, anchor=west] (dados) at (dlc.east) {dados\\0 a 8 bytes};
+  \node[campo=black!8, minimum width=1.2cm, anchor=west] (crc) at (dados.east) {CRC\\15 + 1};
+  \node[campo=black!8, minimum width=0.9cm, anchor=west] (ack) at (crc.east) {ACK\\2};
+  \node[campo=black!8, minimum width=0.9cm, anchor=west] (eof) at (ack.east) {EOF\\7};
+  % zoom do identificador
+  \foreach \b [count=\i from 0] in {10,9,8,7,6,5,4,3,2,1,0} {
+    \pgfmathsetmacro{\x}{1.0 + \i*0.85}
+    \ifnum\b>7 \def\cor{black!8}\else\ifnum\b>3 \def\cor{corambas!30}\else\def\cor{corhub!25}\fi\fi
+    \node[campo=\cor, minimum width=0.85cm, minimum height=0.6cm] (b\b) at (\x,-2.0) {\b};
+  }
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}] (b10.south west) -- (b8.south east)
+       node[midway, below=5pt, align=center] {0\\(ID $\le$ \code{0x0FF})};
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}] (b7.south west) -- (b4.south east)
+       node[midway, below=5pt, align=center] {\textbf{G}: grupo\\(\code{0xF} = este projeto)};
+  \draw[decorate, decoration={brace, amplitude=4pt, mirror}] (b3.south west) -- (b0.south east)
+       node[midway, below=5pt, align=center] {\textbf{S}: sensor\\dentro do grupo};
+  \draw[black!40, dashed] (id.south west) -- (b10.north west);
+  \draw[black!40, dashed] (id.south east) -- (b0.north east);
+  \node[anchor=west, align=left] at (10.6,-2.0) {ex.: \code{0x0F2}\\= grupo F,\\sensor 2 (LM35)};
+\end{tikzpicture}

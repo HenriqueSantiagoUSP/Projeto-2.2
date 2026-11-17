@@ -1,0 +1,23 @@
+% Mensagens ESP-NOW: cabeçalho de 8 bytes e o payload de cada tipo (bytes).
+\begin{tikzpicture}[font=\scriptsize]
+  \tikzset{byte/.style={draw=black!60, fill=#1, minimum height=0.62cm, align=center, inner sep=1pt, anchor=west},
+           byte/.default=white}
+  \def\u{0.62}
+  % cabeçalho comum
+  \foreach \y/\nome/\tam in {0/FALL/13, -1.0/HEARTBEAT/12, -2.0/FALL\_CANCEL/10, -3.0/PING/8} {
+    \node[anchor=east, font=\scriptsize] at (-0.15,\y) {\code{\nome} (\tam\,B)};
+    \node[byte=black!8, minimum width=\u cm] (v) at (0,\y) {ver.};
+    \node[byte=black!8, minimum width=\u cm] (t) at (v.east) {tipo};
+    \node[byte=corhub!18, minimum width=2*\u cm] (s) at (t.east) {\code{seq}};
+    \node[byte=corhub!18, minimum width=4*\u cm] (u) at (s.east) {\code{uptime\_ms}};
+  }
+  % payloads
+  \node[byte=corvest!22, minimum width=4*\u cm] (a2) at ($(0,0)+(8*\u,0)$) {\code{a2\_peak} (float, g$^2$)};
+  \node[byte=corvest!22, minimum width=\u cm*1.6] at (a2.east) {\code{prob}\\\%};
+  \node[byte=corcentral!22, minimum width=2*\u cm] (bat) at ($(0,-1.0)+(8*\u,0)$) {bateria (mV)};
+  \node[byte=corcentral!22, minimum width=2*\u cm] at (bat.east) {atividade (mg)};
+  \node[byte=corvest!22, minimum width=2*\u cm] at ($(0,-2.0)+(8*\u,0)$) {\code{seq} da queda};
+  % réguas
+  \draw[decorate, decoration={brace, amplitude=4pt}] (0,0.42) -- (8*\u,0.42) node[midway, above=5pt] {cabeçalho comum: 8 bytes};
+  \draw[decorate, decoration={brace, amplitude=4pt}] (8*\u,0.42) -- (13*\u+0.6*\u,0.42) node[midway, above=5pt] {payload do tipo};
+\end{tikzpicture}

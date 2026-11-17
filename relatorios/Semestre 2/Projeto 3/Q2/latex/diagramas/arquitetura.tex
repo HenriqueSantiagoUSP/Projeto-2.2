@@ -1,0 +1,32 @@
+% Visão geral: vestível -> hub -> central, com os sensores do quarto e o CAN da sala.
+\begin{tikzpicture}
+  % Quarto
+  \node[bloco=corhub, minimum width=3.4cm] (hub) at (0,0) {\textbf{Hub do quarto}\\ESP32-S3\\regras, alertas, LED};
+  \node[bloco=corvest, minimum width=3.0cm] (vest) at (-5.7,0) {\textbf{Vestível}\\ESP32-S3 + MPU-6050\\detecta a queda};
+  \node[bloco=corhub, minimum width=4.6cm, font=\scriptsize] (sens) at (0,2.1)
+       {portas (MC-38), presença (HC-SR501),\\temperatura (LM35 + LM358)};
+  \node[bloco=corambas, minimum width=3.0cm, font=\scriptsize] (sala) at (0,-2.3) {módulos dos outros\\grupos da sala};
+  \draw[sem fio=corvest] (vest) -- node[rotulo, above=1pt] {ESP-NOW} node[rotulo, below=1pt] {cifrado} (hub);
+  \draw[seta=corhub] (sens) -- node[rotulo, right] {GPIO / ADC} (hub);
+  \draw[thick, corambas, {Stealth[length=2mm]}-{Stealth[length=2mm]}] (hub) -- node[rotulo, right] {CAN, 250 kbit/s} (sala);
+  \begin{scope}[on background layer]
+    \node[draw=black!35, dashed, rounded corners, fit=(vest)(hub)(sens)(sala), inner sep=4mm,
+          label={[font=\footnotesize\bfseries, text=black!60]above left:Quarto (borda)}] {};
+  \end{scope}
+
+  % Central
+  \node[bloco=corcentral, minimum width=2.4cm] (mosq) at (5.4,0) {\textbf{Mosquitto}\\broker MQTT\\com ACL};
+  \node[bloco=corcentral, minimum width=2.6cm] (tele) at (8.9,1.1) {Telegraf\\$\to$ InfluxDB};
+  \node[bloco=corcentral, minimum width=2.6cm] (graf) at (8.9,2.6) {Grafana\\painel ``Quartos''};
+  \node[bloco=corcentral, minimum width=2.6cm] (noti) at (8.9,-1.1) {notificador\\(Python)};
+  \node[bloco=cinza, minimum width=2.6cm] (tg) at (8.9,-2.6) {Telegram\\do cuidador};
+  \draw[seta=corhub] (hub) -- node[rotulo, above=1pt] {MQTT} node[rotulo, below=1pt] {Wi-Fi} (mosq);
+  \draw[seta=corcentral] (mosq.east) -- ++(0.35,0) |- (tele.west);
+  \draw[seta=corcentral] (mosq.east) -- ++(0.35,0) |- (noti.west);
+  \draw[seta=corcentral] (tele) -- (graf);
+  \draw[seta=cinza] (noti) -- node[rotulo, right] {internet} (tg);
+  \begin{scope}[on background layer]
+    \node[draw=black!35, dashed, rounded corners, fit=(mosq)(tele)(noti)(graf), inner sep=4mm,
+          label={[font=\footnotesize\bfseries, text=black!60]above left:Central (Docker)}] {};
+  \end{scope}
+\end{tikzpicture}

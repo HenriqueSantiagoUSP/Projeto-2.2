@@ -1,0 +1,33 @@
+% Gerado por modelo/experimentos/12_relatorio_q2.py a partir de hardware/placas/v1/lista-de-materiais.csv
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{2.3cm} >{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}p{4.4cm} r@{}}
+\toprule
+Referência & Valor & Função & Footprint & Qtd \\
+\midrule
+C1,C2,C4-C7 & 100\,nF & desacoplamento (LM35, LM358, CAN, PIR, botão, MPU) & \texttt{\scriptsize C\_\allowbreak{}Disc\_\allowbreak{}D3.0mm\_\allowbreak{}W1.6mm\_\allowbreak{}P2.50mm} & 6 \\
+C3 & 1\,µF & filtro RC na entrada do ADC (com R3) & \texttt{\scriptsize C\_\allowbreak{}Rect\_\allowbreak{}L4.0mm\_\allowbreak{}W2.5mm\_\allowbreak{}P2.50mm} & 1 \\
+C8 & 10\,µF & reservatório na entrada de 5 V & \texttt{\scriptsize CP\_\allowbreak{}Radial\_\allowbreak{}D5.0mm\_\allowbreak{}P2.00mm} & 1 \\
+D1 & 1N5819 & impede juntar duas fontes no 5 V da DevKit & \texttt{\scriptsize D\_\allowbreak{}DO-41\_\allowbreak{}SOD81\_\allowbreak{}P10.16mm\_\allowbreak{}Horizontal} & 1 \\
+J1 & Conn\_\allowbreak{}01x06\_\allowbreak{}Socket & módulo transceptor CAN SN65HVD230 & \texttt{\scriptsize WCMCU-230} & 1 \\
+J2 & Conn\_\allowbreak{}01x03\_\allowbreak{}Socket & módulo PIR HC-SR501 & \texttt{\scriptsize HCSR501} & 1 \\
+J3,J4 & Conn\_\allowbreak{}01x02\_\allowbreak{}Socket & portas 1 e 2 (reed MC-38) & \texttt{\scriptsize PinSocket\_\allowbreak{}1x02\_\allowbreak{}P2.54mm\_\allowbreak{}Vertical} & 2 \\
+J5 & Conn\_\allowbreak{}01x08\_\allowbreak{}Socket & módulo MPU-6050 (GY-521) & \texttt{\scriptsize MPU6050} & 1 \\
+J6 & Conn\_\allowbreak{}01x04\_\allowbreak{}Socket & módulo USB-C (entrada de 5 V) & \texttt{\scriptsize Modulo USB-C} & 1 \\
+J7 & Conn\_\allowbreak{}01x03 & barramento CAN (CANH, CANL, GND) & \texttt{\scriptsize PinHeader\_\allowbreak{}1x03\_\allowbreak{}P2.54mm\_\allowbreak{}Vertical} & 1 \\
+R1 & 2k & ganho do LM358 (para o GND) & \texttt{\scriptsize R\_\allowbreak{}Axial\_\allowbreak{}DIN0207\_\allowbreak{}L6.3mm\_\allowbreak{}D2.5mm\_\allowbreak{}P10.16mm\_\allowbreak{}Horizontal} & 1 \\
+R2 & 9,1k & ganho do LM358 (realimentação) & \texttt{\scriptsize R\_\allowbreak{}Axial\_\allowbreak{}DIN0207\_\allowbreak{}L6.3mm\_\allowbreak{}D2.5mm\_\allowbreak{}P10.16mm\_\allowbreak{}Horizontal} & 1 \\
+R3 & 10k & filtro RC (com C3) & \texttt{\scriptsize R\_\allowbreak{}Axial\_\allowbreak{}DIN0207\_\allowbreak{}L6.3mm\_\allowbreak{}D2.5mm\_\allowbreak{}P10.16mm\_\allowbreak{}Horizontal} & 1 \\
+R4 & 1k & série na saída do PIR & \texttt{\scriptsize R\_\allowbreak{}Axial\_\allowbreak{}DIN0207\_\allowbreak{}L6.3mm\_\allowbreak{}D2.5mm\_\allowbreak{}P10.16mm\_\allowbreak{}Horizontal} & 1 \\
+SW1 & SW\_\allowbreak{}Push & botão ``estou bem'' & \texttt{\scriptsize SW\_\allowbreak{}PUSH-12mm} & 1 \\
+TP1 & 5V & ponto de teste & \texttt{\scriptsize TestPoint\_\allowbreak{}Pad\_\allowbreak{}D1.5mm} & 1 \\
+TP2 & 3V3 & ponto de teste & \texttt{\scriptsize TestPoint\_\allowbreak{}Pad\_\allowbreak{}D1.5mm} & 1 \\
+TP3 & GND & ponto de teste & \texttt{\scriptsize TestPoint\_\allowbreak{}Pad\_\allowbreak{}D1.5mm} & 1 \\
+TP4 & LM35 & ponto de teste (saída do LM358) & \texttt{\scriptsize TestPoint\_\allowbreak{}Pad\_\allowbreak{}D1.5mm} & 1 \\
+TP5 & CANH & ponto de teste & \texttt{\scriptsize TestPoint\_\allowbreak{}Pad\_\allowbreak{}D1.5mm} & 1 \\
+TP6 & CANL & ponto de teste & \texttt{\scriptsize TestPoint\_\allowbreak{}Pad\_\allowbreak{}D1.5mm} & 1 \\
+U1 & ESP32-S3-DevKitC & ESP32-S3-DevKitC-1 encaixada & \texttt{\scriptsize ESP32-S3-DevKitC} & 1 \\
+U2 & LM35-LP & sensor de temperatura LM35DZ & \texttt{\scriptsize TO-92\_\allowbreak{}Inline\_\allowbreak{}Wide} & 1 \\
+U3 & LM358 & amp-op LM358 (soquete DIP-8) & \texttt{\scriptsize DIP-8\_\allowbreak{}W7.62mm\_\allowbreak{}Socket\_\allowbreak{}LongPads} & 1 \\
+\midrule
+\multicolumn{4}{@{}l}{Total} & 30 \\
+\bottomrule
+\end{tabular}

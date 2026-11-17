@@ -1,0 +1,61 @@
+%======================================================================
+\section{Conclusões}\label{sec:conclusoes}
+%======================================================================
+\subsection{Situação}
+
+O sistema está projetado de ponta a ponta e, na maior parte, implementado
+(Tabela~\ref{tab:objetivos}). Os sensores foram escolhidos e caracterizados; o condicionamento
+do LM35 foi projetado, simulado e validado, e na placa nova passou a funcionar com uma
+alimentação só e um filtro na entrada do ADC; a PCB única foi desenhada, verificada e
+fabricada; o firmware das duas placas está completo e compila sem avisos; a detecção de queda
+passou de um limiar a um modelo embarcado; e a central funciona com um simulador no lugar do
+hub. O que falta é sobretudo bancada: montar a placa e verificar, com o hardware real, o que
+hoje está verificado só no computador.
+
+\begin{table}[H]
+\centering
+\caption{Objetivos específicos e situação.}
+\label{tab:objetivos}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{6.4cm}>{\raggedright\arraybackslash}p{7.4cm}@{}}
+\toprule
+Objetivo & Situação \\
+\midrule
+Selecionar e caracterizar os sensores & feito (primeiro semestre); a faixa do MPU passou a $\pm$8\,g, confirmada na placa \\
+Condicionar o LM35 & feito e validado em protoboard; falta conferir na PCB v1 \\
+PCB única & desenhada, verificada (ERC e DRC) e fabricada; falta montar e testar \\
+Rede CAN & firmware pronto e validado com o professor numa versão anterior; falta o teste entre as placas v1 \\
+Interface sem fio e contrato MQTT & firmware pronto, contrato documentado; falta o teste ESP-NOW em bancada \\
+Detecção de queda embarcada & modelo no firmware, com paridade C $\times$ Python; provisório até os dados do pulso \\
+Regras e alertas no hub & prontas e testadas no computador \\
+Histórico, painel e notificação & funcionando com o simulador; falta o bot do Telegram com o celular do cuidador \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Limitações}
+
+\begin{itemize}
+  \item O modelo de queda foi treinado com o sensor na cintura, e o vestível vai no pulso.
+  \item Nada do sistema completo foi verificado em bancada ainda: as metas de latência,
+        disponibilidade e autonomia estão definidas, mas não medidas.
+  \item A exatidão da temperatura na placa nova ainda não foi conferida contra um termopar.
+  \item O vestível usa a mesma placa do hub: é grande e depende de um \textit{power bank}, sem
+        medição de bateria.
+  \item A cobertura do ESP-NOW fica limitada ao raio do hub; o corredor e as áreas comuns
+        estão fora do escopo desta fase.
+\end{itemize}
+
+\subsection{Próximos passos}
+
+\begin{enumerate}
+  \item Montar as placas v1 e fazer os testes da Seção~\ref{sec:verificacao}, começando pelo
+        ESP-NOW entre o vestível e o hub, para a apresentação do Q3 (24/11).
+  \item Coletar quedas e atividades com o vestível no pulso, com várias pessoas, e retreinar
+        o modelo; reavaliar ali os atributos de frequência e o SVM.
+  \item Medir o consumo e implementar o \textit{light sleep} no vestível.
+  \item Uma placa própria para o vestível, com bateria LiPo, carregador e medição da bateria.
+  \item Na central: um servidor NTP local, para a ILPI funcionar sem internet; um painel para
+        a telemetria do vestível; e um banco relacional (PostgreSQL) com residentes,
+        dispositivos, cuidadores e o ciclo de vida dos alertas.
+\end{enumerate}
