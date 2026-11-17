@@ -28,7 +28,7 @@ detecção de queda. Outros cômodos e áreas comuns ficam fora por enquanto.
 |---|---|---|
 | RF08 | Detectar toda transição de cada porta (quantidade configurável) e publicar o estado | S1 P1 RF07/RF08 |
 | RF09 | Detectar presença (PIR) e publicar o estado | novo |
-| RF10 | Medir a temperatura a cada 30 s (16 amostras, curva MMQ de cadeia completa) | S1 P1 RF11/RF14/RF15 |
+| RF10 | Medir a temperatura a cada 60 s (16 amostras, curva MMQ de cadeia completa) e publicá-la quando mudar 0,2 °C ou mais, ou a cada 5 min (era a cada 30 s, até 2026-11-17) | S1 P1 RF11/RF14/RF15 |
 | RF11 | Executar as regras de tempo e publicar os episódios em `alerta` ([`arquitetura.md`](arquitetura.md), Regras) | S1 P1 RF09/RF13 (revisadas) |
 | RF12 | Sinalizar o estado e os alertas por um LED de status (sem buzzer desde 2026-10-23; o aviso ao cuidador vai pela central) | S1 P2 (atuador) |
 | RF13 | Aplicar parâmetros recebidos por MQTT sem recompilar, guardando-os em NVS | S1 P1 RNF12 |

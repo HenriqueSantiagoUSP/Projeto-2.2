@@ -6,11 +6,15 @@
  * in ~50 ms), read by ADC1 and reported through sensor_events every LM35_PERIOD_MS.
  * The burst of LM35_SAMPLES readings LM35_SAMPLE_GAP_MS apart samples at 100 Hz, so
  * the filter sits below its 50 Hz Nyquist limit (hardware/README.md).
+ *
+ * A room's air takes tens of minutes to change, and the LM35 itself minutes to follow
+ * it: one reading a minute is plenty for the temperature rule (10 min out of range). The
+ * hub publishes a reading only when it changed (docs/protocolo.md §1).
  */
 
 #include "esp_err.h"
 
-#define LM35_PERIOD_MS              30000
+#define LM35_PERIOD_MS              60000
 #define LM35_SAMPLES                16
 #define LM35_SAMPLE_GAP_MS          10
 

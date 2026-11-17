@@ -163,8 +163,8 @@ Tópico & QoS & Retido & Exemplo de conteúdo & Quando \\
 \code{status} & 1 & sim & \code{\{"estado":"online", "hora":true\}} & ao conectar; \textit{Last Will}: \code{offline} \\
 \code{porta/<id>} & 1 & sim & \code{\{"estado":"aberta"\}} & a cada mudança \\
 \code{presenca} & 1 & sim & \code{\{"estado":"detectada"\}} & a cada mudança \\
-\code{temperatura} & 0 & sim & \code{\{"valor":22.5\}} & a cada 30\,s \\
-\code{pulseira/<id>} & 1 & sim & \code{\{"estado":"online", "atividade":0.12\}} & a cada heartbeat; \code{offline} após 90\,s \\
+\code{temperatura} & 0 & sim & \code{\{"valor":22.5\}} & ao mudar 0,2\,°C, ou a cada 5\,min \\
+\code{pulseira/<id>} & 1 & sim & \code{\{"estado":"online", "atividade":0.12\}} & no primeiro heartbeat, depois a cada 5\,min; \code{offline} após 90\,s \\
 \code{alerta} & 1 & não & ver abaixo & início e fim de cada episódio \\
 \code{config/aplicada} & 1 & sim & a configuração em uso & no boot e a cada \code{config/desejada} \\
 \bottomrule
@@ -175,7 +175,25 @@ Todo JSON leva a versão do formato (\code{"v":1}) e a hora UTC da placa em mili
 (\code{ts}), omitida enquanto a placa não tem hora. Os estados são retidos: quem assina
 depois (o painel que acabou de abrir) recebe o último valor na hora. O \code{alerta} não é
 retido, porque cada mensagem é um evento; quem precisa do estado dos alertas o reconstrói
-pelos episódios. Um alerta de queda:
+pelos episódios.
+
+\paragraph{Envio por mudança.} Cada mensagem vira um ponto no banco da central, então o hub
+não publica leitura repetida. Portas, presença e alertas já saem só quando mudam. A temperatura
+e a pulseira chegam ao hub em intervalos fixos, e aí medir e enviar se separam: as regras
+recebem toda leitura, e o MQTT e o CAN, só o que traz novidade.
+\begin{itemize}
+  \item \textbf{Temperatura}: medida a cada 60\,s e publicada quando muda 0,2\,°C ou mais em
+        relação ao \emph{último valor enviado}, ou a cada 5\,min como sinal de vida. Comparar com o
+        último enviado, e não com a leitura anterior, faz uma deriva lenta acabar aparecendo.
+  \item \textbf{Pulseira}: o heartbeat continua a cada 30\,s pelo ESP-NOW, porque é ele que dá o
+        \code{offline} em 90\,s; mas \code{pulseira/<id>} sai no primeiro heartbeat e depois como
+        um resumo a cada 5\,min, com a atividade calculada no período. O \code{offline} sai na hora.
+\end{itemize}
+Com o quarto estável, cada um passa de 2.880 para cerca de 300 pontos por dia; uma mudança
+real de temperatura chega ao painel na hora. A regra fica num componente comum, em C puro e
+testado no computador (\code{report}).
+
+\noindent Um alerta de queda:
 \begin{lstlisting}[language=json]
 {"v":1, "id":"a1b2c3-42", "tipo":"queda", "estado":"ativo",
  "origem":"pulseira/a1b2c3", "detalhe":{"a2":7.88, "prob":0.97}, "ts":1792497600000}

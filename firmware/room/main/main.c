@@ -30,6 +30,7 @@
 #include "protocol_can.h"
 #include "protocol_mqtt.h"
 #include "reedswitch.h"
+#include "report.h"
 #include "rtos_err.h"
 #include "rules.h"
 #include "sensor_events.h"
@@ -42,6 +43,7 @@ static const char *TAG = "main";
 #define HUB_TICK_MS         1000    /* rules run at least this often */
 #define FALL_BUZZER_MS      60000   /* local alarm on a fall or a help request; the cancel stops it earlier */
 #define JSON_MAX            384
+#define REPORT_MAX_MS       ((uint64_t) MQTT_REPORT_MAX_INTERVAL_S * 1000u)
 
 /* Every door needs a CAN nibble of its own (docs/protocolo.md §2). */
 #define DOOR_ONE(index, gpio, id, role)   + 1
@@ -72,21 +74,25 @@ typedef struct {
 
 /* Last state of every input, republished on each MQTT (re)connection. */
 typedef struct {
-    bool  presence_known;
-    bool  presence;
-    bool  door_known[RULES_MAX_DOORS];
-    bool  door_open[RULES_MAX_DOORS];
-    bool  temp_known;
-    float temp_c;
+    bool     presence_known;
+    bool     presence;
+    bool     door_known[RULES_MAX_DOORS];
+    bool     door_open[RULES_MAX_DOORS];
+    bool     temp_known;
+    float    temp_c;        /* the temperature last published (MQTT and CAN), not the last reading */
+    report_t temp_report;   /* every reading goes to the rules; only a change goes out */
 } hub_state_t;
 
 typedef struct {
-    bool     used;
-    bool     heard_heartbeat;
-    char     id[ESPNOW_WEARABLE_ID_LEN];
-    uint16_t battery_mv;
-    uint16_t activity_mg;
-    int8_t   rssi;
+    bool         used;
+    bool         heard_heartbeat;
+    char         id[ESPNOW_WEARABLE_ID_LEN];
+    uint16_t     battery_mv;
+    uint16_t     activity_mg;    /* as last published: the RMS of the heartbeats it summed up */
+    int8_t       rssi;
+    /* pulseira/<id> goes out on the first heartbeat, then as a summary every few minutes. */
+    report_t     report;
+    report_rms_t activity;       /* the heartbeats' activity since the last publish */
 } wearable_cache_t;
 
 static QueueHandle_t s_queue = NULL;
@@ -338,6 +344,13 @@ static void handle_reading(const sensor_reading_t *reading, const rules_clock_t 
             break;
         }
         case SENSOR_KIND_TEMPERATURE: {
+            rules_on_temperature(&s_rules, reading->celsius, now);
+            /* Out only when it changed, or as a sign of life (docs/protocolo.md §1). */
+            if (!report_due(&s_state.temp_report, reading->celsius, MQTT_TEMP_REPORT_DELTA_C, REPORT_MAX_MS,
+                            now->mono_ms)) {
+                break;
+            }
+            report_mark(&s_state.temp_report, reading->celsius, now->mono_ms);
             s_state.temp_known = true;
             s_state.temp_c = reading->celsius;
             /* CAN: int16 little endian, 1/100 degC (docs/protocolo.md §2). */
@@ -345,7 +358,6 @@ static void handle_reading(const sensor_reading_t *reading, const rules_clock_t 
             can_put_i16_le(payload, (int16_t) lroundf(reading->celsius * 100.0f));
             can_send(CAN_NIBBLE_TEMPERATURE, payload, sizeof(payload));
             publish_temperature(reading->celsius);
-            rules_on_temperature(&s_rules, reading->celsius, now);
             break;
         }
     }
@@ -360,15 +372,29 @@ static void handle_espnow(const espnow_rx_msg_t *msg, const rules_clock_t *now){
     bool was_offline = rules_wearable_offline(&s_rules, msg->wearable);
     w->rssi = msg->rssi;
     rules_on_wearable_seen(&s_rules, msg->wearable, now);
+    if (was_offline) {
+        /* Back: the next heartbeat is published at once, without the activity from before the silence. */
+        report_reset(&w->report);
+        (void) report_rms_take(&w->activity);
+    }
 
     switch (msg->type) {
         case ESPNOW_MSG_HEARTBEAT:
             w->heard_heartbeat = true;
             w->battery_mv = msg->heartbeat.battery_mv;
-            w->activity_mg = msg->heartbeat.activity_mg;
-            publish_wearable(w, true);
+            report_rms_add(&w->activity, msg->heartbeat.activity_mg);
             if (msg->heartbeat.battery_mv != ESPNOW_BATTERY_UNKNOWN) {
                 rules_on_battery(&s_rules, msg->wearable, msg->heartbeat.battery_mv, now);
+            }
+            /*
+             * Every heartbeat keeps the wearable alive for the rules (offline after 90 s), but
+             * pulseira/<id> gets the first one and then a summary every few minutes
+             * (docs/protocolo.md §1): the database stores what changed, not each 30 s.
+             */
+            if (report_due(&w->report, 0.0f, 0.0f, REPORT_MAX_MS, now->mono_ms)) {
+                w->activity_mg = report_rms_take(&w->activity);
+                publish_wearable(w, true);
+                report_mark(&w->report, 0.0f, now->mono_ms);
             }
             return;
         case ESPNOW_MSG_FALL:

@@ -34,7 +34,8 @@ documentação do ESP-IDF v6.0.1.
     (`FALL_CANCEL`) ou o pedido de ajuda (`HELP_CANCEL`);
   - **segurar 3 s** fora de alerta = pedido de ajuda (`HELP` → alerta `ajuda`), com a mesma janela para cancelar;
   - um aperto simples não faz nada. Não há buzzer.
-- **MQTT (opcional):** associa ao Wi-Fi do hub, publica `pulseira/<id>/telemetria` e, se o hub não confirmar
+- **MQTT (opcional):** associa ao Wi-Fi do hub, publica `pulseira/<id>/telemetria` (no primeiro heartbeat,
+  depois a cada 5 min e na hora em que o hub para ou volta a responder) e, se o hub não confirmar
   uma queda ou um pedido de ajuda, publica o alerta ela mesma ([`docs/protocolo.md`](../../docs/protocolo.md) §1).
 - **CAN (opcional, só bancada):** quedas (pico e P) e heartbeats como quadros `0x0FD`/`0x0FE`, para o
   requisito da disciplina e para testes. A pulseira de verdade não tem transceptor.

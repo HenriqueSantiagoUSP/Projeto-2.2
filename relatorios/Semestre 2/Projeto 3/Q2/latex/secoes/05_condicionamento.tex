@@ -144,8 +144,10 @@ cerâmico de 1\,µF ao GND, colado no pino. É um passa-baixa de primeira ordem
 
 \subsection{Aquisição da temperatura}
 
-A cada 30\,s, a tarefa do LM35 faz 16 leituras do ADC1, canal 3 (GPIO 4), espaçadas de
-10\,ms. Cada leitura passa pela calibração do próprio chip (\code{adc\_cali}, que converte a
+A cada 60\,s, a tarefa do LM35 faz 16 leituras do ADC1, canal 3 (GPIO 4), espaçadas de
+10\,ms. Uma leitura por minuto basta: o ar do quarto leva dezenas de minutos para mudar, o
+próprio LM35 leva minutos para acompanhá-lo, e a regra de temperatura espera 10\,min fora da
+faixa. Toda leitura vai para a regra, mas só é publicada quando muda (Seção~\ref{sec:mqtt}). Cada leitura passa pela calibração do próprio chip (\code{adc\_cali}, que converte a
 contagem em mV usando os parâmetros gravados de fábrica) e as 16 são promediadas, o que reduz
 o ruído aleatório por um fator de $\sqrt{16} = 4$. A temperatura sai da curva da cadeia:
 \begin{equation}

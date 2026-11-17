@@ -60,10 +60,10 @@ Todo payload JSON tem:
 | `status` (Last Will) | 1 | sim | `{"v":1,"estado":"offline"}` | o broker publica se o hub cair |
 | `porta/<id>` | 1 | sim | `{"v":1,"sensor":"MC-38","estado":"aberta","ts":…}` | a cada mudança |
 | `presenca` | 1 | sim | `{"v":1,"sensor":"HC-SR501","estado":"detectada","ts":…}` | a cada mudança |
-| `temperatura` | 0 | sim | `{"v":1,"sensor":"LM35DZ","valor":22.5,"ts":…}` | a cada 30 s |
-| `pulseira/<id>` | 1 | sim | `{"v":1,"estado":"online","bateria_mV":3900,"rssi":-61,"atividade":0.12,"ts":…}` | a cada heartbeat (30 s) |
+| `temperatura` | 0 | sim | `{"v":1,"sensor":"LM35DZ","valor":22.5,"ts":…}` | quando muda 0,2 °C ou mais desde o último envio, ou a cada 5 min (o hub mede a cada 60 s) |
+| `pulseira/<id>` | 1 | sim | `{"v":1,"estado":"online","bateria_mV":3900,"rssi":-61,"atividade":0.12,"ts":…}` | no primeiro heartbeat (do boot ou da volta do offline) e depois um resumo a cada 5 min |
 | `pulseira/<id>` | 1 | sim | `{"v":1,"estado":"offline","ts":…}` | 90 s sem mensagens da pulseira |
-| `pulseira/<id>/telemetria` | 0 | não | `{"v":1,"bateria_mV":3900,"atividade":0.05,"canal":6,"hub":true,"ts":…}` | publicado **pela pulseira** com MQTT ligado, a cada heartbeat (30 s) |
+| `pulseira/<id>/telemetria` | 0 | não | `{"v":1,"bateria_mV":3900,"atividade":0.05,"canal":6,"hub":true,"ts":…}` | publicado **pela pulseira** com MQTT ligado: no primeiro heartbeat, a cada 5 min e na hora em que `hub` muda |
 | `pulseira/<id>/mqtt` | 1 | sim | `{"v":1,"estado":"online","fw":"0.1.0"}` | a pulseira com MQTT ligado conecta ao broker |
 | `pulseira/<id>/mqtt` (Last Will) | 1 | sim | `{"v":1,"estado":"offline"}` | o broker publica se a pulseira cair |
 | `alerta` | 1 | não | ver abaixo | início e fim de cada episódio |
@@ -72,6 +72,20 @@ Todo payload JSON tem:
 
 Estados retidos chegam a quem assina depois. `alerta` não é retido: quem precisa do estado dos alertas (banco,
 Grafana, backend) o reconstrói pelos episódios.
+
+**Envio por mudança.** Cada mensagem vira um ponto no banco, então leitura repetida não é publicada. Portas,
+presença e alertas já saem só quando mudam. A temperatura e a pulseira, que o hub recebe em intervalos fixos,
+seguem a regra do componente `firmware/common/report` (valores em `protocol_mqtt.h`):
+
+- **temperatura:** o hub mede a cada 60 s e entrega toda leitura às regras, mas só a publica (e só manda o
+  quadro CAN `0x0F2`) quando ela muda 0,2 °C ou mais em relação ao **último valor enviado**, ou quando passam
+  5 min sem envio, como sinal de vida;
+- **pulseira:** o heartbeat por ESP-NOW continua a cada 30 s (é ele que mantém a pulseira viva nas regras), mas
+  `pulseira/<id>` sai no primeiro heartbeat e depois como um resumo a cada 5 min. O `offline` sai na hora.
+  A urgência da bateria fica com o alerta `bateria_baixa`, que é imediato.
+
+Com o quarto estável, são cerca de 300 pontos por dia de cada um, em vez de 2.880. Quem consome pode contar
+com um valor novo de cada um a cada 5 min no máximo.
 
 ### Campos específicos
 
@@ -86,7 +100,7 @@ Grafana, backend) o reconstrói pelos episódios.
 | `hora` | booleano | `status` | `true` se o hub sincronizou a hora; sem hora, as regras com janela de horário ficam suspensas |
 | `bateria_mV` | inteiro | `pulseira/<id>` | tensão da bateria da pulseira |
 | `rssi` | inteiro | `pulseira/<id>` | sinal da pulseira medido pelo hub, em dBm |
-| `atividade` | número | `pulseira/<id>`, `pulseira/<id>/telemetria` | RMS de (\|a\| − 1 g) nos últimos 30 s, em g |
+| `atividade` | número | `pulseira/<id>`, `pulseira/<id>/telemetria` | RMS de (\|a\| − 1 g) desde o envio anterior (normalmente 5 min), em g: o RMS dos heartbeats do período |
 | `canal` | inteiro | `pulseira/<id>/telemetria` | canal de rádio em uso pelo ESP-NOW |
 | `hub` | booleano | `pulseira/<id>/telemetria` | `true` se o hub confirmou (ACK) o último heartbeat por ESP-NOW |
 
@@ -222,10 +236,10 @@ Toda a identidade está no ID; os 8 bytes de dados são só payload. Lembrete: n
 | `0x0FD` | pulseira (bancada) | MPU-6050 | queda | 3 bytes: `int16` little endian, \|a\|² no pico do gatilho em 1/100 g², + `uint8` P(queda) do classificador em % |
 | `0x0FE` | pulseira (bancada) | — | heartbeat | 4 bytes: `uint16` bateria em mV (`0xFFFF` = não medida) + `uint16` atividade em mg, little endian |
 
-`0x0F0`, `0x0FB`, `0x0FC` e `0x0FF` estão livres. Do hub, cada mudança de estado de porta ou presença e cada
-leitura de temperatura (30 s) vira um quadro. Da pulseira, cada queda detectada e cada heartbeat (30 s). O hub
-registra no log os quadros da pulseira, mas **não** os passa às regras: o alerta de queda depende do `seq` do
-ESP-NOW (§3).
+`0x0F0`, `0x0FB`, `0x0FC` e `0x0FF` estão livres. Do hub, cada mudança de estado de porta ou presença vira um
+quadro, e a temperatura segue a regra do MQTT (§1, *Envio por mudança*): um quadro quando muda 0,2 °C ou a
+cada 5 min. Da pulseira (só em bancada), cada queda detectada e cada heartbeat (30 s). O hub registra no log os
+quadros da pulseira, mas **não** os passa às regras: o alerta de queda depende do `seq` do ESP-NOW (§3).
 
 ### Tipos de payload (comuns a todos os grupos)
 

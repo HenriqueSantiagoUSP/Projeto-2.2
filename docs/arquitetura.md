@@ -75,7 +75,7 @@ para o esquemático, a confirmar no layout.
 |---|---|---|
 | HC-SR501 (PIR, 5 V) | presença; 60 s de aquecimento antes da primeira leitura | GPIO8 |
 | MC-38 (reed switch) × N | portas, listadas em `BOARD_DOORS`, cada uma com papel `saida`, `banheiro` ou `outra` | GPIO11 (quarto), GPIO12 (banheiro); 9 e 10 para as portas 3 e 4; 39–42 na expansão |
-| LM35DZ + LM358 (G = 5,5, 5 V e GND, RC 10 kΩ/1 µF na entrada do ADC) | temperatura: `adc_cali` em mV, depois a curva `T = (V_mV − 144,739) / 51,3335`; 16 amostras a cada 30 s | GPIO4 (ADC1_CH3) |
+| LM35DZ + LM358 (G = 5,5, 5 V e GND, RC 10 kΩ/1 µF na entrada do ADC) | temperatura: `adc_cali` em mV, depois a curva `T = (V_mV − 144,739) / 51,3335`; 16 amostras a cada 60 s, publicadas só quando mudam 0,2 °C ou a cada 5 min | GPIO4 (ADC1_CH3) |
 | Transceptor CAN | barramento da sala | TX GPIO13, RX GPIO14 |
 | Buzzer | **retirado em 2026-10-23**: a queda aparece no LED e chega ao cuidador pela central | — (GPIO21 livre) |
 | LED WS2812 da placa | status: verde 1 Hz normal, amarelo 1 Hz sem broker, vermelho 4 Hz com alerta aberto | GPIO48 (v1.0) / GPIO38 (v1.1) |
@@ -111,7 +111,7 @@ Fluxo:
 
 ```
 ISR do GPIO ─fila─▶ sensors_task ─(50 ms sem bordas: lê o nível)─┐
-lm35_task (30 s) ────────────────────────────────────────────────┼─▶ fila do hub ─▶ hub_task ─┬─▶ fila CAN ─▶ can_tx
+lm35_task (60 s) ────────────────────────────────────────────────┼─▶ fila do hub ─▶ hub_task ─┬─▶ fila CAN ─▶ can_tx
 espnow_task (pulseira) ──────────────────────────────────────────┤                            ├─▶ MQTT (estados)
 MQTT config/desejada ────────────────────────────────────────────┘                            └─▶ regras ─▶ alerta, LED
 ISR do TWAI ─fila─▶ can_rx ─▶ log (portas de outros grupos, quadros da pulseira em bancada)
@@ -220,7 +220,7 @@ Wearable, mais os menus comuns Network (Wi-Fi), MQTT e CAN bus (TWAI) quando os 
 | Peça | Função |
 |---|---|
 | Mosquitto | broker com usuário/senha e ACL (`hub`, `pulseira`, `telegraf`, `notificador`, `painel`) |
-| Telegraf | grava todos os tópicos MQTT no InfluxDB, sem código |
+| Telegraf | grava todos os tópicos MQTT no InfluxDB, sem código. Cada mensagem vira um ponto, por isso o hub só publica o que mudou ([`protocolo.md`](protocolo.md) §1, *Envio por mudança*) |
 | InfluxDB | séries temporais, retenção de 30 dias |
 | Grafana | painel "Quartos", com seletor de quarto: estado atual, histórico e alertas; versionado em JSON |
 | Notificador (Python) | assina `idoso/+/+/alerta` e envia ao Telegram do cuidador |
@@ -261,7 +261,7 @@ rádio e tudo o que fala com ele; o núcleo 1, com o tempo real.
 | Placa | Task | Núcleo | Prioridade | Função |
 |---|---|---|---|---|
 | hub | `sensors_task` | 1 | ALTA | estabiliza e lê portas e PIR |
-| hub | `lm35_task` | 1 | BAIXA | temperatura a cada 30 s |
+| hub | `lm35_task` | 1 | BAIXA | temperatura a cada 60 s |
 | hub | `hub_task` | 0 | MEDIA | regras, publicação, LED |
 | hub | `espnow_task` | 0 | MEDIA | valida e encaminha as mensagens da pulseira |
 | as duas | `can_rx`, `can_tx` | 0 | MEDIA | recepção e despacho; transmissão e estado do nó |

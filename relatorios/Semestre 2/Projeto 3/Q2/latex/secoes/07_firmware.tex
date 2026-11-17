@@ -65,7 +65,7 @@ que fala com ele; o núcleo 1, com o tempo real (Tabela~\ref{tab:tasks}).
 Placa & Task & Núcleo & Prioridade & Função \\
 \midrule
 hub & \code{sensors\_task} & 1 & ALTA (15) & estabiliza e lê as portas e o PIR \\
-hub & \code{lm35\_task} & 1 & BAIXA (5) & temperatura a cada 30\,s \\
+hub & \code{lm35\_task} & 1 & BAIXA (5) & temperatura a cada 60\,s \\
 hub & \code{hub\_task} & 0 & MÉDIA (10) & regras, publicação, LED \\
 hub & \code{espnow\_task} & 0 & MÉDIA (10) & valida e encaminha as mensagens da pulseira \\
 as duas & \code{can\_rx}, \code{can\_tx} & 0 & MÉDIA (10) & recepção e transmissão CAN \\
@@ -251,6 +251,7 @@ Componente & O que verifica & Verificações \\
 \code{fall\_pipeline} (pulseira) & filtro, gatilho e, em 26 janelas de 8 trechos da SisFall, os mesmos picos, atributos e probabilidades do Python & 885 \\
 \code{signal\_proc} (pulseira) & buffer circular, atributos, nível de atividade & 25 \\
 \code{button\_gesture} (pulseira) & dois toques, segurar, aperto simples e médio, repique, gesto atendido com atraso, volta do contador & 42 \\
+\code{report} (as duas) & envio por mudança: limiar contado do último envio, deriva lenta, sinal de vida a cada 5\,min, RMS do resumo & 23 \\
 \midrule
 notificador (central) & formatação, reenvio ao Telegram, dados inesperados & 22 testes \\
 \code{demo\_pulseira.py} & leitura da serial, reconexão, linhas estragadas, botão da placa & 19 testes \\
