@@ -9,4 +9,4 @@ CONFIG_ESP_TASK_WDT_PANIC=y
 CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
 
 # The wearable's own broker user (interface/mosquitto/acl), used only with GADGET_MQTT.
-CONFIG_APP_MQTT_USERNAME="vestivel"
+CONFIG_APP_MQTT_USERNAME="pulseira"

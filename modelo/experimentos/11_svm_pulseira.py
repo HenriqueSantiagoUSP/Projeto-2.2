@@ -1,8 +1,8 @@
 """
-SVM (RBF) na configuração do vestível, lado a lado com o Random Forest e a regressão logística do 09.
+SVM (RBF) na configuração da pulseira, lado a lado com o Random Forest e a regressão logística do 09.
 
-A comparação de métodos (03) avaliou o SVM com todos os atributos (tempo, FFT e AR) e o gatilho por picos. O
-vestível usa o gatilho causal e só os 23 atributos no tempo, e nessa configuração o SVM nunca tinha rodado.
+A comparação de métodos (03) avaliou o SVM com todos os atributos (tempo, FFT e AR) e o gatilho por picos. A
+pulseira usa o gatilho causal e só os 23 atributos no tempo, e nessa configuração o SVM nunca tinha rodado.
 Aqui os modelos rodam no mesmo conjunto, com as mesmas dobras e o mesmo ponto de operação do 09:
 - SisFall no cenário A (±8 g), gatilho causal com o L_on escolhido, janela de -1,0 a +0,8 s;
 - os 23 atributos de atributos.tempo();
@@ -16,9 +16,9 @@ Um bootstrap por pessoa (as pessoas sorteadas com reposição, as mesmas para to
 - em alarmes falsos/h, cada um no seu limiar (o das 95 % das janelas de impacto);
 - em quedas detectadas com <= 1 alarme falso/h, recalculado em cada sorteio.
 
-Saída: resultados/svm_vestivel.json. Não muda o modelo exportado nem os vetores de teste do firmware.
+Saída: resultados/svm_pulseira.json. Não muda o modelo exportado nem os vetores de teste do firmware.
 
-    uv run python experimentos/11_svm_vestivel.py
+    uv run python experimentos/11_svm_pulseira.py
 """
 
 import importlib.util
@@ -43,11 +43,11 @@ def carregar_script(nome):
     return modulo
 
 
-M09 = carregar_script("09_exportar_vestivel.py")
+M09 = carregar_script("09_exportar_pulseira.py")
 
 MODELOS = {
     "lr": ("Regressão logística", lambda: modelos.Sklearn("regressao_logistica")),
-    "rf": ("Random Forest 60 × 10", M09.RandomForestVestivel),
+    "rf": ("Random Forest 60 × 10", M09.RandomForestPulseira),
     "svm_6000": ("SVM (RBF), 6000 atividades", lambda: modelos.Sklearn("svm", max_negativos=6000)),
     "svm_todas": ("SVM (RBF), todas as janelas", lambda: modelos.Sklearn("svm")),
 }
@@ -95,8 +95,8 @@ def sens_1alarme_h(amostra, tabela, negativos, positivos):
 
 def main():
     sisfall, _ = _comum.carregar()
-    vestivel = json.loads((_comum.RESULTADOS / "vestivel.json").read_text(encoding="utf-8"))
-    l_on = vestivel["l_on_g"]
+    pulseira = json.loads((_comum.RESULTADOS / "pulseira.json").read_text(encoding="utf-8"))
+    l_on = pulseira["l_on_g"]
     conj = montar(sisfall, CENARIO, l_on, causal=True, distancia_s=M09.DISTANCIA_S)
     F, nomes = atributos.calcular(conj.janelas, int(PRE_S * FS), grupos=("tempo",))
     dobra = avaliacao.dobras(conj)
@@ -110,7 +110,7 @@ def main():
         s, dt, _ = avaliacao.escores_fora_da_dobra(fabrica, conj, F, dobra)
         r = avaliacao.metricas(s, conj)
         if chave == "rf":
-            assert abs(r.limiar - vestivel["rf"]["limiar_prob"]) < 1e-9, "não reproduz o 09: rode o 09 de novo"
+            assert abs(r.limiar - pulseira["rf"]["limiar_prob"]) < 1e-9, "não reproduz o 09: rode o 09 de novo"
         c = custo(chave, fabrica().ajustar(conj, F), len(nomes))
         tabelas[chave] = por_pessoa(s, r.limiar, conj)
         resultado["modelos"][chave] = {"nome": nome, "auc": r.auc, "sens_ensaio": r.sens_ensaio,
@@ -147,7 +147,7 @@ def main():
               f"(RF melhor em {100 * (da > 0).mean():.0f} %); quedas com <= 1 alarme/h {ds.mean():+.1f} pp "
               f"[{ic_s[0]:+.1f}, {ic_s[1]:+.1f}] (RF melhor em {100 * (ds < 0).mean():.0f} %)")
 
-    with open(_comum.RESULTADOS / "svm_vestivel.json", "w", encoding="utf-8", newline="\n") as f:
+    with open(_comum.RESULTADOS / "svm_pulseira.json", "w", encoding="utf-8", newline="\n") as f:
         json.dump(resultado, f, ensure_ascii=False, indent=2)
         f.write("\n")
 

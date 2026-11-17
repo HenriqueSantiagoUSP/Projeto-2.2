@@ -8,12 +8,16 @@ Rede de sensores para o monitoramento contínuo e não invasivo de idosos em Ins
   - roda as regras de alerta (saída noturna, banheiro, inatividade, temperatura);
   - integra o barramento CAN da sala;
   - publica tudo via MQTT.
-- **Vestível** (ESP32-S3): pulseira com MPU-6050 que detecta a queda e avisa o hub por ESP-NOW.
+- **Pulseira** (ESP32-S3): o dispositivo que o residente usa no pulso, com MPU-6050; detecta a queda e avisa o
+  hub por ESP-NOW.
+
+No protótipo, o hub e a pulseira são a mesma PCB com firmwares diferentes. Desde 2026-11-17 o nome é sempre
+**pulseira** (antes, "vestível"); no código C, em inglês, ela é `gadget`/`wearable`.
 - **Central:** Mosquitto, Grafana (estado de todos os quartos e histórico) e Telegram para o cuidador. No
   futuro, banco de dados, backend e nuvem.
 
 ```
-Vestível ──ESP-NOW──▶ Hub do quarto ──MQTT──▶ Mosquitto ─┬─▶ Telegraf ─▶ InfluxDB ─▶ Grafana
+Pulseira ──ESP-NOW──▶ Hub do quarto ──MQTT──▶ Mosquitto ─┬─▶ Telegraf ─▶ InfluxDB ─▶ Grafana
                           │                               └─▶ notificador ─▶ Telegram
                           └──CAN──▶ demais módulos da sala
 ```
@@ -33,7 +37,7 @@ projeto/
 │   └── coleta-de-dados.md  protocolo de ensaios para o futuro modelo de queda
 ├── firmware/
 │   ├── room/            hub do quarto (ESP-IDF)
-│   ├── gadget/          vestível (ESP-IDF)
+│   ├── gadget/          pulseira (ESP-IDF)
 │   └── common/          componentes das duas placas: contrato, rede, MQTT, CAN, RTOS, LED
 ├── interface/           central em Docker Compose + simulador; legado/ = demonstração de 18/09
 ├── hardware/            esquemáticos, PCB e mapa de pinos
@@ -57,7 +61,7 @@ e [`firmware/gadget/README.md`](firmware/gadget/README.md):
 
 ```powershell
 cd firmware\room
-idf.py menuconfig                      # Wi-Fi, broker, pareamento com o vestível
+idf.py menuconfig                      # Wi-Fi, broker, pareamento com a pulseira
 idf.py build
 idf.py -p COMx flash monitor
 ```

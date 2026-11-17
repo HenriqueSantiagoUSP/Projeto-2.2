@@ -22,7 +22,7 @@ Grafana & painel ``Quartos'', com seletor de quarto; o painel é versionado em J
 Notificador & programa em Python que assina \code{idoso/+/+/alerta} e envia cada alerta ao Telegram do cuidador \\
 \midrule
 Simulador & programa em Python que faz o papel de um hub, para testar a central sem hardware \\
-\code{demo\_vestivel.py} & demonstração do vestível com uma placa só, pela USB (Seção~\ref{sec:demo}) \\
+\code{demo\_pulseira.py} & demonstração da pulseira com uma placa só, pela USB (Seção~\ref{sec:demo}) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -32,7 +32,7 @@ Simulador & programa em Python que faz o papel de um hub, para testar a central 
 O painel ``Quartos'' mostra, para o quarto escolhido: o estado do hub (online ou offline, pelo
 \textit{Last Will}), a presença, a temperatura atual e o histórico, as portas, o estado da
 pulseira, a linha do tempo de portas e presença, a tabela de alertas (com a probabilidade de
-queda dada pelo vestível), a bateria e o nível de atividade da pulseira
+queda dada pela pulseira), a bateria e o nível de atividade da pulseira
 (Figura~\ref{fig:grafana}). As consultas foram testadas com o simulador; a aparência com dados
 reais ainda vai ser conferida.
 
@@ -67,17 +67,17 @@ pelo Telegram. Ele foi feito para não perder alertas:
 
 \subsection{Demonstração com uma placa}\label{sec:demo}
 
-Para mostrar o modelo de queda funcionando sem montar o sistema todo, o vestível tem um perfil
+Para mostrar o modelo de queda funcionando sem montar o sistema todo, a pulseira tem um perfil
 de demonstração: sem hub, com o modo de coleta ligado e a serial a 921\,600\,baud. No
-computador, o \code{demo\_vestivel.py} lê a serial e mostra, ao vivo, o $\amag$ filtrado, cada
+computador, o \code{demo\_pulseira.py} lê a serial e mostra, ao vivo, o $\amag$ filtrado, cada
 disparo do gatilho com a probabilidade dada pelo modelo e uma faixa ``QUEDA DETECTADA'' quando
-o vestível decide queda. Opcionalmente, ele faz o papel do hub e publica o alerta no broker,
+a pulseira decide queda. Opcionalmente, ele faz o papel do hub e publica o alerta no broker,
 no mesmo formato, e o alerta aparece no Grafana e no Telegram. Se o link USB cair, a leitura
 reabre a porta sozinha.
 
 \begin{figure}[H]
 \centering
-\fotoouespaco{demo_vestivel}{0.85\linewidth}{janela do demo\_vestivel.py durante uma queda simulada}
+\fotoouespaco{demo_pulseira}{0.85\linewidth}{janela do demo\_pulseira.py durante uma queda simulada}
 \caption{A janela da demonstração com uma placa.}
 \label{fig:demo}
 \end{figure}

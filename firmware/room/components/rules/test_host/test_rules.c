@@ -320,7 +320,7 @@ static void test_fall_and_cancel(void){
     rules_on_fall(&r, "a1b2c3", 42, 120000, 7.88f, 0.97f, &s_clock);
     CHECK(count(ALERT_FALL, ALERT_ACTIVE) == 1);
     CHECK(strcmp(last()->id, "a1b2c3-42") == 0);
-    CHECK(strcmp(last()->origin, "vestivel/a1b2c3") == 0);
+    CHECK(strcmp(last()->origin, "pulseira/a1b2c3") == 0);
     CHECK(last()->a2 == 7.88f);
     CHECK(last()->prob == 0.97f);
 

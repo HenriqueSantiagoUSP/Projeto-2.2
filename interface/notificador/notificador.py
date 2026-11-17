@@ -51,7 +51,7 @@ TIPOS = {
     "banheiro_prolongado": "Permanência prolongada no banheiro",
     "inatividade": "Inatividade prolongada",
     "temperatura": "Temperatura fora da faixa",
-    "vestivel_offline": "Pulseira sem sinal",
+    "pulseira_offline": "Pulseira sem sinal",
     "bateria_baixa": "Bateria da pulseira baixa",
 }
 
@@ -102,7 +102,7 @@ def detalhe_legivel(tipo, detalhe):
         if prob is not None:
             # Saída do classificador da pulseira (não calibrada); 0 numa queda simulada pelo botão.
             partes.append("confiança do modelo: {:.0f} %".format(100 * prob))
-        if d.get("via") == "vestivel":
+        if d.get("via") == "pulseira":
             # A pulseira publicou sozinha: o hub não confirmou a queda (docs/protocolo.md §1).
             partes.append("enviado pela própria pulseira, o hub do quarto não respondeu")
         return "; ".join(partes)
@@ -116,10 +116,10 @@ def detalhe_legivel(tipo, detalhe):
         limite = _numero(d.get("limite"))
         texto = "{:.1f} °C".format(_numero(d["valor"]))
         return texto + (" (limite {:.1f} °C)".format(limite) if limite is not None else "")
-    if tipo == "vestivel_offline":
-        return "Pulseira {} sem sinal há {} s".format(d.get("vestivel", "?"), d.get("ultimo_contato_s", "?"))
+    if tipo == "pulseira_offline":
+        return "Pulseira {} sem sinal há {} s".format(d.get("pulseira", "?"), d.get("ultimo_contato_s", "?"))
     if tipo == "bateria_baixa":
-        return "Pulseira {}: {} mV".format(d.get("vestivel", "?"), d.get("bateria_mV", "?"))
+        return "Pulseira {}: {} mV".format(d.get("pulseira", "?"), d.get("bateria_mV", "?"))
     return ""
 
 

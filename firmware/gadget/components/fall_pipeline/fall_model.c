@@ -1,6 +1,6 @@
 /*
- * GERADO por modelo/experimentos/09_exportar_vestivel.py em 2026-11-13: não edite à mão.
- * Treino: SisFall, cenário A (±8 g / ±500 °/s (vestível atual)), gatilho causal com L_on = 2.0 g,
+ * GERADO por modelo/experimentos/09_exportar_pulseira.py em 2026-11-17: não edite à mão.
+ * Treino: SisFall, cenário A (±8 g / ±500 °/s (pulseira atual)), gatilho causal com L_on = 2.0 g,
  * 12723 janelas (1784 de impacto), 38 pessoas.
  * Validação por pessoa (5 dobras), limiar com 95 % das janelas de impacto acima:
  *   regressão logística: 0.62 alarme falso/h, 94.9 % das quedas com <= 1 alarme/h

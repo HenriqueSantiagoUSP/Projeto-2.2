@@ -1,7 +1,7 @@
-# firmware/gadget — vestível
+# firmware/gadget — pulseira
 
 Pulseira com ESP32-S3 e acelerômetro MPU-6050 (I²C). Detecta a queda na própria placa e avisa o hub do quarto
-por ESP-NOW. O desenho está em [`docs/arquitetura.md`](../../docs/arquitetura.md) (seção Vestível), as
+por ESP-NOW. O desenho está em [`docs/arquitetura.md`](../../docs/arquitetura.md) (seção Pulseira), as
 mensagens em [`docs/protocolo.md`](../../docs/protocolo.md) e o que já foi verificado em
 [`docs/estado.md`](../../docs/estado.md). O código segue os slides de [`aulas/`](../../aulas/README.md) e a
 documentação do ESP-IDF v6.0.1.
@@ -21,17 +21,17 @@ documentação do ESP-IDF v6.0.1.
 
   O custo dos passos 4 a 6 é medido em ciclos de CPU e vai para o log em cada disparo.
 - **O modelo é gerado, não escrito à mão:** `fall_model.h`/`fall_model.c` saem de
-  `modelo/experimentos/09_exportar_vestivel.py`, junto com os vetores de teste de paridade. Ele foi treinado na
+  `modelo/experimentos/09_exportar_pulseira.py`, junto com os vetores de teste de paridade. Ele foi treinado na
   SisFall (cintura, ±8 g) e é **provisório até retreinar com os dados do pulso**.
 - **Modo de coleta:** imprime cada amostra bruta em CSV e, a cada disparo do gatilho, uma linha `FEAT:` com os 23
   atributos, P(queda) e o custo em ciclos. Serve para formar o conjunto de dados do modelo
   ([`docs/coleta-de-dados.md`](../../docs/coleta-de-dados.md)).
 - **ESP-NOW:** varredura de canal, heartbeat a cada 30 s com bateria e atividade, `FALL` (com o pico e a
   P(queda)) com reenvio até o ACK, `FALL_CANCEL` pelo botão "estou bem" dentro da janela de 15 s em que o LED fica em alerta (não há buzzer).
-- **MQTT (opcional):** associa ao Wi-Fi do hub, publica `vestivel/<id>/telemetria` e, se o hub não confirmar
-  uma queda, publica o alerta ele mesmo ([`docs/protocolo.md`](../../docs/protocolo.md) §1).
+- **MQTT (opcional):** associa ao Wi-Fi do hub, publica `pulseira/<id>/telemetria` e, se o hub não confirmar
+  uma queda, publica o alerta ela mesma ([`docs/protocolo.md`](../../docs/protocolo.md) §1).
 - **CAN (opcional, só bancada):** quedas (pico e P) e heartbeats como quadros `0x0FD`/`0x0FE`, para o
-  requisito da disciplina e para testes. O vestível de verdade não tem transceptor.
+  requisito da disciplina e para testes. A pulseira de verdade não tem transceptor.
 - **Ainda não:** *light sleep* (depende de medir o consumo em placa).
 
 ## Configurar
@@ -47,18 +47,18 @@ documentação do ESP-IDF v6.0.1.
 | Cooldown, cancel window | 30 s e 15 s por padrão |
 | Button simulates a fall | só para testes: o botão gera uma queda e permite testar todo o caminho até o Telegram |
 | Data collection mode | liga a saída CSV e as linhas `FEAT:` (uma por disparo do gatilho) |
-| Battery divider | **desligado por padrão**: a PCB do protótipo não tem divisor (o vestível roda com power bank), e a bateria vai como "desconhecida". Ligue só numa placa com LiPo e divisor no GPIO 5 |
-| Also join the Wi-Fi and talk to the central over MQTT | liga o MQTT direto (padrão: desligado). Preencha também **Network (Wi-Fi)** e **MQTT** (usuário `vestivel`, senha `MQTT_VESTIVEL_PASSWORD` do `interface/.env`, mesmo site e quarto do hub) |
+| Battery divider | **desligado por padrão**: a PCB do protótipo não tem divisor (a pulseira roda com power bank), e a bateria vai como "desconhecida". Ligue só numa placa com LiPo e divisor no GPIO 5 |
+| Also join the Wi-Fi and talk to the central over MQTT | liga o MQTT direto (padrão: desligado). Preencha também **Network (Wi-Fi)** e **MQTT** (usuário `pulseira`, senha `MQTT_PULSEIRA_PASSWORD` do `interface/.env`, mesmo site e quarto do hub) |
 | CAN bus | liga o CAN de bancada (padrão: desligado). Modo de bancada em **CAN bus (TWAI)** |
 
-O id do vestível (3 últimos bytes do MAC) e o MAC completo, que o hub precisa, aparecem no log de boot. Pinos:
-`firmware/common/pcb/include/pcb_pins.h`, o mapa da PCB que o vestível divide com o hub
-([`hardware/README.md`](../../hardware/README.md)); `components/board/include/board_pins.h` escolhe o que o
-vestível usa. Em `menuconfig` → PCB, a versão da DevKit (LED no GPIO48 ou no GPIO38).
+O id da pulseira (3 últimos bytes do MAC) e o MAC completo, que o hub precisa, aparecem no log de boot. Pinos:
+`firmware/common/pcb/include/pcb_pins.h`, o mapa da PCB que a pulseira divide com o hub
+([`hardware/README.md`](../../hardware/README.md)); `components/board/include/board_pins.h` escolhe o que a
+pulseira usa. Em `menuconfig` → PCB, a versão da DevKit (LED no GPIO48 ou no GPIO38).
 
 ## Sem alguma peça
 
-Nada do que é opcional derruba o vestível. Cada peça ausente dá **um** aviso (W) quando é percebida e uma linha
+Nada do que é opcional derruba a pulseira. Cada peça ausente dá **um** aviso (W) quando é percebida e uma linha
 (I) quando volta, e as novas tentativas ficam em silêncio:
 
 | Situação | O que acontece |
@@ -86,14 +86,14 @@ Para mostrar o modelo funcionando só com a ESP e o MPU-6050, ligada ao computad
 
    Se mudar o `sdkconfig.demo.defaults`, apague `build/demo/sdkconfig` antes: os defaults só preenchem o que o
    `sdkconfig` ainda não tem.
-3. **No computador**, rode o [`interface/demo_vestivel.py`](../../interface/README.md#demonstração-com-uma-placa-só).
+3. **No computador**, rode o [`interface/demo_pulseira.py`](../../interface/README.md#demonstração-com-uma-placa-só).
    Ele mostra o sinal e as decisões ao vivo e, se quiser, repassa as quedas à central. Para só olhar o log:
    `idf.py -B build/demo -p COMx monitor`. No boot devem aparecer `+-8 g, +-500 dps`,
    `fall pipeline: trigger 2.00 g, random forest…` e o aviso `no hub configured … stand-alone`.
 
    O `-B build/demo` também vale para o monitor: sem ele, o `idf.py monitor` usa o build do dia a dia e abre a
    115200. Aí só as linhas da ROM (`ESP-ROM…`, `load:…`) saem legíveis, e o resto, a 921600, vira lixo. Feche o
-   monitor (Ctrl+]) antes de abrir o `demo_vestivel.py`, porque os dois não usam a porta ao mesmo tempo.
+   monitor (Ctrl+]) antes de abrir o `demo_pulseira.py`, porque os dois não usam a porta ao mesmo tempo.
 
 **Na frente do professor:**
 1. **Andar ou balançar a placa:** o gatilho dispara, mas a P(queda) fica perto de 0 e não há alarme.

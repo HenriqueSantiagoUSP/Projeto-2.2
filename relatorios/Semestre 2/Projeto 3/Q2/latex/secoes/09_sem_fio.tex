@@ -2,7 +2,7 @@
 \section{Interface sem fio}\label{sec:semfio}
 %======================================================================
 O sistema tem dois enlaces sem fio, os dois em 2,4\,GHz no rádio do próprio ESP32-S3: o
-\textbf{ESP-NOW}, do vestível ao hub, e o \textbf{Wi-Fi}, do hub ao ponto de acesso da
+\textbf{ESP-NOW}, da pulseira ao hub, e o \textbf{Wi-Fi}, do hub ao ponto de acesso da
 ILPI, por onde passa o MQTT até a central.
 
 \subsection{Modos do ESP32-S3 e o papel de cada nó}\label{sec:modos}
@@ -23,7 +23,7 @@ o rádio estiver.
 Nó & Modo & Por quê \\
 \midrule
 Hub & STA associado ao Wi-Fi da ILPI, sem economia de energia, + ESP-NOW & precisa do Wi-Fi para o MQTT; sem economia de energia, porque com ela o rádio dorme entre os \textit{beacons} e perde quadros ESP-NOW \\
-Vestível & STA sem associação, só ESP-NOW & o rádio só liga para enviar; não precisa manter a associação nem conhecer a senha da rede \\
+Pulseira & STA sem associação, só ESP-NOW & o rádio só liga para enviar; não precisa manter a associação nem conhecer a senha da rede \\
 Central & --- (rede local, cabo ou Wi-Fi) & --- \\
 \bottomrule
 \end{tabular}
@@ -33,9 +33,9 @@ A primeira proposta, no Projeto 1 deste semestre, já usava o ESP-NOW, mas punha
 AP+STA, com o ESP-NOW num canal fixo, sem criptografia e com mensagens em texto. Ela foi
 revista: o ESP-NOW funciona sobre a interface STA, então o SoftAP não acrescentava nada; e o
 que evita perder quadros no hub é desligar a economia de energia do rádio. O canal passou a
-ser descoberto pelo vestível, e as mensagens ganharam formato binário e criptografia.
+ser descoberto pela pulseira, e as mensagens ganharam formato binário e criptografia.
 
-\subsection{ESP-NOW: do vestível ao hub}\label{sec:espnow}
+\subsection{ESP-NOW: da pulseira ao hub}\label{sec:espnow}
 
 \begin{table}[H]
 \centering
@@ -46,10 +46,10 @@ ser descoberto pelo vestível, e as mensagens ganharam formato binário e cripto
 \toprule
 Item & Valor \\
 \midrule
-Sentido & vestível envia, hub recebe; sempre \textit{unicast} \\
-Endereçamento & o MAC do hub, configurado no vestível; o hub aceita só o vestível pareado \\
+Sentido & pulseira envia, hub recebe; sempre \textit{unicast} \\
+Endereçamento & o MAC do hub, configurado na pulseira; o hub aceita só a pulseira pareada \\
 Criptografia & ligada: chave primária (PMK) comum e chave local (LMK) do par, 16 bytes cada, fora do repositório \\
-Canal & o do Wi-Fi do hub, descoberto pelo vestível por varredura \\
+Canal & o do Wi-Fi do hub, descoberto pela pulseira por varredura \\
 Tamanho & até 13 bytes por mensagem (o limite do ESP-NOW é 250) \\
 Confirmação & ACK da camada MAC do hub, informado pelo \textit{callback} de envio \\
 \bottomrule
@@ -59,13 +59,13 @@ Confirmação & ACK da camada MAC do hub, informado pelo \textit{callback} de en
 \paragraph{Formato.} As mensagens são estruturas empacotadas, em \textit{little endian},
 definidas num cabeçalho C (\code{protocol\_espnow.h}) que as duas placas compilam
 (Figura~\ref{fig:espnow_quadro}). O cabeçalho comum traz a versão do formato, o tipo, um
-número de sequência e o tempo desde o boot do vestível. O hub descarta versão ou tipo
+número de sequência e o tempo desde o boot da pulseira. O hub descarta versão ou tipo
 desconhecidos e mensagens com tamanho diferente do esperado para o tipo.
 
 \begin{figure}[H]
 \centering
 \resizebox{0.95\linewidth}{!}{\input{diagramas/espnow_quadro}}
-\caption{Mensagens ESP-NOW do vestível: cabeçalho de 8 bytes e o conteúdo de cada tipo.}
+\caption{Mensagens ESP-NOW da pulseira: cabeçalho de 8 bytes e o conteúdo de cada tipo.}
 \label{fig:espnow_quadro}
 \end{figure}
 
@@ -84,31 +84,31 @@ typedef struct __attribute__((packed)) {
 } espnow_fall_t;
 \end{lstlisting}
 
-\paragraph{Varredura de canal.} O vestível não está associado a nada e não sabe o canal da
-rede. No boot, e depois de 3 falhas seguidas de envio, ele manda um \code{PING} ao hub nos
+\paragraph{Varredura de canal.} A pulseira não está associada a nada e não sabe o canal da
+rede. No boot, e depois de 3 falhas seguidas de envio, ela manda um \code{PING} ao hub nos
 canais 1 a 13; o primeiro canal que confirma é guardado na memória RTC e usado dali em
-diante. Se nenhum responder, ele espera 30\,s e recomeça.
+diante. Se nenhum responder, ela espera 30\,s e recomeça.
 
 \paragraph{Confiabilidade.} O ESP-NOW não garante a entrega, e uma queda perdida é o pior
 erro do sistema. Por isso:
 \begin{itemize}
   \item uma mensagem só conta como entregue com o ACK da camada MAC do hub;
   \item \code{FALL} e \code{FALL\_CANCEL} têm até 10 tentativas, a cada 50\,ms, com o mesmo
-        número de sequência. Se todas falharem, o vestível refaz a varredura e tenta de novo;
-        com o MQTT do vestível ligado, publica o alerta direto no broker;
-  \item se nem assim a mensagem chegar, o vestível guarda o quadro e o reenvia \emph{igual}
+        número de sequência. Se todas falharem, a pulseira refaz a varredura e tenta de novo;
+        com o MQTT da pulseira ligado, publica o alerta direto no broker;
+  \item se nem assim a mensagem chegar, a pulseira guarda o quadro e o reenvia \emph{igual}
         2\,s depois, dobrando a espera até 30\,s, e na hora em que um heartbeat voltar a ser
         entregue. Repete até entregar;
-  \item o hub guarda o último par (sequência, \textit{uptime}) de cada vestível e descarta a
+  \item o hub guarda o último par (sequência, \textit{uptime}) de cada pulseira e descarta a
         mensagem que repete os dois: um reenvio cujo ACK se perdeu não vira outro alerta. O
-        \textit{uptime} distingue um reenvio da primeira mensagem de um vestível que
+        \textit{uptime} distingue um reenvio da primeira mensagem de uma pulseira que
         reiniciou, e a sequência começa num valor aleatório a cada boot, para o
         identificador do alerta não repetir o de uma queda anterior.
 \end{itemize}
 
-\paragraph{Vivacidade.} O vestível manda um \code{HEARTBEAT} a cada 30\,s. Qualquer mensagem
-conta como sinal de vida; depois de 90\,s sem nenhuma, o hub publica o vestível como
-\code{offline} e abre o alerta \code{vestivel\_offline}.
+\paragraph{Vivacidade.} A pulseira manda um \code{HEARTBEAT} a cada 30\,s. Qualquer mensagem
+conta como sinal de vida; depois de 90\,s sem nenhuma, o hub publica a pulseira como
+\code{offline} e abre o alerta \code{pulseira\_offline}.
 
 A Figura~\ref{fig:sequencia} junta tudo: o caminho de uma queda até o celular do cuidador,
 com as metas de latência, e o cancelamento pelo botão.
@@ -116,7 +116,7 @@ com as metas de latência, e o cancelamento pelo botão.
 \begin{figure}[H]
 \centering
 \resizebox{\linewidth}{!}{\input{diagramas/sequencia_queda}}
-\caption{Sequência de uma queda e do cancelamento, do vestível ao Telegram.}
+\caption{Sequência de uma queda e do cancelamento, da pulseira ao Telegram.}
 \label{fig:sequencia}
 \end{figure}
 
@@ -142,7 +142,7 @@ Item & Valor \\
 \midrule
 Implementação & Eclipse Mosquitto 2.0, MQTT 3.1.1 \\
 Portas & 1883 (TCP: hubs e serviços), 9001 (WebSocket: navegador); 8883 com TLS quando houver nuvem \\
-Autenticação & usuário e senha por cliente, com ACL por tópico: \code{hub}, \code{vestivel}, \code{telegraf}, \code{notificador}, \code{painel} \\
+Autenticação & usuário e senha por cliente, com ACL por tópico: \code{hub}, \code{pulseira}, \code{telegraf}, \code{notificador}, \code{painel} \\
 Keepalive & 30\,s: o \textit{Last Will} sai até $\sim$45\,s depois de a placa cair \\
 \bottomrule
 \end{tabular}
@@ -161,7 +161,7 @@ Tópico & QoS & Retido & Exemplo de conteúdo & Quando \\
 \code{porta/<id>} & 1 & sim & \code{\{"estado":"aberta"\}} & a cada mudança \\
 \code{presenca} & 1 & sim & \code{\{"estado":"detectada"\}} & a cada mudança \\
 \code{temperatura} & 0 & sim & \code{\{"valor":22.5\}} & a cada 30\,s \\
-\code{vestivel/<id>} & 1 & sim & \code{\{"estado":"online", "atividade":0.12\}} & a cada heartbeat; \code{offline} após 90\,s \\
+\code{pulseira/<id>} & 1 & sim & \code{\{"estado":"online", "atividade":0.12\}} & a cada heartbeat; \code{offline} após 90\,s \\
 \code{alerta} & 1 & não & ver abaixo & início e fim de cada episódio \\
 \code{config/aplicada} & 1 & sim & a configuração em uso & no boot e a cada \code{config/desejada} \\
 \bottomrule
@@ -175,25 +175,25 @@ retido, porque cada mensagem é um evento; quem precisa do estado dos alertas o 
 pelos episódios. Um alerta de queda:
 \begin{lstlisting}[language=json]
 {"v":1, "id":"a1b2c3-42", "tipo":"queda", "estado":"ativo",
- "origem":"vestivel/a1b2c3", "detalhe":{"a2":7.88, "prob":0.97}, "ts":1792497600000}
+ "origem":"pulseira/a1b2c3", "detalhe":{"a2":7.88, "prob":0.97}, "ts":1792497600000}
 \end{lstlisting}
 
 O \code{id} identifica o episódio e se repete no \code{resolvido} ou \code{cancelado}
 correspondente. Com QoS 1, uma mensagem pode chegar duas vezes; quem consome descarta
 \code{id} e \code{estado} repetidos. O \code{detalhe} da queda traz o $\amag^2$ no pico e a
-probabilidade que o classificador do vestível deu.
+probabilidade que o classificador da pulseira deu.
 
-\paragraph{Reserva pelo vestível.} Com a opção MQTT ligada, o vestível se associa ao mesmo
-Wi-Fi e, se o hub não confirmar uma queda, publica o alerta ele mesmo, com o mesmo \code{id};
+\paragraph{Reserva pela pulseira.} Com a opção MQTT ligada, a pulseira se associa ao mesmo
+Wi-Fi e, se o hub não confirmar uma queda, publica o alerta ela mesma, com o mesmo \code{id};
 a central recebe uma notificação só. Custa bateria, por isso vem desligado.
 
 \subsection{Segurança}
 
 \begin{itemize}
-  \item ESP-NOW cifrado (PMK e LMK), e o hub aceita só o vestível pareado: um ESP32 qualquer
+  \item ESP-NOW cifrado (PMK e LMK), e o hub aceita só a pulseira pareada: um ESP32 qualquer
         por perto não consegue mandar uma queda falsa.
-  \item MQTT com usuário e senha por cliente e ACL por tópico: o notificador só lê alertas, o
-        vestível só publica a própria telemetria e o alerta, e só o painel escreve a
+  \item MQTT com usuário e senha por cliente e ACL por tópico: o notificador só lê alertas, a
+        pulseira só publica a própria telemetria e o alerta, e só o painel escreve a
         configuração.
   \item Senhas, chaves e o \code{sdkconfig} ficam fora do repositório.
   \item Na rede local, o MQTT ainda é sem TLS; o TLS entra quando houver ponte para a nuvem.
@@ -201,7 +201,7 @@ a central recebe uma notificação só. Custa bateria, por isso vem desligado.
 
 \begin{figure}[H]
 \centering
-\fotoouespaco{serial_espnow}{0.85\linewidth}{monitor serial do hub recebendo o heartbeat e uma queda do vestível por ESP-NOW}
-\caption{Hub recebendo o vestível por ESP-NOW.}
+\fotoouespaco{serial_espnow}{0.85\linewidth}{monitor serial do hub recebendo o heartbeat e uma queda da pulseira por ESP-NOW}
+\caption{Hub recebendo a pulseira por ESP-NOW.}
 \label{fig:serial_espnow}
 \end{figure}

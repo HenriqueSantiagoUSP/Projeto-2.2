@@ -1,6 +1,6 @@
 # modelo
 
-Desenvolvimento e comparação, no PC, dos modelos de detecção de queda que depois vão para o vestível
+Desenvolvimento e comparação, no PC, dos modelos de detecção de queda que depois vão para a pulseira
 (S2 P3 Q1: "desenvolvimento do modelo autorregressivo e/ou dos modelos de classificação"). O código usa as
 bases descritas em [`../dados/README.md`](../dados/README.md):
 - a SisFall: 38 pessoas e 4505 ensaios, com sensor na cintura;
@@ -59,7 +59,7 @@ uv run python experimentos/08_relatorio_latex.py
 ```
 
 ```bash
-uv run python experimentos/09_exportar_vestivel.py
+uv run python experimentos/09_exportar_pulseira.py
 ```
 
 ```bash
@@ -67,7 +67,7 @@ uv run python experimentos/10_figuras_apresentacao.py
 ```
 
 ```bash
-uv run python experimentos/11_svm_vestivel.py
+uv run python experimentos/11_svm_pulseira.py
 ```
 
 ```bash
@@ -86,14 +86,14 @@ A ordem importa:
 4. `08_relatorio_latex.py` copia as figuras e gera as tabelas do relatório LaTeX do Q1
    (`relatorios/Semestre 2/Projeto 3/Q1/latex/`) a partir dos CSVs. Depois, compile lá com `pdflatex main.tex`,
    duas vezes.
-5. `09_exportar_vestivel.py` é independente dos outros, exceto pelo L_on do `02`. Ele gera o que vai para o
-   vestível (seção [No vestível](#no-vestível)) e leva ~1 min.
+5. `09_exportar_pulseira.py` é independente dos outros, exceto pelo L_on do `02`. Ele gera o que vai para a
+   pulseira (seção [Na pulseira](#no-pulseira)) e leva ~1 min.
 6. `10_figuras_apresentacao.py` vem por último: lê os resultados do `03`, do `04` e do `09`.
    - Gera as figuras da apresentação do Q1 em tamanho de slide (`resultados/ap_*.png`).
    - Escreve as tabelas e os números em `relatorios/Semestre 2/Projeto 3/Q1/apresentacao/`.
-   - Confere que o Random Forest que ele explica é o do vestível (limiar e vetores de teste).
+   - Confere que o Random Forest que ele explica é o da pulseira (limiar e vetores de teste).
    - Depois, compile lá com `pdflatex main.tex`, duas vezes.
-7. `11_svm_vestivel.py` roda depois do `09`. Ele avalia o SVM na configuração do vestível, ao lado do Random
+7. `11_svm_pulseira.py` roda depois do `09`. Ele avalia o SVM na configuração da pulseira, ao lado do Random
    Forest e da regressão logística, com intervalos de confiança por pessoa, e leva ~30 s. Não muda o modelo
    exportado.
 8. `12_relatorio_q2.py` roda depois do `09` e do `11`. Ele prepara o relatório do Q2
@@ -131,7 +131,7 @@ duas CNNs, leva ~3 min por cenário.
 | Arquivo | O que faz |
 |---|---|
 | `queda/dados.py` | leitores da SisFall (pessoa pela pasta; cache) e dos nossos ensaios (reamostrados para 200 Hz) e saturação na faixa do sensor |
-| `queda/pipeline.py` | filtro, gatilho (detector de picos; `gatilho_causal`, o que roda no vestível; e a histerese do firmware antigo, para a linha de base), janelas e cenários A (±8 g) e B (±2 g) |
+| `queda/pipeline.py` | filtro, gatilho (detector de picos; `gatilho_causal`, o que roda na pulseira; e a histerese do firmware antigo, para a linha de base), janelas e cenários A (±8 g) e B (±2 g) |
 | `queda/atributos.py` | atributos no tempo (as definições do `signal_proc.c` + as dos slides), FFT e AR(p) por mínimos quadrados |
 | `queda/modelos.py` | regras em cascata, correlação com templates (normalizada e não), DTW, AR/ARX como anomalia, centroide, kNN, regressão logística, árvore, SVM e Random Forest |
 | `queda/cnn.py` | CNN 1D: só módulos (|a| e \|ω\|) ou os 6 eixos |
@@ -139,8 +139,8 @@ duas CNNs, leva ~3 min por cenário.
 | `tests/` | blocos contra valores conhecidos e os exemplos dos slides (AR(2), DTW, correlação), o gatilho vetorizado contra o laço do firmware antigo e o gatilho causal |
 | `experimentos/07_figuras_explicativas.py` | 11 figuras para a apresentação e o relatório, e `ensaios_com_alarme_A.csv` (% de ensaios de cada atividade com alarme: limiar atual × Random Forest) |
 | `experimentos/08_relatorio_latex.py` | figuras e tabelas (`.tex`) do relatório LaTeX do Q1, geradas dos resultados |
-| `experimentos/09_exportar_vestivel.py` | treina os classificadores do vestível com o gatilho causal e gera `fall_model.h`/`.c`, os vetores de teste de paridade e `resultados/vestivel.json` |
-| `experimentos/11_svm_vestivel.py` | SVM (RBF) na configuração do vestível (gatilho causal, 23 atributos no tempo, ±8 g) contra o Random Forest 60 × 10 e a regressão logística: métricas, tamanho, operações por janela e bootstrap por pessoa. Grava `resultados/svm_vestivel.json` |
+| `experimentos/09_exportar_pulseira.py` | treina os classificadores da pulseira com o gatilho causal e gera `fall_model.h`/`.c`, os vetores de teste de paridade e `resultados/pulseira.json` |
+| `experimentos/11_svm_pulseira.py` | SVM (RBF) na configuração da pulseira (gatilho causal, 23 atributos no tempo, ±8 g) contra o Random Forest 60 × 10 e a regressão logística: métricas, tamanho, operações por janela e bootstrap por pessoa. Grava `resultados/svm_pulseira.json` |
 | `experimentos/10_figuras_apresentacao.py` | figuras em tamanho de slide (`ap_*.png`), tabelas e números da apresentação Beamer do Q1. Inclui o sinal antes e depois do filtro, a árvore de decisão, a fronteira árvore × floresta e os votos das 60 árvores |
 | `experimentos/12_relatorio_q2.py` | gráficos, tabelas, números e exportações da PCB do relatório do Q2 (primeira versão do relatório final); confere que o ajuste do LM35 reproduz a curva do firmware e que o biquad é o do `fall_model.c` |
 | `experimentos/_estilo.py` | paleta, parâmetros do matplotlib e nomes dos atributos, comuns ao `07`, ao `10` e ao `12` |
@@ -175,11 +175,11 @@ Números de [`resultados/resumo.md`](resultados/resumo.md).
   - as quedas de joelhos foram perdidas (o SVM pegou uma das três): são mais lentas, e os ensaios acabam ~1 s
     depois do impacto.
 
-## No vestível
+## Na pulseira
 
 Desde 2026-11-11, o pipeline roda no firmware (`firmware/gadget/components/fall_pipeline`). O que vai para lá
-sai de `experimentos/09_exportar_vestivel.py`, com os números em
-[`resultados/vestivel.json`](resultados/vestivel.json) (SisFall, cenário A, validação por pessoa):
+sai de `experimentos/09_exportar_pulseira.py`, com os números em
+[`resultados/pulseira.json`](resultados/pulseira.json) (SisFall, cenário A, validação por pessoa):
 
 - **Gatilho causal** (`pipeline.gatilho_causal`), o que roda amostra a amostra:
   - acompanha o pico de \|a\| filtrado desde uma subida até 2,0 g e o emite depois de 0,5 s sem um valor maior;
@@ -193,7 +193,7 @@ sai de `experimentos/09_exportar_vestivel.py`, com os números em
   - 0,62 alarme falso/h;
   - 94,9 % das quedas com ≤ 1 alarme/h;
   - limiar P ≥ 0,96.
-- **SVM (RBF)**, avaliado na mesma configuração por `11_svm_vestivel.py` ([`resultados/svm_vestivel.json`](resultados/svm_vestivel.json)), mas
+- **SVM (RBF)**, avaliado na mesma configuração por `11_svm_pulseira.py` ([`resultados/svm_pulseira.json`](resultados/svm_pulseira.json)), mas
   não exportado:
   - treinado com todas as janelas: 0,69 alarme falso/h e 96,2 % das quedas com ≤ 1 alarme/h;
   - 34 kB na flash (348 vetores de suporte), mas ~24 mil operações e 348 exponenciais por janela, contra ≤ 600

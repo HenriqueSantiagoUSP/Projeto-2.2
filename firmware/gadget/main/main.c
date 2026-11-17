@@ -344,7 +344,7 @@ static void ts_field(char *out, size_t out_len){
     snprintf(out, out_len, ",\"ts\":%lld", (long long) tv.tv_sec * 1000 + tv.tv_usec / 1000);
 }
 
-/* "vestivel/<id>/<suffix>" */
+/* "pulseira/<id>/<suffix>" */
 static void wearable_suffix(char *out, size_t out_len, const char *suffix){
     snprintf(out, out_len, "%s/%s/%s", MQTT_TOPIC_WEARABLE, s_wearable_id, suffix);
 }
@@ -382,10 +382,10 @@ static bool publish_fall_alert(uint16_t seq, const fall_info_t *fall, bool activ
     char ts[32], detail[64], json[JSON_MAX];
     ts_field(ts, sizeof(ts));
     if (active) {
-        snprintf(detail, sizeof(detail), "\"a2\":%.2f,\"prob\":%.2f,\"via\":\"vestivel\"", fall->a2_peak,
+        snprintf(detail, sizeof(detail), "\"a2\":%.2f,\"prob\":%.2f,\"via\":\"pulseira\"", fall->a2_peak,
                  fall->prob_pct / 100.0f);
     } else {
-        snprintf(detail, sizeof(detail), "\"via\":\"vestivel\"");
+        snprintf(detail, sizeof(detail), "\"via\":\"pulseira\"");
     }
     snprintf(json, sizeof(json),
              "{\"v\":%d,\"id\":\"%s-%u\",\"tipo\":\"%s\",\"estado\":\"%s\",\"origem\":\"%s/%s\",\"detalhe\":{%s}%s}",

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-demo_vestivel.py — o modelo de queda ao vivo, com uma placa só ligada ao computador.
+demo_pulseira.py — o modelo de queda ao vivo, com uma placa só ligada ao computador.
 
-Lê a serial do vestível gravado com o perfil de demonstração (firmware/gadget/sdkconfig.demo.defaults):
+Lê a serial da pulseira gravada com o perfil de demonstração (firmware/gadget/sdkconfig.demo.defaults):
 - linhas CSV: cada amostra bruta, a 200 Hz, que viram o gráfico do |a| filtrado;
 - linhas FEAT: cada disparo do gatilho, com os atributos, a P(queda) e a decisão do Random Forest da placa.
 
 Mostra tudo numa janela. Com --mqtt-host, também faz o papel do hub para a central, no contrato de
 docs/protocolo.md:
 - status online;
-- vestivel/<id> com a atividade;
+- pulseira/<id> com a atividade;
 - o alerta de queda com a P(queda), que aparece no Grafana e no Telegram.
 
 A placa decide; este programa só mostra e repassa.
@@ -17,10 +17,10 @@ A placa decide; este programa só mostra e repassa.
 Uso
 ---
     pip install -r requirements-demo.txt                              # uma vez
-    python demo_vestivel.py --porta COM5                              # só a janela
-    python demo_vestivel.py --porta COM5 --mqtt-host 192.168.0.10 --senha <MQTT_HUB_PASSWORD>
-    python demo_vestivel.py --porta COM5 --gravar sessao.log          # guarda a sessão
-    python demo_vestivel.py --reproduzir sessao.log                   # ensaio sem a placa
+    python demo_pulseira.py --porta COM5                              # só a janela
+    python demo_pulseira.py --porta COM5 --mqtt-host 192.168.0.10 --senha <MQTT_HUB_PASSWORD>
+    python demo_pulseira.py --porta COM5 --gravar sessao.log          # guarda a sessão
+    python demo_pulseira.py --reproduzir sessao.log                   # ensaio sem a placa
 
 Na janela: c = "estou bem" (cancela a última queda na central); q = sai.
 """
@@ -37,17 +37,17 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 
-FS_HZ = 200.0                   # taxa do MPU-6050 no vestível
+FS_HZ = 200.0                   # taxa do MPU-6050 na pulseira
 PERIODO_S = 1.0 / FS_HZ
 LSB_POR_G = 4096.0              # ±8 g
 FC_HZ = 20.0                    # o passa-baixa do pipeline (modelo/queda/pipeline.py, FC_PASSA_BAIXA)
-INTERVALO_VESTIVEL_S = 30.0     # como o heartbeat do vestível
+INTERVALO_PULSEIRA_S = 30.0     # como o heartbeat da pulseira
 FAIXA_QUEDA_S = 4.0             # quanto tempo a faixa "QUEDA DETECTADA" fica na tela
 REABRIR_S = 1.0                 # intervalo entre as tentativas de reabrir a porta quando ela cai
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 LOG_ESP = re.compile(r"^([IWE]) \((\d+)\) ([\w.-]+): (.*)$")
-VESTIVEL = re.compile(r"wearable ([0-9a-f]{6}), MAC")
+PULSEIRA = re.compile(r"wearable ([0-9a-f]{6}), MAC")
 MODELO = re.compile(r"fall pipeline: trigger ([\d.]+) g, (.+?), fall when P >= ([\d.]+)")
 
 # Os atributos que o painel mostra, com o nome do Python (modelo/queda/atributos.py).
@@ -61,7 +61,7 @@ def br(valor, casas=2):
 
 
 # ---------------------------------------------------------------------------------------------------------
-# Leitura das linhas da serial (funções puras, testadas em test_demo_vestivel.py)
+# Leitura das linhas da serial (funções puras, testadas em test_demo_pulseira.py)
 # ---------------------------------------------------------------------------------------------------------
 
 def interpretar_linha(linha):
@@ -70,7 +70,7 @@ def interpretar_linha(linha):
     - ("inicio", None): cabeçalho CSV, o sensor (re)começou e a contagem de amostras recomeça;
     - ("amostra", (t_ms, ax, ay, az)): aceleração em g;
     - ("janela", {...}): uma linha FEAT, com os números convertidos;
-    - ("vestivel", "a1b2c3"), ("modelo", {...}): do log de boot;
+    - ("pulseira", "a1b2c3"), ("modelo", {...}): do log de boot;
     - ("aviso", "texto"): um aviso (W) ou erro (E) do log, para mostrar na janela.
     """
     linha = ANSI.sub("", linha).strip()
@@ -104,9 +104,9 @@ def interpretar_linha(linha):
         except (ValueError, OverflowError):      # inf ou nan numa linha estragada
             return None
         return ("janela", dados)
-    m = VESTIVEL.search(linha)
+    m = PULSEIRA.search(linha)
     if m:
-        return ("vestivel", m.group(1))
+        return ("pulseira", m.group(1))
     m = MODELO.search(linha)
     if m:
         try:
@@ -149,13 +149,13 @@ def agora_ms():
     return int(time.time() * 1000)
 
 
-def alerta_queda(vestivel, seq, estado, a_pico=None, prob=None, ts=None):
+def alerta_queda(pulseira, seq, estado, a_pico=None, prob=None, ts=None):
     """O alerta de queda como o hub o publica (docs/protocolo.md §1)."""
     detalhe = {}
     if estado == "ativo":
         detalhe = {"a2": round(a_pico * a_pico, 2), "prob": round(prob, 2)}
-    return {"v": 1, "id": f"{vestivel}-{seq}", "tipo": "queda", "estado": estado,
-            "origem": f"vestivel/{vestivel}", "detalhe": detalhe, "ts": ts if ts is not None else agora_ms()}
+    return {"v": 1, "id": f"{pulseira}-{seq}", "tipo": "queda", "estado": estado,
+            "origem": f"pulseira/{pulseira}", "detalhe": detalhe, "ts": ts if ts is not None else agora_ms()}
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -175,7 +175,7 @@ class Disparo:
 class Estado:
     janela_s: float
     trava: threading.Lock = field(default_factory=threading.Lock)
-    vestivel: str = "demo"
+    pulseira: str = "demo"
     modelo: dict = field(default_factory=lambda: {"l_on": 2.0, "classificador": "random forest", "limiar": 0.73})
     sinal: deque = field(default_factory=deque)          # (t em s, |a| filtrado)
     disparos: deque = field(default_factory=lambda: deque(maxlen=200))
@@ -235,8 +235,8 @@ class Leitor:
                 if d.queda:
                     e.n_quedas += 1
                     e.faixa_ate = e.t_ultimo + FAIXA_QUEDA_S
-            elif tipo == "vestivel":
-                e.vestivel = dados
+            elif tipo == "pulseira":
+                e.pulseira = dados
             elif tipo == "modelo":
                 e.modelo = dados
             elif tipo == "aviso":
@@ -390,7 +390,7 @@ class Ponte:
             sys.exit(f"Não foi possível conectar em {args.mqtt_host}:{args.mqtt_porta} ({erro}). A central está no "
                      "ar? (No Windows, o serviço Mosquitto local captura localhost: use o IP da máquina.)")
         self.cli.loop_start()
-        threading.Thread(target=self._vestivel_periodico, daemon=True).start()
+        threading.Thread(target=self._pulseira_periodico, daemon=True).start()
 
     def publicar(self, sufixo, dados, retain):
         texto = json.dumps(dados, separators=(",", ":"), ensure_ascii=False)
@@ -407,21 +407,21 @@ class Ponte:
     def _ao_desconectar(self, client, userdata, flags, reason_code, properties):
         self.conectado = False
 
-    def _vestivel_periodico(self):
+    def _pulseira_periodico(self):
         while True:
-            time.sleep(INTERVALO_VESTIVEL_S)
+            time.sleep(INTERVALO_PULSEIRA_S)
             with self.e.trava:
-                n, soma, vestivel = self.e.ativ_n, self.e.ativ_soma, self.e.vestivel
+                n, soma, pulseira = self.e.ativ_n, self.e.ativ_soma, self.e.pulseira
                 self.e.ativ_n, self.e.ativ_soma = 0, 0.0
             if n == 0:
                 continue         # sem amostras, como sem heartbeat: a pulseira não está viva
-            self.publicar(f"vestivel/{vestivel}", {"v": 1, "estado": "online",
+            self.publicar(f"pulseira/{pulseira}", {"v": 1, "estado": "online",
                                                     "atividade": round(math.sqrt(soma / n), 3), "ts": agora_ms()},
                           True)
 
     def queda(self, a_pico, prob):
         self.seq += 1
-        alerta = alerta_queda(self.e.vestivel, self.seq, "ativo", a_pico, prob)
+        alerta = alerta_queda(self.e.pulseira, self.seq, "ativo", a_pico, prob)
         self.queda_aberta = alerta["id"].rsplit("-", 1)[1]
         self.publicar("alerta", alerta, False)
 
@@ -429,7 +429,7 @@ class Ponte:
         if self.queda_aberta is None:
             print("(nenhuma queda aberta para cancelar)")
             return
-        self.publicar("alerta", alerta_queda(self.e.vestivel, self.queda_aberta, "cancelado"), False)
+        self.publicar("alerta", alerta_queda(self.e.pulseira, self.queda_aberta, "cancelado"), False)
         self.queda_aberta = None
 
     def encerrar(self):
@@ -484,7 +484,7 @@ def janela(estado, ponte, args, parar):
             ultima = dict(estado.ultima) if estado.ultima else None
             t_fim = estado.t_ultimo
             modelo = dict(estado.modelo)
-            vestivel = estado.vestivel
+            pulseira = estado.pulseira
             mostrar_faixa = t_fim < estado.faixa_ate
             avisos = list(estado.avisos)
             serial_perdida = estado.serial_perdida
@@ -507,7 +507,7 @@ def janela(estado, ponte, args, parar):
             fonte += " PERDIDA, reabrindo…"
         central = "sem central" if ponte is None else ("central: conectado" if ponte.conectado else
                                                        "central: desconectado")
-        titulo.set_text(f"Vestível {vestivel} — {modelo['classificador']}, queda quando P ≥ "
+        titulo.set_text(f"Pulseira {pulseira} — {modelo['classificador']}, queda quando P ≥ "
                         f"{br(modelo['limiar'])}, gatilho {br(modelo['l_on'], 1)} g   |   {fonte}   |   {central}")
         if mostrar_faixa and disparos:
             ultima_queda = next((d for d in reversed(disparos) if d.queda), disparos[-1])
@@ -557,13 +557,13 @@ def janela(estado, ponte, args, parar):
 # ---------------------------------------------------------------------------------------------------------
 
 def parse_args():
-    p = argparse.ArgumentParser(description="O modelo de queda do vestível ao vivo, pela USB, com ponte opcional "
+    p = argparse.ArgumentParser(description="O modelo de queda da pulseira ao vivo, pela USB, com ponte opcional "
                                             "para a central.")
     p.add_argument("--porta", help="porta serial da placa (ex.: COM5); sem ela, usa a única porta encontrada")
     p.add_argument("--baud", type=int, default=921600, help="velocidade da serial (padrão: 921600, a do perfil "
                                                             "de demonstração)")
     p.add_argument("--sem-reset", action="store_true", help="não reinicia a placa ao abrir a porta (o id do "
-                                                             "vestível só aparece no próximo boot)")
+                                                             "pulseira só aparece no próximo boot)")
     p.add_argument("--reproduzir", help="toca uma sessão gravada com --gravar, sem a placa")
     p.add_argument("--gravar", help="guarda tudo o que chega da serial neste arquivo")
     p.add_argument("--janela-s", type=float, default=10.0, help="segundos de sinal na tela (padrão: 10)")

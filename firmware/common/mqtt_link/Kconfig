@@ -10,7 +10,7 @@ menu "MQTT"
         string "Broker username"
         default "hub"
         help
-            "hub" for a room hub, "vestivel" for a wearable (interface/mosquitto/acl):
+            "hub" for a room hub, "pulseira" for a wearable (interface/mosquitto/acl):
             each user may only publish its own topics.
 
     config APP_MQTT_PASSWORD

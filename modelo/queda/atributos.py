@@ -5,7 +5,7 @@ A janela tem o impacto na amostra `pre` (1,0 s): antes dele está a queda livre,
 Os atributos usam módulos (|a|, |ω|) e ângulos entre vetores, que não dependem de como a placa está
 presa: a SisFall e os nossos dados têm a placa orientada de jeitos diferentes.
 
-- Tempo: as mesmas definições do signal_proc.c do vestível (mean, rms, std, min, max, crest) mais curtose,
+- Tempo: as mesmas definições do signal_proc.c da pulseira (mean, rms, std, min, max, crest) mais curtose,
   assimetria, ZCR, SMA, pico a pico, queda livre, tempo entre a queda livre e o impacto, atividade depois
   do impacto, mudança de inclinação, correlação entre eixos e giroscópio.
 - Frequência: FFT de |a| — fração de energia por banda, frequência dominante e centroide espectral.

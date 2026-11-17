@@ -3,7 +3,7 @@
 %======================================================================
 \subsection{Visão geral}
 
-O sistema tem três tipos de nó (Figura~\ref{fig:arquitetura}). O \textbf{vestível} lê o
+O sistema tem três tipos de nó (Figura~\ref{fig:arquitetura}). A \textbf{pulseira} lê o
 acelerômetro e o giroscópio, decide se houve queda e avisa o hub. O \textbf{hub do quarto}
 lê os sensores fixos, roda as regras de tempo, transforma tudo em mensagens MQTT e participa
 do barramento CAN da sala. A \textbf{central} recebe as mensagens, guarda o histórico,
@@ -12,7 +12,7 @@ mostra o painel e manda as notificações.
 \begin{figure}[H]
 \centering
 \resizebox{\linewidth}{!}{\input{diagramas/arquitetura}}
-\caption{Arquitetura geral. Azul: hub; laranja: vestível; roxo: barramento CAN da sala;
+\caption{Arquitetura geral. Azul: hub; laranja: pulseira; roxo: barramento CAN da sala;
 verde: central. Setas tracejadas são enlaces sem fio.}
 \label{fig:arquitetura}
 \end{figure}
@@ -20,7 +20,7 @@ verde: central. Setas tracejadas são enlaces sem fio.}
 Três princípios orientam a divisão:
 
 \begin{enumerate}
-  \item \textbf{Processamento na borda.} A queda é decidida no vestível e as regras de tempo
+  \item \textbf{Processamento na borda.} A queda é decidida na pulseira e as regras de tempo
         rodam no hub, que publica os alertas prontos. Isso é uma diretriz da disciplina, mas
         também uma escolha de robustez: o hub acende o LED de alerta mesmo sem rede, e a
         central pode ser trocada sem mexer nas placas.
@@ -45,7 +45,7 @@ Três princípios orientam a divisão:
 Dispositivo & Hardware & Papel & Rádio \\
 \midrule
 Hub do quarto & ESP32-S3-DevKitC-1 na PCB v1 & sensores do quarto, regras, alertas, recepção ESP-NOW, cliente MQTT, nó CAN & Wi-Fi STA associado (sem economia de energia) + ESP-NOW + TWAI \\
-Vestível & ESP32-S3-DevKitC-1 na PCB v1 & aquisição inercial, detecção de queda, envio ESP-NOW; MQTT direto e CAN como opções & STA sem associação, só para o ESP-NOW \\
+Pulseira & ESP32-S3-DevKitC-1 na PCB v1 & aquisição inercial, detecção de queda, envio ESP-NOW; MQTT direto e CAN como opções & STA sem associação, só para o ESP-NOW \\
 Central & PC ou Raspberry Pi 4 & broker, histórico, painéis, notificação & rede local \\
 \bottomrule
 \end{tabular}
@@ -56,16 +56,16 @@ Nenhuma placa usa o modo SoftAP nem AP+STA: o ESP-NOW funciona sobre a interface
 
 \subsection{Por que estes enlaces}\label{sec:enlaces}
 
-\paragraph{Vestível $\to$ hub: ESP-NOW.} A Tabela~\ref{tab:enlaces} compara as três opções
+\paragraph{Pulseira $\to$ hub: ESP-NOW.} A Tabela~\ref{tab:enlaces} compara as três opções
 para a pulseira. O ESP-NOW manda um quadro em milissegundos sem associação nem conexão, o
 rádio só precisa ficar ligado durante o envio, e o alarme continua funcionando dentro do
 quarto mesmo com a rede Wi-Fi fora do ar. O ponto fraco é a cobertura, limitada ao raio do
 hub; se os testes mostrarem pontos cegos (corredor, áreas comuns), as saídas são mais hubs
-ou o Wi-Fi como reserva, que já existe como opção do vestível.
+ou o Wi-Fi como reserva, que já existe como opção da pulseira.
 
 \begin{table}[H]
 \centering
-\caption{Opções de enlace para o vestível.}
+\caption{Opções de enlace para a pulseira.}
 \label{tab:enlaces}
 \small
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{3.9cm}>{\raggedright\arraybackslash}p{3.8cm}>{\raggedright\arraybackslash}p{3.6cm}@{}}
@@ -85,12 +85,12 @@ Complexidade & média: confiabilidade por nossa conta & baixa & alta; disputa o 
 quem conecta depois, \textit{Last Will} para saber que um hub caiu e QoS por criticidade.
 
 \paragraph{CAN.} Exigência da disciplina: integra o hub aos módulos dos outros grupos na
-sala. Não é caminho até a central. O vestível também tem CAN, mas só em bancada, para
+sala. Não é caminho até a central. A pulseira também tem CAN, mas só em bancada, para
 testes; a pulseira de verdade não tem transceptor.
 
 \subsection{Topologia}
 
-A rede sem fio forma duas estrelas (Figura~\ref{fig:topologia}): em cada quarto, o vestível
+A rede sem fio forma duas estrelas (Figura~\ref{fig:topologia}): em cada quarto, a pulseira
 fala só com o seu hub por ESP-NOW; e os hubs se associam ao ponto de acesso da ILPI como
 estações Wi-Fi, chegando à central por MQTT. O barramento CAN liga os hubs aos módulos dos
 outros grupos, com terminação de 120\,$\Omega$ nas duas pontas.
@@ -120,7 +120,7 @@ Quando & Entrega & Decisão marcante \\
 mar/26 & S1 P1 & ILPI Butantã como cenário; Modbus RTU sobre RS-485 com um Raspberry Pi mestre; Mosquitto, InfluxDB, Grafana e Telegram; queda = 2,5\,g por 100\,ms \\
 mai/26 & S1 P2 & ESP32-S3-DevKitC-1; LM35 calibrado (22 pontos) e LM358 com G = 5,5; 18 ensaios do MPU-6050 \\
 jul/26 & S1 P3 & CAN no lugar do RS-485; PCB de face simples com todos os sensores; firmware em C \\
-ago/26 & S2 P1 & MQTT como interface aberta; CAN validado com o professor (28/08); hub e vestível \\
+ago/26 & S2 P1 & MQTT como interface aberta; CAN validado com o professor (28/08); hub e pulseira \\
 set/26 & S2 P2 & interface demonstrada com um simulador (18/09) \\
 out/26 & S2 P2 & PCB v1 de duas camadas, única para as duas placas; revisão completa da arquitetura: regras na borda, contrato MQTT, ESP-NOW cifrado \\
 nov/26 & S2 P3 Q1 & 22 métodos de detecção de queda comparados; Random Forest embarcado no lugar do limiar \\

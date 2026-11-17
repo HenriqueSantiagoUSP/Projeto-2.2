@@ -9,12 +9,12 @@ detecção de queda. Outros cômodos e áreas comuns ficam fora por enquanto.
 
 ## Funcionais
 
-### Vestível
+### Pulseira
 
 | ID | Requisito | Origem |
 |---|---|---|
 | RF01 | Adquirir aceleração nos 3 eixos a 200 Hz, faixa ±8 g | S1 P1 RF01 (era 100 Hz) |
-| RF02 | Detectar queda no próprio vestível. Desde 2026-11-11: gatilho em picos de \|a\| ≥ 2,0 g + classificador (Random Forest) sobre 23 atributos da janela. O modelo, treinado na SisFall (cintura), é **provisório até retreinar com os dados do pulso** (antes: a² > 6,25 g²) | S1 P1 RF02/RF03 |
+| RF02 | Detectar queda na própria pulseira. Desde 2026-11-11: gatilho em picos de \|a\| ≥ 2,0 g + classificador (Random Forest) sobre 23 atributos da janela. O modelo, treinado na SisFall (cintura), é **provisório até retreinar com os dados do pulso** (antes: a² > 6,25 g²) | S1 P1 RF02/RF03 |
 | RF03 | Enviar `FALL` ao hub imediatamente, com reenvio até a confirmação | S1 P1 RF04 |
 | RF04 | Após uma queda, não gerar outra por 30 s (cooldown) | S1 P1 RF05 |
 | RF05 | Botão "estou bem" cancela a queda (`FALL_CANCEL`) | novo |
@@ -31,7 +31,7 @@ detecção de queda. Outros cômodos e áreas comuns ficam fora por enquanto.
 | RF11 | Executar as regras de tempo e publicar os episódios em `alerta` ([`arquitetura.md`](arquitetura.md), Regras) | S1 P1 RF09/RF13 (revisadas) |
 | RF12 | Sinalizar o estado e os alertas por um LED de status (sem buzzer desde 2026-10-23; o aviso ao cuidador vai pela central) | S1 P2 (atuador) |
 | RF13 | Aplicar parâmetros recebidos por MQTT sem recompilar, guardando-os em NVS | S1 P1 RNF12 |
-| RF14 | Publicar no barramento CAN os estados dos sensores locais (o vestível também tem CAN, só para bancada: quedas e heartbeats) | S2 P1 Q2 |
+| RF14 | Publicar no barramento CAN os estados dos sensores locais (a pulseira também tem CAN, só para bancada: quedas e heartbeats) | S2 P1 Q2 |
 | RF15 | Sincronizar a hora por SNTP | S1 P1 RF08 |
 
 ### Central
@@ -48,7 +48,7 @@ detecção de queda. Outros cômodos e áreas comuns ficam fora por enquanto.
 | ID | Requisito | Meta | Como medir |
 |---|---|---|---|
 | RNF01 | Amostragem do acelerômetro estável | 200 Hz, jitter ≤ ±5 ms | intervalos entre amostras no modo de coleta |
-| RNF02 | Latência da queda | pico de aceleração → publicação MQTT ≤ 500 ms | `ts` no vestível/hub e no broker |
+| RNF02 | Latência da queda | pico de aceleração → publicação MQTT ≤ 500 ms | `ts` na pulseira/hub e no broker |
 | RNF03 | Latência da porta | transição → MQTT ≤ 200 ms; → InfluxDB ≤ 1 s | log com hora nos dois lados |
 | RNF04 | Latência da notificação | alerta → Telegram ≤ 5 s | hora do `alerta` vs. hora da mensagem |
 | RNF05 | Disponibilidade | 24/7, com reconexão automática Wi-Fi/MQTT (*backoff* exponencial) | ensaio de 24 h derrubando a rede |
@@ -60,15 +60,15 @@ detecção de queda. Outros cômodos e áreas comuns ficam fora por enquanto.
 | RNF11 | Funcionar sem internet | todas as funções locais sem acesso externo, exceto o Telegram | ensaio com a internet desligada |
 | RNF12 | Proteção física | caixas IP42 no mínimo, sobretudo perto do banheiro | inspeção |
 | RNF13 | Diagnóstico | logs na serial a 115200 baud: estado das tasks, conexão, contagem de eventos | inspeção |
-| RNF14 | Autonomia do vestível | a definir depois de medir o consumo | medição com bateria real |
+| RNF14 | Autonomia da pulseira | a definir depois de medir o consumo | medição com bateria real |
 
 ## Restrições
 
 | ID | Restrição | Origem |
 |---|---|---|
-| RR01 | Processamento na ESP32: detecção no vestível, regras e alertas no hub | diretriz da disciplina |
+| RR01 | Processamento na ESP32: detecção na pulseira, regras e alertas no hub | diretriz da disciplina |
 | RR02 | Firmware em C com ESP-IDF 6 e FreeRTOS, em ESP32-S3 DevKitC-1 | S1 P1 RR02 (era C++) |
-| RR03 | Hub alimentado em 5 V; vestível a bateria (no protótipo, power bank na USB-C) | S1 P1 RR03 (era só USB) |
+| RR03 | Hub alimentado em 5 V; pulseira a bateria (no protótipo, power bank na USB-C) | S1 P1 RR03 (era só USB) |
 | RR04 | Custo do protótipo ≤ R$ 600 (revisar com 2 placas + Raspberry Pi) | S1 P1 RR01 |
 | RR05 | Central em ferramentas abertas: Mosquitto, Telegraf, InfluxDB, Grafana, Python | S1 P1 RR02 (revisada) |
 
@@ -81,7 +81,7 @@ detecção de queda. Outros cômodos e áreas comuns ficam fora por enquanto.
 | Classes C++ com `SensorBase` (S1 P1 RNF13) | firmware em C com componentes ESP-IDF |
 | Validação obrigatória no Wokwi (S1 P1 RR04) | opcional; o simulador MQTT cobre a interface |
 | Node-RED para a lógica (S1 P1) | as regras rodam no hub |
-| Pulseira em Wi-Fi/MQTT alimentada por USB (S1 P1) | vestível a bateria com ESP-NOW |
+| Pulseira em Wi-Fi/MQTT alimentada por USB (S1 P1) | pulseira a bateria com ESP-NOW |
 | Queda = 2,5 g sustentado por 100 ms (S1 P1 RF03) | o impacto dura dezenas de ms; substituído pelo limiar provisório e, depois, pelo modelo |
 | Inatividade = 30 min sem PIR à noite | dispararia toda noite com o residente dormindo |
 
@@ -93,5 +93,5 @@ detecção de queda. Outros cômodos e áreas comuns ficam fora por enquanto.
 | Falsos alarmes em uso | horas de uso contínuo com a pulseira | ≤ 1 por dia (modelo) |
 | Latências | RNF02–RNF04 com registro de hora nos dois lados | metas da tabela |
 | Regras | perfil "demo" com tempos curtos, um cenário por regra | dispara e resolve como especificado |
-| Cobertura | `rssi` do vestível no quarto, no banheiro e no corredor | sem perda de heartbeat no quarto e no banheiro |
+| Cobertura | `rssi` da pulseira no quarto, no banheiro e no corredor | sem perda de heartbeat no quarto e no banheiro |
 | Disponibilidade | 24 h contínuas, com quedas de rede provocadas | RNF05 e RNF06 |

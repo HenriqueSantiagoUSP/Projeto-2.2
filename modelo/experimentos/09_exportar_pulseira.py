@@ -1,5 +1,5 @@
 """
-Exporta o pipeline de queda para o vestível (firmware/gadget/components/fall_pipeline/).
+Exporta o pipeline de queda para a pulseira (firmware/gadget/components/fall_pipeline/).
 
 O que vai para a ESP (decidido em docs/decisoes.md, 2026-11-11):
 - filtro passa-baixa de 20 Hz (biquad) nos 6 eixos;
@@ -13,9 +13,9 @@ Gera (não edite à mão; rode de novo este script):
 - include/fall_model.h e fall_model.c: constantes, coeficientes do filtro e os dois modelos;
 - test_host/vetores/: trechos de ensaios da SisFall e o que o Python calcula neles (picos, atributos,
   probabilidades), para os testes de paridade do C;
-- resultados/vestivel.json: métricas da validação cruzada e limiares.
+- resultados/pulseira.json: métricas da validação cruzada e limiares.
 
-    uv run python experimentos/09_exportar_vestivel.py
+    uv run python experimentos/09_exportar_pulseira.py
 """
 
 import io
@@ -44,7 +44,7 @@ TRECHOS_QUEDA = [("F01", 3.0, 3.0), ("F05", 3.0, 3.0), ("F10", 3.0, 3.0), ("F13"
 TRECHOS_ATIVIDADE = [("D04", 2.0, 10.0), ("D06", 2.0, 10.0), ("D10", 0.0, 8.0), ("D19", 0.0, 8.0)]
 
 
-class RandomForestVestivel(modelos.Sklearn):
+class RandomForestPulseira(modelos.Sklearn):
     """O Random Forest de modelos.Sklearn, menor: 60 árvores de profundidade ≤ 10 (~106 kB na flash)."""
 
     def __init__(self):
@@ -109,7 +109,7 @@ def gerar_modelo(nomes, b, a, lr, rf, limiar_lr, limiar_rf, l_on, resumo):
     nos, raizes = nos_da_floresta(rf.modelo)
     pre, pos = int(PRE_S * FS), int(POS_S * FS)
     n = len(nomes)
-    cabecalho = (f"/*\n * GERADO por modelo/experimentos/09_exportar_vestivel.py em {date.today().isoformat()}: não edite à mão.\n"
+    cabecalho = (f"/*\n * GERADO por modelo/experimentos/09_exportar_pulseira.py em {date.today().isoformat()}: não edite à mão.\n"
                  f" * Treino: SisFall, cenário {CENARIO} ({CENARIOS[CENARIO]['descricao']}), gatilho causal com L_on = {l_on} g,\n"
                  f" * {resumo['janelas']} janelas ({resumo['impactos']} de impacto), {resumo['pessoas']} pessoas.\n"
                  f" * Validação por pessoa (5 dobras), limiar com 95 % das janelas de impacto acima:\n"
@@ -266,7 +266,7 @@ def main():
               "pessoas": int(len(set(conj.pessoa))), "atributos": nomes}
     finais = {}
     for chave, fabrica, prob in (("lr", lambda: modelos.Sklearn("regressao_logistica"), prob_lr),
-                                 ("rf", RandomForestVestivel, prob_rf)):
+                                 ("rf", RandomForestPulseira, prob_rf)):
         s, _, _ = avaliacao.escores_fora_da_dobra(fabrica, conj, F, dobra)
         r = avaliacao.metricas(s, conj)
         limiar = float(sigmoide(r.limiar)) if chave == "lr" else float(r.limiar)
@@ -277,7 +277,7 @@ def main():
               f"{100 * r.sens_1alarme_h:.1f} % com <= 1 alarme/h; limiar de probabilidade {limiar:.4f}")
 
     # Tudo é calculado antes de gravar qualquer coisa: um erro no meio (um código que falta na SisFall, por
-    # exemplo) não deixa o firmware com o modelo novo e os vetores ou o vestivel.json do anterior.
+    # exemplo) não deixa o firmware com o modelo novo e os vetores ou o pulseira.json do anterior.
     b, a = coeficientes_passa_baixa()
     arquivos, n_nos = gerar_modelo(nomes, b, a, finais["lr"], finais["rf"], resumo["lr"]["limiar_prob"],
                                    resumo["rf"]["limiar_prob"], l_on, resumo)
@@ -285,7 +285,7 @@ def main():
     resumo["rf"]["bytes_flash"] = 12 * n_nos
     vetores, janelas = gerar_vetores(escolher_trechos(sisfall), nomes, finais["lr"], finais["rf"], l_on)
     arquivos.update(vetores)
-    arquivos[_comum.RESULTADOS / "vestivel.json"] = json.dumps(resumo, ensure_ascii=False, indent=2) + "\n"
+    arquivos[_comum.RESULTADOS / "pulseira.json"] = json.dumps(resumo, ensure_ascii=False, indent=2) + "\n"
     gravar(arquivos)
     print(f"modelo: {n_nos} nós no Random Forest (~{12 * n_nos / 1e3:.0f} kB); vetores de teste: {janelas} janelas")
 

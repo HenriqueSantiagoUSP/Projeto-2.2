@@ -54,7 +54,7 @@ def fig_saturacao(sisfall):
     corrida = corridas[int(np.argsort(picos)[len(picos) // 2])]              # corrida típica (mediana)
 
     estilos = ((16.0, EIXO, 3.2, "sem saturar (±16 g, como a SisFall)"),
-               (8.0, TINTA2, 1.3, "cenário A: ±8 g por eixo (vestível atual)"),
+               (8.0, TINTA2, 1.3, "cenário A: ±8 g por eixo (pulseira atual)"),
                (2.0, VIOLETA, 1.5, "cenário B: ±2 g por eixo (nossos ensaios)"))
     fig, eixos = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True)
     for ax, e, titulo in ((eixos[0], queda, "Queda"), (eixos[1], corrida, "Corrida típica")):

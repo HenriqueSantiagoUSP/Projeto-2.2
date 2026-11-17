@@ -15,14 +15,14 @@
 %    pcb_fabricada_cima      PCB v1 nua, face de cima
 %    pcb_fabricada_baixo     PCB v1 nua, face de baixo (plano de GND)
 %    pcb_montada_hub         PCB montada como hub (LM35, LM358, PIR, CAN)
-%    pcb_montada_vestivel    PCB montada como vestível (MPU-6050, botão)
-%    vestivel_no_pulso       o vestível preso ao corpo
+%    pcb_montada_pulseira    PCB montada como pulseira (MPU-6050, botão)
+%    pulseira_em_uso         a pulseira presa ao corpo
 %    bancada_can             as duas placas ligadas pelo barramento CAN
 %    serial_can              monitor serial com os quadros CAN entre as placas
-%    serial_espnow           monitor serial do hub recebendo o vestível por ESP-NOW
+%    serial_espnow           monitor serial do hub recebendo a pulseira por ESP-NOW
 %    grafana_quartos         painel "Quartos" do Grafana com dados
 %    telegram_alerta         alerta de queda chegando no Telegram
-%    demo_vestivel           janela do demo_vestivel.py durante uma queda
+%    demo_pulseira           janela do demo_pulseira.py durante uma queda
 % ============================================================
 \documentclass[12pt,a4paper]{article}
 
@@ -209,7 +209,7 @@
 		\vspace{1.4cm}
 
 		\begin{tabular}{p{10cm}l}
-			DIMITRI GARCIA & NUSP 1682224 \\
+			DIMITRI GARCIA & NUSP 16862224 \\
 			HENRIQUE GUIMAR\~AES MARGARIDO & NUSP 5797753 \\
 			HENRIQUE SANTIAGO & NUSP 16872729 \\
 		\end{tabular}
@@ -255,7 +255,7 @@
 				condicionamento de sinais, a interface com a rede CAN, a interface sem fio
 				e a placa desenvolvida. Primeira versão do relatório final. \\[0.5cm]
 				Sistema de monitoramento não invasivo de idosos em Instituições de Longa
-				Permanência: hub do quarto e vestível com ESP32-S3, sensores de porta,
+				Permanência: hub do quarto e pulseira com ESP32-S3, sensores de porta,
 				presença, temperatura e movimento, PCB única de duas camadas, barramento
 				CAN, ESP-NOW e MQTT, detecção de queda embarcada e central com Mosquitto,
 				InfluxDB, Grafana e Telegram.

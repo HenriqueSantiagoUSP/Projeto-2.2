@@ -34,7 +34,7 @@ Componente & Responsabilidade \\
 \code{hub\_config} & configuração em JSON recebida por MQTT, validada e gravada na NVS \\
 \code{espnow\_link} & recepção ESP-NOW: validação, descarte de reenvios, remetente pareado \\
 \midrule
-\multicolumn{2}{@{}l}{\textit{Vestível (\code{firmware/gadget/})}} \\
+\multicolumn{2}{@{}l}{\textit{Pulseira (\code{firmware/gadget/})}} \\
 \code{mpu6050} & driver do sensor: configuração, FIFO, detecção de sensor perdido \\
 \code{fall\_pipeline} & pipeline de queda em C puro, gerado e testado contra o Python \\
 \code{signal\_proc} & buffer circular, momentos com ESP-DSP e nível de atividade \\
@@ -67,11 +67,11 @@ Placa & Task & Núcleo & Prioridade & Função \\
 hub & \code{sensors\_task} & 1 & ALTA (15) & estabiliza e lê as portas e o PIR \\
 hub & \code{lm35\_task} & 1 & BAIXA (5) & temperatura a cada 30\,s \\
 hub & \code{hub\_task} & 0 & MÉDIA (10) & regras, publicação, LED \\
-hub & \code{espnow\_task} & 0 & MÉDIA (10) & valida e encaminha as mensagens do vestível \\
+hub & \code{espnow\_task} & 0 & MÉDIA (10) & valida e encaminha as mensagens da pulseira \\
 as duas & \code{can\_rx}, \code{can\_tx} & 0 & MÉDIA (10) & recepção e transmissão CAN \\
 as duas & \code{indicators} & 0 & MÍNIMA (2) & LED \\
-vestível & \code{sampling} & 1 & ALTA (15) & FIFO do MPU-6050 e pipeline de queda \\
-vestível & \code{comm} & 0 & MÉDIA (10) & ESP-NOW, botão, heartbeat, opcionais \\
+pulseira & \code{sampling} & 1 & ALTA (15) & FIFO do MPU-6050 e pipeline de queda \\
+pulseira & \code{comm} & 0 & MÉDIA (10) & ESP-NOW, botão, heartbeat, opcionais \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -84,7 +84,7 @@ Os recursos compartilhados seguem regras simples, que evitam corridas e travamen
         escritor por bit.
   \item \textbf{Notificação de task} onde um aviso não pode se perder: o \textit{callback} de
         estado do TWAI só acorda a \code{can\_tx}, que lê o estado ela mesma.
-  \item \textbf{Mutex} só para somar um lote de atividade no vestível, e seção crítica
+  \item \textbf{Mutex} só para somar um lote de atividade na pulseira, e seção crítica
         (\code{portMUX}) só para poucas instruções.
   \item Nenhuma task segura duas travas ao mesmo tempo, e as tasks vigiadas pelo
         \textit{watchdog} de 30\,s só esperam com tempo limite.
@@ -95,7 +95,7 @@ Os recursos compartilhados seguem regras simples, que evitam corridas e travamen
 \paragraph{Fluxo.} Tudo o que acontece no quarto vira um evento na fila do hub, e uma única
 task, a \code{hub\_task}, roda as regras e publica (Figura~\ref{fig:tasks_hub}). Por isso o
 motor de regras não precisa de travas. As mudanças de porta e de presença e cada temperatura
-saem por MQTT e pelo CAN; as mensagens do vestível chegam pela \code{espnow\_task}, que as
+saem por MQTT e pelo CAN; as mensagens da pulseira chegam pela \code{espnow\_task}, que as
 valida antes (versão, tipo, tamanho, remetente pareado e reenvios).
 
 \begin{figure}[H]
@@ -122,13 +122,13 @@ aciona o PIR.
 \toprule
 Tipo & Dispara quando & Resolve quando & Padrão \\
 \midrule
-\code{queda} & chega uma \code{FALL} do vestível & ``estou bem'' (\code{cancelado}) & --- \\
+\code{queda} & chega uma \code{FALL} da pulseira & ``estou bem'' (\code{cancelado}) & --- \\
 \code{saida\_noturna} & a porta de saída abre à noite e passam N\,min sem presença & a presença volta & 22h--6h, 15\,min \\
 \code{banheiro\_prolongado} & a porta do banheiro fecha e passam N\,min sem presença e sem a saída abrir & a porta do banheiro abre & 40\,min \\
 \code{inatividade} & de dia, N\,min sem presença e sem a saída abrir & a presença volta & 120\,min \\
 \code{temperatura} & fora da faixa por 10\,min seguidos & dentro da faixa (histerese de 0,5\,°C) por 10\,min & 18--28\,°C \\
-\code{vestivel\_offline} & 90\,s sem mensagens do vestível & a próxima mensagem & --- \\
-\code{bateria\_baixa} & bateria do vestível abaixo do limite & acima de 3,6\,V & 3,5\,V \\
+\code{pulseira\_offline} & 90\,s sem mensagens da pulseira & a próxima mensagem & --- \\
+\code{bateria\_baixa} & bateria da pulseira abaixo do limite & acima de 3,6\,V & 3,5\,V \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -149,24 +149,24 @@ valendo. No boot, o hub usa a NVS ou, se ela estiver vazia, os valores padrão:
  "portas":{"quarto":"saida","banheiro":"banheiro"},
  "saida_noturna_min":15, "banheiro_min":40, "inatividade_min":120,
  "temperatura":{"min":18,"max":28,"histerese":0.5,"persistencia_min":10},
- "vestivel_offline_s":90, "bateria_baixa_mV":3500}
+ "pulseira_offline_s":90, "bateria_baixa_mV":3500}
 \end{lstlisting}
 
-\subsection{Vestível}
+\subsection{Pulseira}
 
 \paragraph{Aquisição.} A task \code{sampling} lê a FIFO do MPU-6050 a cada 50\,ms e passa
-cada amostra pelo pipeline de queda (Figura~\ref{fig:tasks_vestivel};
+cada amostra pelo pipeline de queda (Figura~\ref{fig:tasks_pulseira};
 Seção~\ref{sec:queda}). Se a FIFO transbordar ou a leitura falhar no meio, a FIFO é zerada e
 o pipeline recomeça: uma janela nunca junta trechos dos dois lados de uma lacuna. Dez leituras
 seguidas sem amostra (0,5\,s) significam que o sensor parou (um MPU que reinicia volta
-dormindo); o vestível passa então a procurar o sensor a cada 5\,s.
+dormindo); a pulseira passa então a procurar o sensor a cada 5\,s.
 
 \begin{figure}[H]
 \centering
-\resizebox{\linewidth}{!}{\input{diagramas/tasks_vestivel}}
-\caption{O vestível: a task \code{sampling} roda o pipeline amostra a amostra no núcleo 1, e a
+\resizebox{\linewidth}{!}{\input{diagramas/tasks_pulseira}}
+\caption{A pulseira: a task \code{sampling} roda o pipeline amostra a amostra no núcleo 1, e a
 \code{comm} cuida do rádio no núcleo 0.}
-\label{fig:tasks_vestivel}
+\label{fig:tasks_pulseira}
 \end{figure}
 
 \paragraph{Comunicação e interação.} A \code{comm} manda a \code{FALL} na hora em que o
@@ -195,8 +195,8 @@ Sensor, CAN, Wi-Fi ou broker que faltam dão um único aviso no log quando a fal
 uma informação quando voltam; as novas tentativas ficam em silêncio, com espera crescente até
 60\,s. Nada opcional pode derrubar a placa:
 \begin{itemize}
-  \item \textbf{Vestível sem MPU-6050}: segue rodando, com o LED vermelho lento, e \textbf{não
-        manda heartbeat}, para não parecer saudável sem detectar quedas; o hub o declara
+  \item \textbf{Pulseira sem MPU-6050}: segue rodando, com o LED vermelho lento, e \textbf{não
+        manda heartbeat}, para não parecer saudável sem detectar quedas; o hub a declara
         offline em 90\,s.
   \item \textbf{Hub com sensor não instalado}: um PIR solto lê ``ninguém'' e uma porta solta
         lê ``aberta'', e nada no sinal os distingue de um caso real. Por isso os sensores
@@ -226,13 +226,13 @@ queda comparam o C, janela a janela, com o Python que treinou o modelo.
 \toprule
 Componente & O que verifica & Verificações \\
 \midrule
-\code{rules} (hub) & cada regra dispara e resolve como especificado, episódios sem repetição, queda depois de o vestível reiniciar, sensores ausentes & 62 \\
+\code{rules} (hub) & cada regra dispara e resolve como especificado, episódios sem repetição, queda depois de a pulseira reiniciar, sensores ausentes & 62 \\
 \code{hub\_config} (hub) & validação do JSON da configuração, recusa de valores inválidos & 60 \\
-\code{fall\_pipeline} (vestível) & filtro, gatilho e, em 26 janelas de 8 trechos da SisFall, os mesmos picos, atributos e probabilidades do Python & 885 \\
-\code{signal\_proc} (vestível) & buffer circular, atributos, nível de atividade & 25 \\
+\code{fall\_pipeline} (pulseira) & filtro, gatilho e, em 26 janelas de 8 trechos da SisFall, os mesmos picos, atributos e probabilidades do Python & 885 \\
+\code{signal\_proc} (pulseira) & buffer circular, atributos, nível de atividade & 25 \\
 \midrule
 notificador (central) & formatação, reenvio ao Telegram, dados inesperados & 19 testes \\
-\code{demo\_vestivel.py} & leitura da serial, reconexão, linhas estragadas & 15 testes \\
+\code{demo\_pulseira.py} & leitura da serial, reconexão, linhas estragadas & 15 testes \\
 \code{modelo/} (Python) & blocos do pipeline contra os exemplos das aulas, leitura dos dados & 30 testes \\
 \bottomrule
 \end{tabular}
@@ -254,8 +254,8 @@ a floresta do modelo de queda ocupa \rfKB\,kB.
 Firmware & Imagem (bytes) & Partição livre & RAM interna usada \\
 \midrule
 Hub & 992\,672 & 35\,\% & 112\,135 B (32,8\,\%) \\
-Vestível com ESP-NOW & 960\,688 & 37\,\% & 130\,615 B (38,2\,\%) \\
-Vestível sem hub (bancada) & 383\,184 & 75\,\% & 86\,203 B (25,2\,\%) \\
+Pulseira com ESP-NOW & 960\,688 & 37\,\% & 130\,615 B (38,2\,\%) \\
+Pulseira sem hub (bancada) & 383\,184 & 75\,\% & 86\,203 B (25,2\,\%) \\
 \bottomrule
 \end{tabular}
 \end{table}

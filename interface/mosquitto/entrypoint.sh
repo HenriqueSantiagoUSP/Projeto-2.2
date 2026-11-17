@@ -6,7 +6,7 @@ set -eu
 PASSWD=/mosquitto/data/passwd
 
 mosquitto_passwd -c -b "$PASSWD" hub "$MQTT_HUB_PASSWORD"
-mosquitto_passwd -b "$PASSWD" vestivel "$MQTT_VESTIVEL_PASSWORD"
+mosquitto_passwd -b "$PASSWD" pulseira "$MQTT_PULSEIRA_PASSWORD"
 mosquitto_passwd -b "$PASSWD" telegraf "$MQTT_TELEGRAF_PASSWORD"
 mosquitto_passwd -b "$PASSWD" notificador "$MQTT_NOTIFICADOR_PASSWORD"
 mosquitto_passwd -b "$PASSWD" painel "$MQTT_PAINEL_PASSWORD"

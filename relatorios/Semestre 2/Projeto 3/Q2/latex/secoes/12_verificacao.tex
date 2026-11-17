@@ -36,18 +36,18 @@ bancada & rodando na placa, com os sensores \\
 Parte & Nível alcançado & Como \\
 \midrule
 Firmware do hub & build; testes no PC & build sem avisos, também com PIR, LM35 e uma porta declarados ausentes e com o CAN fora do modo de bancada; regras (62) e configuração (60) \\
-Firmware do vestível & build; testes no PC & build sem avisos no perfil padrão, no de demonstração e com MAC, MQTT, CAN e coleta ligados; pipeline (885) e processamento de sinal (25) \\
+Firmware da pulseira & build; testes no PC & build sem avisos no perfil padrão, no de demonstração e com MAC, MQTT, CAN e coleta ligados; pipeline (885) e processamento de sinal (25) \\
 Mapa de pinos, chaves e MAC & build & pino repetido ou proibido e MAC mal escrito fazem o build falhar \\
 Modelo de queda & testes no PC & validação por pessoa na SisFall; paridade C $\times$ Python \\
 Central & ponta a ponta sem placa & os 5 serviços sobem; o broker recusa conexão anônima e senha errada; o simulador publicou estados e alertas, o InfluxDB gravou, as consultas do painel rodaram e o notificador formatou cada episódio \\
 Notificador e demonstração & testes no PC & 19 e 15 testes \\
 PCB v1 & ERC/DRC; papel 1:1 & \ercViolacoes{} violações de ERC e \drcErros{} erros de DRC; encaixe e ordem dos pinos no papel \\
-Vestível na placa & bancada (parcial) & em 13/11, perfil de demonstração: 200\,Hz contínuos por 16\,min e $\pm$8\,g confirmado (abaixo) \\
+Pulseira na placa & bancada (parcial) & em 13/11, perfil de demonstração: 200\,Hz contínuos por 16\,min e $\pm$8\,g confirmado (abaixo) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Primeiro dado de bancada.} Em 13/11/2026, o vestível com o perfil de demonstração,
+\paragraph{Primeiro dado de bancada.} Em 13/11/2026, a pulseira com o perfil de demonstração,
 ligado ao computador por USB, mandou as amostras brutas a 200\,Hz por 16 minutos sem parar.
 Parado, $\amag$ ficou em $\approx$4077 contagens, ou seja, $\approx$1\,g na escala de
 4096 contagens por g: a faixa de $\pm$8\,g está configurada. No mesmo ensaio, o programa de
@@ -55,7 +55,7 @@ demonstração parou de atualizar quando o link USB piscou, e a leitura da seria
 para reabrir a porta sozinha.
 
 \textbf{O que ainda não foi verificado}: nada da PCB v1 montada, o CAN entre as duas placas, o
-ESP-NOW entre o vestível e o hub, as latências, o Telegram com um bot real e a autonomia.
+ESP-NOW entre a pulseira e o hub, as latências, o Telegram com um bot real e a autonomia.
 
 \subsection{Plano de testes em bancada}
 
@@ -79,16 +79,16 @@ Portas & abrir e fechar depressa, várias vezes & nenhuma transição perdida ou
 PIR & movimento depois dos 60\,s de aquecimento & detecção e volta a ``livre'' \\
 Temperatura & 3 ou 4 pontos (perto de 10, 20 e 30\,°C) contra um termômetro; depois, termopar & $\pm$1\,°C (RNF10) \\
 Peças ausentes & sem SSID, senha errada, broker parado, LM35 solto, MPU solto, CAN sem transceptor & um aviso por caso, e o resto funcionando \\
-CAN entre as placas & vestível com CAN de bancada, transceptores e terminação; tirar um fio do barramento & quadros \code{0x0FD}/\code{0x0FE} no log do hub; um aviso ao cair e um ao voltar \\
-ESP-NOW & boot do vestível; queda simulada pelo botão; ``estou bem'' & canal descoberto; heartbeat no Grafana; alerta \code{ativo} e \code{cancelado} \\
+CAN entre as placas & pulseira com CAN de bancada, transceptores e terminação; tirar um fio do barramento & quadros \code{0x0FD}/\code{0x0FE} no log do hub; um aviso ao cair e um ao voltar \\
+ESP-NOW & boot da pulseira; queda simulada pelo botão; ``estou bem'' & canal descoberto; heartbeat no Grafana; alerta \code{ativo} e \code{cancelado} \\
 Queda atrasada & hub desligado, queda, hub religado em $\sim$20\,s & o alerta chega uma vez só \\
-Queda após reinício & queda, vestível reiniciado, nova queda & dois alertas, com \code{id} diferentes \\
+Queda após reinício & queda, pulseira reiniciada, nova queda & dois alertas, com \code{id} diferentes \\
 Remetente estranho & outro ESP32 mandando ESP-NOW ao hub & um aviso e nenhum alerta \\
-Latências & hora no vestível, no hub, no broker e no celular & pico $\to$ MQTT $\le$ 500\,ms; porta $\to$ MQTT $\le$ 200\,ms; alerta $\to$ Telegram $\le$ 5\,s \\
+Latências & hora na pulseira, no hub, no broker e no celular & pico $\to$ MQTT $\le$ 500\,ms; porta $\to$ MQTT $\le$ 200\,ms; alerta $\to$ Telegram $\le$ 5\,s \\
 \textit{Last Will} & desligar o hub & \code{status} \code{offline} em até $\sim$45\,s \\
 Notificador & derrubar a internet 1\,min com um alerta no meio; reiniciar o contêiner & os dois alertas chegam \\
 Disponibilidade & 24\,h contínuas, derrubando a rede & reconexão sozinha, nenhum evento QoS 1 perdido \\
-Autonomia & medidor USB entre o \textit{power bank} e o vestível & consumo medido (RNF14) \\
+Autonomia & medidor USB entre o \textit{power bank} e a pulseira & consumo medido (RNF14) \\
 \bottomrule
 \end{tabular}
 \end{table}

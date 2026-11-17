@@ -3,7 +3,7 @@
 simulador.py — Faz o papel de um hub do quarto, publicando no broker da central.
 
 Publica no contrato de docs/protocolo.md exatamente o que o firmware do hub publica:
-status (com Last Will), presenca, porta/<id>, temperatura, vestivel/<id>, alerta
+status (com Last Will), presenca, porta/<id>, temperatura, pulseira/<id>, alerta
 (episódios "ativo" -> "resolvido"/"cancelado") e config/aplicada. Serve para testar a
 central — Telegraf, InfluxDB, Grafana e o notificador do Telegram — sem hardware.
 
@@ -45,7 +45,7 @@ TEMP_PASSO = 0.3             # °C — variação máxima entre leituras
 PORTA_INTERVALO = (20, 60)   # s — uma porta muda de estado em intervalos aleatórios nesta faixa
 PRESENCA_INTERVALO = (8, 30) # s — idem para a presença
 PORTAS = ("quarto", "banheiro")
-VESTIVEL = "a1b2c3"          # id = 3 últimos bytes do MAC da pulseira
+PULSEIRA = "a1b2c3"          # id = 3 últimos bytes do MAC da pulseira
 
 CONFIG_PADRAO = {
     "noite": {"inicio": "22:00", "fim": "06:00"},
@@ -54,7 +54,7 @@ CONFIG_PADRAO = {
     "banheiro_min": 40,
     "inatividade_min": 120,
     "temperatura": {"min": 18, "max": 28, "histerese": 0.5, "persistencia_min": 10},
-    "vestivel_offline_s": 90,
+    "pulseira_offline_s": 90,
     "bateria_baixa_mV": 3500,
 }
 
@@ -76,7 +76,7 @@ class Simulador:
         self.portas = {p: False for p in PORTAS}          # False = fechada
         self.presente = False
         self.bateria_mv = 4100
-        self.vestivel_mudo = False
+        self.pulseira_mudo = False
         self.seq_queda = 0
         self.queda_aberta = None                          # id da última queda ainda ativa
         self.abertos = {}                                 # id -> alerta ativo (exceto quedas)
@@ -138,10 +138,10 @@ class Simulador:
         self.publicar("presenca", {"sensor": "HC-SR501", "estado": "detectada" if self.presente else "livre"})
 
     def heartbeat(self):
-        if self.vestivel_mudo:
+        if self.pulseira_mudo:
             return
         self.bateria_mv = max(3300, self.bateria_mv - random.randint(0, 3))
-        self.publicar(f"vestivel/{VESTIVEL}", {
+        self.publicar(f"pulseira/{PULSEIRA}", {
             "estado": "online",
             "bateria_mV": self.bateria_mv,
             "rssi": random.randint(-78, -48),
@@ -153,15 +153,15 @@ class Simulador:
         epoch_s = int(time.time())
         if cmd == "":
             self.seq_queda += 1
-            self.queda_aberta = f"{VESTIVEL}-{self.seq_queda}"
+            self.queda_aberta = f"{PULSEIRA}-{self.seq_queda}"
             a2 = round(random.uniform(6.3, 12.0), 2)
             prob = round(random.uniform(0.75, 1.0), 2)       # acima do limiar do Random Forest (0,73)
-            self.alerta(self.queda_aberta, "queda", "ativo", f"vestivel/{VESTIVEL}", {"a2": a2, "prob": prob})
+            self.alerta(self.queda_aberta, "queda", "ativo", f"pulseira/{PULSEIRA}", {"a2": a2, "prob": prob})
         elif cmd == "c":
             if self.queda_aberta is None:
                 print("  (nenhuma queda aberta para cancelar)")
             else:
-                self.alerta(self.queda_aberta, "queda", "cancelado", f"vestivel/{VESTIVEL}")
+                self.alerta(self.queda_aberta, "queda", "cancelado", f"pulseira/{PULSEIRA}")
                 self.queda_aberta = None
         elif cmd in ("s", "b", "t"):
             tipo, origem, detalhe = {
@@ -177,17 +177,17 @@ class Simulador:
                 self.alerta(id_, tipo, "resolvido", origem, detalhe)
             self.abertos.clear()
         elif cmd == "o":
-            self.vestivel_mudo = not self.vestivel_mudo
-            id_ = f"vestivel_offline-{VESTIVEL}-{epoch_s}"
-            detalhe = {"vestivel": VESTIVEL, "ultimo_contato_s": 90}
-            if self.vestivel_mudo:
-                self.abertos["offline"] = ("vestivel_offline", f"vestivel/{VESTIVEL}", detalhe)
-                self.publicar(f"vestivel/{VESTIVEL}", {"estado": "offline"})
-                self.alerta(id_, "vestivel_offline", "ativo", f"vestivel/{VESTIVEL}", detalhe)
+            self.pulseira_mudo = not self.pulseira_mudo
+            id_ = f"pulseira_offline-{PULSEIRA}-{epoch_s}"
+            detalhe = {"pulseira": PULSEIRA, "ultimo_contato_s": 90}
+            if self.pulseira_mudo:
+                self.abertos["offline"] = ("pulseira_offline", f"pulseira/{PULSEIRA}", detalhe)
+                self.publicar(f"pulseira/{PULSEIRA}", {"estado": "offline"})
+                self.alerta(id_, "pulseira_offline", "ativo", f"pulseira/{PULSEIRA}", detalhe)
                 self.offline_id = id_
             else:
                 self.abertos.pop("offline", None)
-                self.alerta(self.offline_id, "vestivel_offline", "resolvido", f"vestivel/{VESTIVEL}", detalhe)
+                self.alerta(self.offline_id, "pulseira_offline", "resolvido", f"pulseira/{PULSEIRA}", detalhe)
                 self.heartbeat()
         elif cmd == "q":
             self.encerrar.set()
@@ -246,7 +246,7 @@ class Simulador:
             "temperatura": agora + a.intervalo_temp,
             "porta": agora + random.uniform(*PORTA_INTERVALO),
             "presenca": agora + random.uniform(*PRESENCA_INTERVALO),
-            "vestivel": agora + a.intervalo_vestivel,
+            "pulseira": agora + a.intervalo_pulseira,
             "queda": (agora + a.auto_queda) if a.auto_queda else None,
         }
 
@@ -268,7 +268,7 @@ class Simulador:
                     ("temperatura", lambda: a.intervalo_temp, self.temperatura),
                     ("porta", lambda: random.uniform(*PORTA_INTERVALO), self.porta),
                     ("presenca", lambda: random.uniform(*PRESENCA_INTERVALO), self.presenca),
-                    ("vestivel", lambda: a.intervalo_vestivel, self.heartbeat),
+                    ("pulseira", lambda: a.intervalo_pulseira, self.heartbeat),
                 ):
                     if agora >= proximo[chave]:
                         acao()
@@ -305,13 +305,13 @@ def parse_args():
     p.add_argument("--site", default="butanta", help="instituição no tópico (padrão: butanta)")
     p.add_argument("--quarto", default="quarto101", help="quarto no tópico (padrão: quarto101)")
     p.add_argument("--intervalo-temp", type=float, default=30.0, help="segundos entre leituras de temperatura")
-    p.add_argument("--intervalo-vestivel", type=float, default=30.0, help="segundos entre heartbeats da pulseira")
+    p.add_argument("--intervalo-pulseira", type=float, default=30.0, help="segundos entre heartbeats da pulseira")
     p.add_argument("--auto-queda", type=float, default=0, help="publica uma queda a cada N segundos (0 = só com ENTER)")
     p.add_argument("--duracao", type=float, default=0, help="encerra sozinho após N segundos (0 = até Ctrl+C ou q)")
     p.add_argument("--sem-teclado", action="store_true", help="não lê comandos do teclado (execução automática)")
     p.add_argument("--seed", type=int, help="semente do gerador aleatório, para repetir a mesma sequência")
     args = p.parse_args()
-    if args.intervalo_temp <= 0 or args.intervalo_vestivel <= 0:
+    if args.intervalo_temp <= 0 or args.intervalo_pulseira <= 0:
         p.error("os intervalos devem ser maiores que zero")
     return args
 

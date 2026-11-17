@@ -2,10 +2,15 @@
 
 Projeto de faculdade (Escola Politécnica da USP, Projeto Integrativo 2 e 3): rede de sensores para
 monitoramento não invasivo de idosos em **ILPIs** (Instituições de Longa Permanência; referência: ILPI
-Butantã). Dois ESP32-S3:
+Butantã). Dois ESP32-S3, que no protótipo são a mesma PCB com firmwares diferentes:
 
-- o **hub do quarto**: portas, presença, temperatura, regras de alerta, gateway CAN/MQTT;
-- o **vestível** (pulseira com MPU-6050): detecção de queda.
+- o **hub** (ou hub do quarto, `firmware/room/`): a placa fixa no quarto. Lê portas, presença e temperatura,
+  roda as regras de alerta, recebe a pulseira por ESP-NOW, publica por MQTT e é o nó CAN do quarto;
+- a **pulseira** (`firmware/gadget/`): o dispositivo que o residente usa no pulso, com o MPU-6050 e o botão
+  "estou bem". Detecta a queda e avisa o hub.
+
+**Nomes:** na documentação, nos relatórios, nos painéis e no MQTT é sempre **pulseira** (desde 2026-11-17;
+antes, "vestível"). No código C, que é em inglês, ela é `gadget`/`wearable`, e o hub é `room`/`hub`.
 
 A **central** guarda, mostra e notifica: Mosquitto, Grafana, Telegram, um banco relacional (PostgreSQL; protótipo em SQLite na atividade de Fundamentos de Software) e, no
 futuro, nuvem.
@@ -23,7 +28,7 @@ futuro, nuvem.
 | `docs/pendencias.md` | **o que falta fazer**: lista única com caixas de marcar, por área, e o histórico do que foi concluído |
 | `docs/coleta-de-dados.md` | protocolo de ensaios rotulados para o futuro modelo de queda |
 | `firmware/room/` | hub do quarto (ESP-IDF) |
-| `firmware/gadget/` | vestível (ESP-IDF) |
+| `firmware/gadget/` | pulseira (ESP-IDF) |
 | `firmware/common/` | componentes das duas placas: `pcb` (mapa de pinos da PCB única), `protocol` (contrato em C), `rtos_util` (prioridades e núcleos), `sys_events` (event group), `net`, `mqtt_link`, `can`, `indicators` (LED; buzzer opcional, ausente na PCB atual) |
 | `interface/` | central em Docker Compose (Mosquitto, Telegraf, InfluxDB, Grafana, notificador) + `simulador.py`; `legado/` = demonstração de 18/09, só histórico |
 | `modelo/` | modelos de detecção de queda desenvolvidos no PC (Python 3.12 via `uv`): pipeline, atributos, AR, templates, DTW, classificadores, CNN, avaliação por pessoa; `resultados/resumo.md` tem os números |
@@ -52,10 +57,10 @@ futuro, nuvem.
 - `docs/protocolo.md` é a fonte única da verdade. Qualquer mudança em tópico, payload, QoS, alerta, config,
   ID CAN ou mensagem ESP-NOW altera esse arquivo no mesmo commit que altera o código. Se código e documento
   divergirem, aponte a divergência em vez de escolher um lado em silêncio.
-- **Processamento na ESP32** (diretriz da disciplina): a detecção de queda roda no vestível; as regras de
+- **Processamento na ESP32** (diretriz da disciplina): a detecção de queda roda na pulseira; as regras de
   tempo e a geração de alertas rodam no hub. Não mova essa lógica para a central. A central só armazena,
   mostra e notifica.
-- A **detecção de queda** no vestível é o pipeline do `modelo/` (`firmware/gadget/components/fall_pipeline`,
+- A **detecção de queda** na pulseira é o pipeline do `modelo/` (`firmware/gadget/components/fall_pipeline`,
   desde 2026-11-11): filtro → gatilho (picos de |a| ≥ 2,0 g) → janela → 23 atributos → classificador (Random
   Forest; regressão logística como opção).
   - O limiar é só o gatilho: quem decide é o classificador.
@@ -63,7 +68,7 @@ futuro, nuvem.
     apresente como final, e preserve o que alimenta o retreino: amostragem por hardware e coleta de dados
     brutos.
   - `fall_model.h`/`fall_model.c` e `test_host/vetores/` são **gerados** por
-    `modelo/experimentos/09_exportar_vestivel.py`: retreine lá, nunca edite à mão.
+    `modelo/experimentos/09_exportar_pulseira.py`: retreine lá, nunca edite à mão.
   - Ao mudar o pipeline (C ou Python), mantenha a paridade com `modelo/queda/`:
     - mesmas definições de atributos e o mesmo gatilho (`gatilho_causal`);
     - rode os testes de host do `fall_pipeline`, que comparam com os vetores do Python.
@@ -110,13 +115,13 @@ sh firmware/gadget/components/fall_pipeline/test_host/run_tests.sh # pipeline de
 sh firmware/gadget/components/signal_proc/test_host/run_tests.sh # buffer circular, atributos, atividade
 ```
 
-Para compilar os caminhos opcionais do vestível sem mexer no `sdkconfig` dele, use um build de teste com outro
+Para compilar os caminhos opcionais da pulseira sem mexer no `sdkconfig` dela, use um build de teste com outro
 `sdkconfig` (no scratchpad):
 `idf.py -B <dir>/build -D SDKCONFIG=<dir>/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;<dir>/extra.defaults" build`,
 com `CONFIG_GADGET_MQTT=y`, `CONFIG_GADGET_CAN=y` etc. no `extra.defaults`.
 
-Demonstração com uma placa só (vestível sem hub, perfil `firmware/gadget/sdkconfig.demo.defaults`; no PC,
-`interface/demo_vestivel.py`):
+Demonstração com uma placa só (pulseira sem hub, perfil `firmware/gadget/sdkconfig.demo.defaults`; no PC,
+`interface/demo_pulseira.py`):
 `idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" build flash`.
 
 Pegadinhas dos firmwares:
@@ -127,8 +132,8 @@ Pegadinhas dos firmwares:
 - O que as duas placas usam fica em `firmware/common/`, nunca copiado numa placa; pinos e tópicos entram por
   struct de configuração (`can_config_t`, `net_config_t`, `mqtt_link_config_t`).
 - O componente MQTT se chama `mqtt_link`, não `mqtt`: um componente local chamado `mqtt` sobrescreveria o
-  `espressif/mqtt`. cJSON, MQTT e `led_strip` vêm do armazenamento local do EIM; `espressif/esp-dsp` (vestível)
-  não está lá, então o primeiro build do vestível precisa de internet.
+  `espressif/mqtt`. cJSON, MQTT e `led_strip` vêm do armazenamento local do EIM; `espressif/esp-dsp` (pulseira)
+  não está lá, então o primeiro build da pulseira precisa de internet.
 - **Tasks:** sempre `xTaskCreatePinnedToCore` com `PRIO_*` e `CORE_*` de `task_config.h` (nunca acima de
   `PRIO_CRITICA` = 20; núcleo 1 para tempo real, núcleo 0 para rádio e protocolos).
 - **Recurso compartilhado:** fila por valor entre tasks; estado do sistema em `sys_events` (um escritor por
@@ -150,7 +155,7 @@ Pegadinhas dos firmwares:
   ao MQTT e às regras.
 - `hub_task` é a única task que chama o motor de regras e publica; os demais só enfileiram eventos.
 - Autoteste do CAN: `menuconfig` → CAN bus (TWAI) (ligado por padrão; desligar no barramento real).
-- No vestível, MQTT (`GADGET_MQTT`) e CAN (`GADGET_CAN`) são opcionais e desligados por padrão; o CAN dele é só
+- Na pulseira, MQTT (`GADGET_MQTT`) e CAN (`GADGET_CAN`) são opcionais e desligados por padrão; o CAN dela é só
   de bancada (requisito da disciplina e testes), a comunicação real é ESP-NOW. **MAC do hub vazio = sem hub**:
   o ESP-NOW não é ligado (bancada, demonstração), e o compilador então descarta o Wi-Fi do binário. Para
   compilar o caminho do ESP-NOW, use um build de teste com um MAC.
@@ -164,7 +169,7 @@ Pegadinhas dos firmwares:
   caracteres, MAC vazio ou exatamente `aa:bb:cc:dd:ee:ff`. Uma queda que não chegou a lugar nenhum é guardada e
   reenviada igual até entregar ([`docs/protocolo.md`](docs/protocolo.md) §3).
 - `sdkconfig` e `build/` são ignorados pelo git; o que precisa valer para todos vai em `sdkconfig.defaults`
-  (watchdog de 30 s com pânico, partição de app grande, usuário MQTT `vestivel` no vestível). O
+  (watchdog de 30 s com pânico, partição de app grande, usuário MQTT `pulseira` na pulseira). O
   `sdkconfig.defaults` vale para opções que o `sdkconfig` ainda não tem; uma opção que já está nele não muda.
 
 ## Central
@@ -175,10 +180,10 @@ copy .env.example .env       # e troque as senhas
 docker compose up -d         # Mosquitto, Telegraf, InfluxDB, Grafana (:3000), notificador
 python simulador.py --host <IP da máquina> --senha <MQTT_HUB_PASSWORD>
 python -m unittest discover -s notificador
-python -m unittest test_demo_vestivel       # demo_vestivel.py (requirements-demo.txt para rodar a janela)
+python -m unittest test_demo_pulseira       # demo_pulseira.py (requirements-demo.txt para rodar a janela)
 ```
 
-Usuários do broker: `hub`, `vestivel` (MQTT opcional da pulseira), `telegraf`, `notificador`, `painel`; a ACL
+Usuários do broker: `hub`, `pulseira` (MQTT opcional da pulseira), `telegraf`, `notificador`, `painel`; a ACL
 fica em `interface/mosquitto/acl` e as senhas no `.env`.
 
 **Atenção:** nesta máquina há um serviço Mosquitto do Windows (início automático) em `127.0.0.1:1883`, e ele
@@ -200,9 +205,9 @@ uv run python experimentos/04_dados_proprios.py
 uv run python experimentos/06_resumo.py                   # resultados/resumo.md, de onde saem os números
 uv run python experimentos/07_figuras_explicativas.py     # figuras que explicam os resultados (lê os escores do 03)
 uv run python experimentos/08_relatorio_latex.py          # figuras e tabelas do relatório LaTeX do Q1 (relatorios/.../Q1/latex)
-uv run python experimentos/09_exportar_vestivel.py        # modelo do vestível (fall_model.c) + vetores de paridade
+uv run python experimentos/09_exportar_pulseira.py        # modelo da pulseira (fall_model.c) + vetores de paridade
 uv run python experimentos/10_figuras_apresentacao.py     # figuras, tabelas e números da apresentação Beamer do Q1
-uv run python experimentos/11_svm_vestivel.py             # SVM × Random Forest × logística na configuração do vestível
+uv run python experimentos/11_svm_pulseira.py             # SVM × Random Forest × logística na configuração da pulseira
 uv run python experimentos/12_relatorio_q2.py             # gráficos, tabelas e PCB (kicad-cli) do relatório do Q2 (relatorios/.../Q2/latex)
 ```
 

@@ -7,7 +7,7 @@
 # Defaults only fill options the sdkconfig does not have yet: after changing this file,
 # delete build/demo/sdkconfig so it is generated again.
 #
-# On the computer, interface/demo_vestivel.py shows the signal and the decisions live
+# On the computer, interface/demo_pulseira.py shows the signal and the decisions live
 # and can forward the falls to the central.
 
 # No hub: ESP-NOW is not started; falls go to the serial log.

@@ -2,13 +2,13 @@
 \section{Processamento: detecção de queda}\label{sec:queda}
 %======================================================================
 Esta seção resume o relatório do Q1~\cite{q1}, que desenvolveu e comparou os modelos no
-computador, e descreve a versão que roda no vestível.
+computador, e descreve a versão que roda na pulseira.
 
 \subsection{Por que um modelo}
 
-O primeiro detector do vestível era um limiar: queda quando $\amag$ passa de 2,5\,g. Ele pega
+O primeiro detector da pulseira era um limiar: queda quando $\amag$ passa de 2,5\,g. Ele pega
 as quedas, mas também correr, pular, subir escada depressa e sentar com força. Na base
-pública SisFall, com o sensor na faixa do vestível, esse limiar deu \textbf{69,9 alarmes falsos
+pública SisFall, com o sensor na faixa da pulseira, esse limiar deu \textbf{69,9 alarmes falsos
 por hora} de atividade. O que separa uma queda de uma corrida não é o tamanho do pico, e sim
 o que vem antes e depois dele: a queda livre ($\amag$ abaixo de 1\,g) logo antes do impacto e,
 depois, o corpo parado em outra posição (Figura~\ref{fig:janela}).
@@ -18,15 +18,15 @@ depois, o corpo parado em outra posição (Figura~\ref{fig:janela}).
 \begin{itemize}
   \item \textbf{SisFall}~\cite{sisfall}: \sisPessoas{} pessoas (23 jovens e 15 idosos), 4505
         ensaios a 200\,Hz, com o sensor na cintura: 2707 atividades de 19 tipos (14,5\,h) e
-        1798 quedas de 15 tipos. Os sinais foram saturados em $\pm$8\,g para imitar o
-        vestível.
+        1798 quedas de 15 tipos. Os sinais foram saturados em $\pm$8\,g para imitar a
+        pulseira.
   \item \textbf{Nossos ensaios}: os 18 do primeiro semestre (Seção~\ref{sec:mpu}), na cintura e
         em $\pm$2\,g, usados só como teste.
 \end{itemize}
 
 \subsection{Pipeline}
 
-Todos os métodos compartilham o mesmo pipeline, e é ele que roda no vestível:
+Todos os métodos compartilham o mesmo pipeline, e é ele que roda na pulseira:
 \begin{enumerate}
   \item \textbf{Filtro}: passa-baixa de 20\,Hz nos 6 eixos (Seção~\ref{sec:cond_digital}).
   \item \textbf{Gatilho}: um pico de $\amag$ filtrado de \gatilhoLon\,g ou mais, emitido depois de
@@ -71,14 +71,14 @@ foram muito melhores.
 \centering
 \includegraphics[width=\linewidth]{figuras/fig_resumo.png}
 \caption{Alarmes falsos por hora de atividade de alguns dos métodos comparados no Q1, com a
-fração de quedas detectadas entre parênteses. Cenário A: $\pm$8\,g, como o vestível.}
+fração de quedas detectadas entre parênteses. Cenário A: $\pm$8\,g, como a pulseira.}
 \label{fig:resumo}
 \end{figure}
 
-\subsection{O modelo do vestível}
+\subsection{O modelo da pulseira}
 
-Na configuração exata do vestível (gatilho causal, os \nAtributos{} atributos no tempo,
-$\pm$8\,g), três classificadores ficaram na disputa (Tabela~\ref{tab:modelos_vestivel}). As
+Na configuração exata da pulseira (gatilho causal, os \nAtributos{} atributos no tempo,
+$\pm$8\,g), três classificadores ficaram na disputa (Tabela~\ref{tab:modelos_pulseira}). As
 diferenças entre eles cabem no erro da estimativa: os intervalos de 95\,\% das diferenças,
 obtidos sorteando pessoas, passam pelo zero. O \textbf{Random Forest}~\cite{breiman} ficou: não precisa
 padronizar os atributos, a probabilidade que vai no alerta é a fração de árvores que votaram
@@ -87,16 +87,16 @@ firmware se ganhasse com folga, porque exigiria outro classificador em C e outro
 
 \begin{table}[H]
 \centering
-\caption{Classificadores na configuração do vestível (SisFall, validação por pessoa).}
-\label{tab:modelos_vestivel}
+\caption{Classificadores na configuração da pulseira (SisFall, validação por pessoa).}
+\label{tab:modelos_pulseira}
 \small
-\input{tabelas/modelos_vestivel}
+\input{tabelas/modelos_pulseira}
 \end{table}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\linewidth]{figuras/fig_importancia.png}
-\caption{Importância dos atributos no Random Forest do vestível.}
+\caption{Importância dos atributos no Random Forest da pulseira.}
 \label{fig:importancia}
 \end{figure}
 
@@ -107,8 +107,8 @@ por hora de atividade e detecta \rfQuedas\,\% das quedas com no máximo um alarm
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figuras/fig_funil_vestivel.png}
-\caption{O pipeline do vestível na SisFall: das quedas, quantas passam no gatilho e quantas o
+\includegraphics[width=\linewidth]{figuras/fig_funil_pulseira.png}
+\caption{O pipeline da pulseira na SisFall: das quedas, quantas passam no gatilho e quantas o
 Random Forest confirma; das atividades, quantos disparos e quantos alarmes falsos por hora.}
 \label{fig:funil}
 \end{figure}
@@ -141,13 +141,13 @@ queda que falhou fica marcado para a coleta.
 \label{fig:proprios}
 \end{figure}
 
-O modelo é \textbf{provisório}. Os dados de treino têm o sensor na cintura, e o vestível vai no
+O modelo é \textbf{provisório}. Os dados de treino têm o sensor na cintura, e a pulseira vai no
 pulso (Figura~\ref{fig:pulso}), onde o braço se move muito mais e o impacto chega diferente.
 
 \begin{figure}[H]
 \centering
-\fotoouespaco{vestivel_no_pulso}{0.6\linewidth}{o vestível (MPU-6050) preso ao pulso para a coleta}
-\caption{O vestível no pulso.}
+\fotoouespaco{pulseira_em_uso}{0.6\linewidth}{a pulseira (MPU-6050) presa ao pulso para a coleta}
+\caption{A pulseira em uso.}
 \label{fig:pulso}
 \end{figure} O próximo passo é a coleta
 no pulso, com várias pessoas e com o firmware atual ($\pm$8\,g), seguindo o protocolo de coleta

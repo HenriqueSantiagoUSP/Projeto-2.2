@@ -6,7 +6,7 @@ que já foi verificado fica em [`estado.md`](estado.md)**, e a lista viva do que
 
 Princípios que definem a ordem:
 
-- **Processamento na borda:** a queda é detectada no vestível e as regras de tempo rodam no hub
+- **Processamento na borda:** a queda é detectada na pulseira e as regras de tempo rodam no hub
   (diretriz da disciplina). A central só armazena, mostra e notifica.
 - **Contrato antes do código:** tópicos, payloads e mensagens são definidos em
   [`protocolo.md`](protocolo.md) antes de implementar.
@@ -79,7 +79,7 @@ Princípios que definem a ordem:
 - um alerta simulado chega ao Telegram em ≤ 5 s;
 - o Grafana mostra todos os quartos.
 
-## Fase 6 — Vestível: aquisição e enlace
+## Fase 6 — Pulseira: aquisição e enlace
 
 - Driver do MPU-6050: ±8 g, filtro digital (DLPF), 200 Hz pela taxa interna (`SMPLRT_DIV`) com FIFO ou pino
   INT. Nada de `vTaskDelay` para temporizar.
@@ -89,12 +89,12 @@ Princípios que definem a ordem:
 
 **Pronto quando:**
 - 200 Hz ± 5 ms medidos;
-- o hub publica o vestível como online/offline;
+- o hub publica a pulseira como online/offline;
 - uma queda por botão vira alerta no Telegram.
 
-## Fase 7 — Vestível: detecção e energia
+## Fase 7 — Pulseira: detecção e energia
 
-- **Detecção:** o pipeline do PC no vestível (`fall_pipeline`, desde 2026-11-11):
+- **Detecção:** o pipeline do PC na pulseira (`fall_pipeline`, desde 2026-11-11):
   - filtro de 20 Hz;
   - gatilho em picos de \|a\| ≥ 2,0 g;
   - janela de −1,0 a +0,8 s;
@@ -109,7 +109,7 @@ Princípios que definem a ordem:
 - *Light sleep* entre leituras do FIFO, depois de medir o consumo em placa: a estratégia depende do número
   medido.
 
-**Pronto quando:** latência pico → MQTT ≤ 500 ms e autonomia do vestível medida.
+**Pronto quando:** latência pico → MQTT ≤ 500 ms e autonomia da pulseira medida.
 
 ## Fase 8 — Coleta de dados
 
@@ -119,7 +119,7 @@ Princípios que definem a ordem:
   - movimentos de braço: palmas, acenar, bater na mesa (o pulso é a posição mais difícil).
 - Formato de arquivo e metadados: pessoa, posição do sensor, atividade, rótulo.
 - Janelas brutas em torno de cada disparo, gravadas pela serial agora e enviadas à central/nuvem depois. O
-  buffer circular e os atributos de cada janela (linhas `FEAT:` do modo de coleta) já estão no vestível.
+  buffer circular e os atributos de cada janela (linhas `FEAT:` do modo de coleta) já estão na pulseira.
 - Dados grandes ficam fora do git, com a descrição versionada.
 
 **Pronto quando:** existe um conjunto de dados descrito e reprodutível.
@@ -135,7 +135,7 @@ Princípios que definem a ordem:
 - Latências e disponibilidade (metas em [`requisitos.md`](requisitos.md)).
 - Sensibilidade e especificidade do limiar provisório: é a linha de base do modelo futuro.
 - Falsos alarmes por dia em uso contínuo.
-- Cobertura do vestível pelo `rssi` (quarto, banheiro, corredor).
+- Cobertura da pulseira pelo `rssi` (quarto, banheiro, corredor).
 - 24 h de operação sem reinício.
 
 **Pronto quando:** existe a tabela de resultados para o relatório final.
@@ -143,13 +143,13 @@ Princípios que definem a ordem:
 ## Futuro (sem data)
 
 - **Detecção de queda por modelo preditivo:** pipeline de processamento complexo treinado com grande volume
-  de dados (fase 8). Onde ele roda (vestível, hub ou nuvem) e como é atualizado (OTA) se decide quando houver
+  de dados (fase 8). Onde ele roda (pulseira, hub ou nuvem) e como é atualizado (OTA) se decide quando houver
   dados.
   - **Primeiro passo feito no PC (2026-11-09, [`modelo/`](../modelo/README.md)):**
     - pipeline filtro → gatilho (picos > 2,0 g) → janela → atributos → classificador;
     - Random Forest e regressão logística com < 1,5 alarme falso/h e ~94 % das quedas, contra ~70 alarmes/h
       do limiar atual.
-  - **No vestível desde 2026-11-11** (`fall_pipeline`):
+  - **Na pulseira desde 2026-11-11** (`fall_pipeline`):
     - gatilho causal e 23 atributos no tempo;
     - Random Forest de 60 árvores: 0,55 alarme falso/h e 95,1 % das quedas com ≤ 1 alarme/h na SisFall;
     - paridade C × Python testada no PC.
@@ -164,9 +164,9 @@ Princípios que definem a ordem:
   local continua funcionando sem internet.
 - **App ou web do cuidador,** com reconhecimento de alertas.
 - **OTA:** atualização de firmware pela rede.
-- **Configuração do vestível pelo hub:** mensagem `CONFIG` no ESP-NOW (tipo `0x05`, reservado).
-- **Cobertura além do quarto:** vários hubs e roaming do vestível. O Wi-Fi como reserva da queda já existe
-  como opção do vestível (MQTT direto, desligado por padrão); falta medir o custo em bateria e decidir se fica
+- **Configuração da pulseira pelo hub:** mensagem `CONFIG` no ESP-NOW (tipo `0x05`, reservado).
+- **Cobertura além do quarto:** vários hubs e roaming da pulseira. O Wi-Fi como reserva da queda já existe
+  como opção da pulseira (MQTT direto, desligado por padrão); falta medir o custo em bateria e decidir se fica
   ligado.
 
 ## Pendências de hardware que bloqueiam fases
@@ -175,4 +175,4 @@ Princípios que definem a ordem:
 |---|---|
 | PCB única (S2 P2): esquemático e layout sobre o mapa proposto ([`hardware/README.md`](../hardware/README.md)) | fases 2–4 no hardware final |
 | Revisão da DevKitC-1 (LED no GPIO48 ou no GPIO38: `menuconfig` → PCB) | LED de status |
-| Bateria, carregador e leitura de tensão do vestível | fase 7 |
+| Bateria, carregador e leitura de tensão da pulseira | fase 7 |

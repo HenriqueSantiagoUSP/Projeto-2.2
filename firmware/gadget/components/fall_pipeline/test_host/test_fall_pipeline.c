@@ -2,7 +2,7 @@
  * Host tests of fall_pipeline (run_tests.sh builds them and runs them from vetores/):
  *  - the trigger on synthetic |a| (the same cases as modelo/tests/test_blocos.py);
  *  - the filter start and the window right after boot;
- *  - parity with Python, from what 09_exportar_vestivel.py exported with the model:
+ *  - parity with Python, from what 09_exportar_pulseira.py exported with the model:
  *    the classifiers on Python's own feature vectors, then the whole pipeline (filter,
  *    trigger, window, features, classifier) on SisFall excerpts.
  * ESP-DSP is replaced by stubs/esp_dsp.h.

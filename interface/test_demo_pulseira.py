@@ -1,6 +1,6 @@
-"""Testes do demo_vestivel.py sem placa, sem janela e sem broker.
+"""Testes do demo_pulseira.py sem placa, sem janela e sem broker.
 
-    python -m unittest test_demo_vestivel          (de dentro de interface/)
+    python -m unittest test_demo_pulseira          (de dentro de interface/)
 """
 
 import contextlib
@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import demo_vestivel as demo
+import demo_pulseira as demo
 
 AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI / "notificador"))
@@ -42,7 +42,7 @@ class TestLinhas(unittest.TestCase):
 
     def test_boot(self):
         self.assertEqual(demo.interpretar_linha("I (345) main: wearable a1b2c3, MAC 24:0a:c4:a1:b2:c3 (configure "
-                                                "it in the hub)"), ("vestivel", "a1b2c3"))
+                                                "it in the hub)"), ("pulseira", "a1b2c3"))
         tipo, modelo = demo.interpretar_linha("I (350) main: fall pipeline: trigger 2.00 g, random forest, fall "
                                               "when P >= 0.73 (trained at +-8 g)")
         self.assertEqual(tipo, "modelo")
@@ -76,7 +76,7 @@ class TestPonte(unittest.TestCase):
     def test_alerta_como_o_do_hub_e_o_notificador_entende(self):
         alerta = demo.alerta_queda("a1b2c3", 42, "ativo", a_pico=3.0, prob=0.97, ts=1792497600000)
         self.assertEqual(alerta, {"v": 1, "id": "a1b2c3-42", "tipo": "queda", "estado": "ativo",
-                                  "origem": "vestivel/a1b2c3", "detalhe": {"a2": 9.0, "prob": 0.97},
+                                  "origem": "pulseira/a1b2c3", "detalhe": {"a2": 9.0, "prob": 0.97},
                                   "ts": 1792497600000})
         a = interpretar("idoso/butanta/quarto101/alerta", json.dumps(alerta).encode())
         texto = formatar(a)

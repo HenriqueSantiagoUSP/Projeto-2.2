@@ -36,11 +36,11 @@ Histórico, painel e notificação & funcionando com o simulador; falta o bot do
 \subsection{Limitações}
 
 \begin{itemize}
-  \item O modelo de queda foi treinado com o sensor na cintura, e o vestível vai no pulso.
+  \item O modelo de queda foi treinado com o sensor na cintura, e a pulseira vai no pulso.
   \item Nada do sistema completo foi verificado em bancada ainda: as metas de latência,
         disponibilidade e autonomia estão definidas, mas não medidas.
   \item A exatidão da temperatura na placa nova ainda não foi conferida contra um termopar.
-  \item O vestível usa a mesma placa do hub: é grande e depende de um \textit{power bank}, sem
+  \item A pulseira usa a mesma placa do hub: é grande e depende de um \textit{power bank}, sem
         medição de bateria.
   \item A cobertura do ESP-NOW fica limitada ao raio do hub; o corredor e as áreas comuns
         estão fora do escopo desta fase.
@@ -50,12 +50,12 @@ Histórico, painel e notificação & funcionando com o simulador; falta o bot do
 
 \begin{enumerate}
   \item Montar as placas v1 e fazer os testes da Seção~\ref{sec:verificacao}, começando pelo
-        ESP-NOW entre o vestível e o hub, para a apresentação do Q3 (24/11).
-  \item Coletar quedas e atividades com o vestível no pulso, com várias pessoas, e retreinar
+        ESP-NOW entre a pulseira e o hub, para a apresentação do Q3 (24/11).
+  \item Coletar quedas e atividades com a pulseira no pulso, com várias pessoas, e retreinar
         o modelo; reavaliar ali os atributos de frequência e o SVM.
-  \item Medir o consumo e implementar o \textit{light sleep} no vestível.
-  \item Uma placa própria para o vestível, com bateria LiPo, carregador e medição da bateria.
+  \item Medir o consumo e implementar o \textit{light sleep} na pulseira.
+  \item Uma placa própria para a pulseira, com bateria LiPo, carregador e medição da bateria.
   \item Na central: um servidor NTP local, para a ILPI funcionar sem internet; um painel para
-        a telemetria do vestível; e um banco relacional (PostgreSQL) com residentes,
+        a telemetria da pulseira; e um banco relacional (PostgreSQL) com residentes,
         dispositivos, cuidadores e o ciclo de vida dos alertas.
 \end{enumerate}

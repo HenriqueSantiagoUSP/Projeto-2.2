@@ -2,7 +2,7 @@ Este relatório é a primeira versão do relatório final do sistema de monitora
 invasivo de idosos em Instituições de Longa Permanência (ILPIs). Em cada quarto, um
 \textbf{hub} com ESP32-S3 lê as portas (reed switch MC-38), a presença (PIR HC-SR501) e a
 temperatura (LM35DZ condicionado por um LM358), roda as regras de alerta e publica tudo
-por MQTT. O idoso usa um \textbf{vestível}, também com ESP32-S3, com um acelerômetro e
+por MQTT. O idoso usa uma \textbf{pulseira}, também com ESP32-S3, com um acelerômetro e
 giroscópio MPU-6050 a 200\,Hz, que detecta quedas com um Random Forest embarcado e avisa
 o hub por ESP-NOW cifrado. Uma \textbf{central} em Docker guarda o histórico (InfluxDB),
 mostra os quartos (Grafana) e avisa o cuidador (Telegram).
@@ -13,8 +13,8 @@ sensores e a caracterização deles, o condicionamento do LM35 (ganho de 5,5 em
 alimentação simples e filtro RC de \rcFc\,Hz, com a curva
 $T = (V - \lmBetaCadeia)/\lmAlfaCadeia$ ajustada em \lmPontos{} pontos), a placa, a
 interface CAN (TWAI a 250\,kbit/s, identificadores \code{0x0GS}), a interface sem fio
-(ESP-NOW do vestível ao hub, MQTT do hub à central), o firmware em FreeRTOS, a detecção de
-queda e a central. Na base SisFall, o Random Forest do vestível dá \rfAlarmes{} alarme
+(ESP-NOW da pulseira ao hub, MQTT do hub à central), o firmware em FreeRTOS, a detecção de
+queda e a central. Na base SisFall, o Random Forest da pulseira dá \rfAlarmes{} alarme
 falso por hora de atividade e detecta \rfQuedas\,\% das quedas; o modelo ainda é
 provisório, porque foi treinado com o sensor na cintura.
 

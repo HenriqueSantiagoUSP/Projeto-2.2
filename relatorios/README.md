@@ -101,7 +101,7 @@ contém Q1, Q2 e Q3.
 - **Ainda vale:**
   - MQTT + Mosquitto como interface aberta;
   - CAN validado com o professor em 28/08;
-  - hub + vestível em duas estrelas (ESP-NOW e Wi-Fi);
+  - hub + pulseira em duas estrelas (ESP-NOW e Wi-Fi);
   - uso dos dois núcleos.
 - **Superado:**
   - hub em AP+STA (agora STA com `WIFI_PS_NONE`);
@@ -156,7 +156,7 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
     - o pipeline (o filtro aparece só como um bloco dele), o gatilho, a janela e os atributos;
     - visão geral dos métodos e resultados;
     - o Random Forest a fundo: árvore, floresta, votos, importância e por que foi escolhido;
-    - a versão que foi para o vestível.
+    - a versão que foi para a pulseira.
   - Figuras, tabelas e números (`numeros.tex`) são gerados por `modelo/experimentos/10_figuras_apresentacao.py`,
     em tamanho de slide. As figuras do filtro (`ap_filtro_*.png`) continuam sendo geradas, mas os slides não as
     usam desde 2026-11-13.
@@ -166,7 +166,7 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
 - Guia de estudo para a apresentação: [`Q1/explicacao-modelos.md`](<Semestre 2/Projeto 3/Q1/explicacao-modelos.md>),
   com o funcionamento de cada método testado, os números, por que deu cada resultado e respostas para as
   perguntas prováveis.
-- Os números saem de `modelo/resultados/resumo.md` e, para o vestível, de `modelo/resultados/vestivel.json`.
+- Os números saem de `modelo/resultados/resumo.md` e, para a pulseira, de `modelo/resultados/pulseira.json`.
 
 **Q2: primeira versão do relatório final** (17/11). LaTeX em
 [`Q2/latex/main.tex`](<Semestre 2/Projeto 3/Q2/latex/main.tex>), com o PDF em
@@ -189,8 +189,8 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
   `modelo/experimentos/12_relatorio_q2.py`. Compila com `pdflatex main.tex`, duas vezes.
 - **Fotos a acrescentar:** cada uma tem um quadro tracejado com o nome do arquivo esperado. Basta salvar a foto
   em `Q2/latex/imagens/` com esse nome e recompilar. A lista está no topo do `main.tex`:
-  - a PCB fabricada (cima e baixo) e montada (hub e vestível);
-  - o vestível no pulso;
+  - a PCB fabricada (cima e baixo) e montada (hub e pulseira);
+  - a pulseira no pulso;
   - a bancada CAN e o monitor serial (CAN e ESP-NOW);
   - o Grafana e o Telegram;
-  - a janela do `demo_vestivel.py`.
+  - a janela do `demo_pulseira.py`.
