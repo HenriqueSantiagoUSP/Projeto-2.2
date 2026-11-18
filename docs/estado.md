@@ -71,6 +71,40 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-17 — central em Docker com o simulador e captura do Grafana para o relatório
+
+- **Pedido:** subir a central, rodar o simulador e tirar a captura do painel "Quartos" para o relatório do Q2.
+- **Feito:**
+  - **rodada:**
+    - central em Docker (`docker compose up -d`; o notificador foi reconstruído para ter o alerta `ajuda`);
+    - o simulador por ~15 min, com temperatura a cada 5 s e resumo da pulseira a cada 60 s;
+    - um roteiro de alertas: queda, cancelamento, saída noturna, ajuda, temperatura, resolução, queda.
+
+    O Telegram está vazio no `.env`, então o notificador só imprimiu;
+  - **defeitos achados e corrigidos:**
+    - **pulseira fora do InfluxDB:** o consumidor `telegraf-ids` usa sessão persistente, e com ela o Telegraf
+      não assina tópicos novos enquanto o broker guarda a sessão. Ele ficou assinando `vestivel/+` desde a troca
+      de nomes (commit 9a17edd). Corrigido com o `client_id` `telegraf-ids-2`, comentado no `telegraf.conf`, e
+      a sessão velha apagada no broker. A pegadinha entrou no README da central e no `CLAUDE.md`;
+    - **tabela de alertas:** erro do Flux (`schema collision`), por juntar campos de texto com o `detalhe_prob`
+      numérico antes do `pivot`. Agora é `pivot` e depois `group()`;
+    - **quadros de estado** (hub, presença, portas, pulseira): mostravam a hora como um segundo valor, porque a
+      consulta devolvia o `_time`. Agora devolvem só o valor (e o `id`);
+    - **"Portas e presença":** a presença aparecia como duas linhas, `_value` e `id`, porque o `id` criado pelo
+      `map` ficava fora do agrupamento. Agora há um `group(columns: ["id"])`;
+  - **captura:** feita pelo Edge sem janela, comandado por um script (DevTools) que entra com o usuário do
+    `.env` e salva o PNG (3000 × 2300, tema claro, intervalo fixo da rodada). Entrou como
+    `imagens/grafana_quartos.png` (Figura 34, seção 11.1), com a legenda dizendo que os dados são do
+    simulador.
+- **Verificado:**
+  - **InfluxDB:** gravou, nos 14 min, 6 pontos de temperatura (só as mudanças de 0,2 °C), 15 resumos da
+    pulseira e 8 alertas;
+  - **notificador:** formatou todos os alertas, inclusive "Pedido de ajuda (botão da pulseira)" e o
+    cancelamento;
+  - **relatório:** compilado numa cópia sem erros, sem referência indefinida e sem *overfull* (71 páginas), e
+    a página da figura conferida na imagem. O `main.pdf` da pasta estava aberto no Acrobat e só foi
+    recompilado na entrada seguinte.
+
 ### 2026-11-17 — custo estimado de um quarto no relatório do Q2
 
 - **Pedido:** na lista de materiais, o preço aproximado de cada item e o custo de produção do produto.

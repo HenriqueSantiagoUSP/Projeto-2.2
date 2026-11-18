@@ -206,12 +206,13 @@ Tudo isto já está no código e compila; falta rodar na placa.
 
 - [ ] **Envio por mudança na central:** com o Docker no ar, rodar o simulador e conferir que os painéis de
   temperatura, atividade e bateria aparecem com os pontos espaçados (um a cada 5 min, ou a cada 0,2 °C) e que o
-  InfluxDB recebe ~12 pontos de temperatura por hora com o quarto estável. Não foi feito em 2026-11-17 porque
-  o Docker estava parado.
+  InfluxDB recebe ~12 pontos de temperatura por hora com o quarto estável.
+  - Em 2026-11-17, com intervalos acelerados (temperatura medida a cada 5 s, resumo da pulseira a cada 60 s), os
+    painéis apareceram e o InfluxDB gravou 6 pontos de temperatura em 14 min, só nas mudanças de 0,2 °C.
+  - Falta a conta com os intervalos reais (60 s e 5 min), numa rodada de 1 h.
 - [ ] **Painel no Grafana para `pulseira_telemetria`**, a telemetria que a pulseira publica direto (hoje ela só
   é gravada).
 - [ ] **Servidor NTP local** (no Raspberry Pi ou num container da central), para a ILPI funcionar sem internet.
-- [ ] **Conferir o painel "Quartos" no navegador:** as consultas foram testadas, a aparência não.
 - [ ] **Banco relacional da central**, para integrar com a interface. O banco final vai ser PostgreSQL.
   - **Protótipo:** a atividade de Fundamentos de Software em SQLite (`C:\Users\henri\dev\tarefa python sql`,
     repositório do grupo) já tem um esquema de 9 tabelas, revisado em 2026-11-10:
@@ -280,6 +281,17 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-17 — Painel "Quartos" conferido no navegador,** com a central em Docker e o simulador. Saíram
+  quatro defeitos, corrigidos:
+  - o Telegraf não gravava a pulseira;
+  - a tabela de alertas dava erro do Flux;
+  - os quadros de estado mostravam a hora;
+  - a presença aparecia como `_value` e `id`.
+
+  A captura do painel entrou no relatório do Q2 (Seção 11.1). Detalhes no diário.
+  - Verificado: dados no InfluxDB conferidos por consulta; todos os painéis preenchidos na captura; o
+    notificador formatou os 8 alertas da rodada, inclusive o `ajuda` e o cancelamento.
+
 - [x] **2026-11-17 — Envio por mudança (temperatura e pulseira):** o hub mede a temperatura a cada 60 s e só a
   publica (MQTT e CAN) quando ela muda 0,2 °C ou a cada 5 min; `pulseira/<id>` sai no primeiro heartbeat e
   depois como resumo a cada 5 min (a telemetria opcional da pulseira também). Componente comum novo
@@ -303,8 +315,8 @@ O mais recente no topo.
   (tópicos, alerta `pulseira_offline`, usuário do broker). Detalhes em [`decisoes.md`](decisoes.md) e no diário.
   - Verificado: builds sem avisos (hub e pulseira em três perfis), testes de host, do notificador, da demo e do
     modelo, e o relatório do Q2 recompilado.
-  - Não verificado: a central em Docker com os tópicos novos. Na próxima vez que ela subir, conferir que o
-    simulador aparece no painel (as medidas antigas, `vestivel*`, não aparecem mais).
+  - Central em Docker com os tópicos novos: conferida em 2026-11-17 (item acima). O Telegraf não gravava
+    `pulseira/<id>` por causa da sessão persistente, e foi corrigido.
 
 - [x] **2026-11-16 — Relatório do Q2 escrito** (primeira versão do relatório final,
   `relatorios/Semestre 2/Projeto 3/Q2/latex/`, 66 páginas). A entrega segue em "Entregas da disciplina".
