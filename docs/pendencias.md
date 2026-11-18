@@ -284,9 +284,9 @@ Tudo isto já está no código e compila; falta rodar na placa.
   - **O relatório do Q2 cita esse endereço** (Apêndices C e D). Os caminhos citados,
     `hardware/fontes/esquematico/` e `hardware/placas/v1/`, já têm commit e passam a existir lá com o push. O
     repositório precisa estar público, ou aberto a quem corrige.
-  - **Antes do push, decidir se `aulas/` sai também do histórico:** são os slides da disciplina, 16 arquivos,
-    que saíram do git em 2026-11-16 mas continuam nos commits antigos. Um push publica tudo. Apagar exige
-    reescrever o histórico (os hashes de commit citados no diário mudariam).
+  - **`aulas/` saiu do histórico em 2026-11-18,** a pedido do usuário: os slides da disciplina não vão para o
+    GitHub. Os commits a partir do que a adicionou ganharam hashes novos, e as citações no diário foram
+    corrigidas.
   - **Conferido em 2026-11-18:** nenhum `.env`, `sdkconfig`, senha ou chave em commit algum do histórico.
 - [ ] **Fim de linha na cópia de trabalho:** o `core.autocrlf=true` do sistema faz o checkout em CRLF (o
   repositório está em LF). Um `.gitattributes` com `* text=auto eol=lf` e um `git add --renormalize .` deixam a
@@ -321,7 +321,7 @@ O mais recente no topo.
   - Verificado: `pdflatex` sem erros, sem referência indefinida, sem caractere faltando e sem *overfull*
     (72 páginas); as páginas mudadas conferidas na imagem, e nenhum decimal com espaço no texto do PDF.
 
-- [x] **2026-11-18 — Correções da revisão de código** (`c607918..75291f9`; detalhes no diário):
+- [x] **2026-11-18 — Correções da revisão de código** (`21cb342..c8b0ed9`; detalhes no diário):
   - **pulseira:**
     - um gesto que encontra a fila cheia guarda a hora;
     - a janela da queda conta da detecção;
