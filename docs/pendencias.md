@@ -126,6 +126,10 @@ Tudo isto já está no código e compila; falta rodar na placa.
 
 ## Hardware
 
+- [ ] **Custo da PCB:** o custo estimado de um quarto (`hardware/placas/v1/custo-estimado.csv`, Apêndice C do
+  relatório) usa uma estimativa para a PCB (US$ 2 pelas 5 placas + frete de ~US$ 15 + impostos, ~R$ 35 por
+  placa). Se o grupo achar o total pago no pedido da JLCPCB, trocar o valor no CSV e rodar o
+  `12_relatorio_q2.py`. Os preços de varejo são de 17/11/2026.
 - [ ] **Montar e testar a PCB v1** (fabricada; em mãos).
   - Antes de soldar os conectores da DevKit, conferir na placa fabricada a ordem dos pinos: os nomes no U1 da
     serigrafia (3V3, 3V3, EN, GPIO4…) contra os impressos na própria DevKit. A ordem e o encaixe já foram

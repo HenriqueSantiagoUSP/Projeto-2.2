@@ -220,20 +220,26 @@ Antes de gerar os arquivos de fabricação, a placa passou por:
 
 Os Gerbers e a furação foram gerados pelo \code{kicad-cli}, e a placa foi fabricada na
 JLCPCB: duas camadas, FR-4 de 1,6\,mm, cobre de 1\,oz, 114 furos metalizados (nenhum sem
-metalização) e acabamento HASL. A montagem é feita à mão. A lista de materiais tem \bomItens{} itens e
-\bomPecas{} peças (Apêndice~\ref{ap:bom}).
+metalização) e acabamento HASL (Figura~\ref{fig:pcb_fabricada}). A montagem é feita à mão. A
+lista de materiais tem \bomItens{} itens e \bomPecas{} peças (Apêndice~\ref{ap:bom}). Em peças,
+alimentação e caixas, um quarto (o hub e a pulseira) custa cerca de R\$\,\custoKit{}
+(Seção~\ref{sec:custo}).
 
-\begin{figure}[H]
+\begin{figure}[tbp]
 \centering
-\begin{subfigure}[b]{0.49\linewidth}
+\begin{subfigure}{\linewidth}
   \centering
   \fotoouespaco{pcb_fabricada_cima}{\linewidth}{PCB v1 fabricada, face de cima}
-\end{subfigure}\hfill
-\begin{subfigure}[b]{0.49\linewidth}
+  \caption{Face de cima: a serigrafia com as referências das peças e os pinos da DevKit, que
+  ocupa o lugar de U1.}
+\end{subfigure}\\[6pt]
+\begin{subfigure}{\linewidth}
   \centering
   \fotoouespaco{pcb_fabricada_baixo}{\linewidth}{PCB v1 fabricada, face de baixo}
+  \caption{Face de baixo, vista por baixo: o plano de GND, com o retângulo sem cobre sob a
+  antena da DevKit.}
 \end{subfigure}
-\caption{A PCB v1 como chegou da JLCPCB.}
+\caption{A PCB v1 como chegou da JLCPCB, ainda sem as peças.}
 \label{fig:pcb_fabricada}
 \end{figure}
 
@@ -250,7 +256,8 @@ alimentação simples.
 
 \begin{figure}[H]
 \centering
-\includegraphics[height=7.5cm]{imagens/s1_pcb_montada.jpg}
+% A foto (900 x 1600 px, 1 px = 1 bp) tem mesa em cima e embaixo: o recorte deixa só a placa.
+\includegraphics[width=0.75\linewidth, trim=40 390 40 340, clip]{imagens/s1_pcb_montada.jpg}
 \caption{A PCB de face simples do primeiro semestre, montada.}
 \label{fig:pcb_s1}
 \end{figure}

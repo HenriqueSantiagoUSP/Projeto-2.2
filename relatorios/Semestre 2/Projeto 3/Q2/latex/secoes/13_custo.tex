@@ -1,0 +1,40 @@
+%======================================================================
+\section{Custo do sistema}\label{sec:custo}
+%======================================================================
+Cada quarto recebe um hub e uma pulseira. A Tabela~\ref{tab:custo_resumo} resume quanto custa
+equipá-lo, por grupo de itens, e a Tabela~\ref{tab:custo}, no Apêndice~\ref{ap:bom}, traz
+cada item com a loja e o preço.
+
+\begin{table}[H]
+\centering
+\caption{Custo estimado de um quarto, por grupo de itens.}
+\label{tab:custo_resumo}
+\small
+\input{tabelas/custo_resumo}
+\end{table}
+
+\paragraph{Critério.} Os preços são do varejo brasileiro, para compra por unidade, sem frete,
+consultados nos sites das lojas em \custoData. Cada PCB leva só as peças da sua função: o hub,
+o LM35, o LM358, o PIR, o CAN e as portas; a pulseira, o MPU e o botão. A PCB entra como
+estimativa, a partir do preço da JLCPCB com frete e impostos de importação
+(Apêndice~\ref{ap:bom}). Ficam de fora a central, um único Raspberry Pi para todos os quartos
+da ILPI, e a montagem, feita à mão.
+
+\paragraph{O que pesa.} Um quarto custa cerca de R\$\,\custoKit: R\$\,\custoHub{} o hub e
+R\$\,\custoPulseira{} a pulseira. As duas DevKits são \custoDevkitPct\,\% desse valor, e a
+alimentação e as caixas, outros \custoAlimCaixasPct\,\%. Os sensores, os módulos e os
+componentes da placa, que fazem o trabalho do sistema, somam menos de um quinto. A maior parte
+do custo do protótipo está nas peças prontas, compradas para encurtar o desenvolvimento, e não
+nos circuitos projetados.
+
+\paragraph{Em série.} Esse é o custo de um protótipo comprado no varejo, e ele cairia por três
+caminhos:
+\begin{itemize}
+  \item trocar a DevKit pelo módulo ESP32-S3 soldado numa placa própria, que dispensa a placa de
+        desenvolvimento inteira (regulador, conversor USB--serial, conectores);
+  \item comprar módulos e componentes em volume, de distribuidores, em vez do varejo;
+  \item dar à pulseira uma placa pequena, com bateria e carregador, no lugar do
+        \textit{power bank} e da caixa do tamanho da do hub (Seção~\ref{sec:conclusoes}).
+\end{itemize}
+A caixa do hub também precisa de vedação nas aberturas, do PIR e da USB, para chegar ao IP42
+pedido no RNF12.

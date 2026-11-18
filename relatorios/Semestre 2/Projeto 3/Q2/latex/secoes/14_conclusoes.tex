@@ -9,7 +9,8 @@ do LM35 foi projetado, simulado e validado, e na placa nova passou a funcionar c
 alimentação só e um filtro na entrada do ADC; a PCB única foi desenhada, verificada e
 fabricada; o firmware das duas placas está completo; a detecção de queda
 passou de um limiar a um modelo embarcado; e a central guarda, mostra e notifica o que os hubs
-publicam.
+publicam. Com peças de varejo, um quarto custa cerca de R\$\,\custoKit, um terço disso nas
+duas DevKits (Seção~\ref{sec:custo}).
 
 \begin{table}[H]
 \centering
@@ -50,7 +51,9 @@ Histórico, painel e notificação & funcionando, testados com o simulador no lu
   \item Coletar quedas e atividades com a pulseira no pulso, com várias pessoas, e retreinar
         o modelo; reavaliar ali os atributos de frequência e o SVM.
   \item Medir o consumo e implementar o \textit{light sleep} na pulseira.
-  \item Uma placa própria para a pulseira, com bateria LiPo, carregador e medição da bateria.
+  \item Uma placa própria para a pulseira, com bateria LiPo, carregador e medição da bateria; com
+        o módulo ESP32-S3 soldado no lugar da DevKit, ela também reduz o custo
+        (Seção~\ref{sec:custo}).
   \item Na central: um servidor NTP local, para a ILPI funcionar sem internet; um painel para
         a telemetria da pulseira; e um banco relacional (PostgreSQL) com residentes,
         dispositivos, cuidadores e o ciclo de vida dos alertas.

@@ -12,6 +12,7 @@ Fonte em [`../../fontes/esquematico/`](../../fontes/esquematico/); decisões em 
 | `gerber/` | os mesmos arquivos soltos, mais o mapa de furação e o job file (fora do zip) |
 | `esquema.pdf` | esquema completo |
 | `lista-de-materiais.csv` | lista de materiais agrupada por valor e footprint |
+| `custo-estimado.csv` | custo estimado do kit de um quarto (hub + pulseira, com módulos, alimentação e caixas): quantidades, preço de varejo em R$, loja, link e data da consulta. O `modelo/experimentos/12_relatorio_q2.py` gera dele a tabela do Apêndice C do relatório do Q2 |
 | `placa-3d-cima.png` | render 3D da face de cima |
 
 ## Placa

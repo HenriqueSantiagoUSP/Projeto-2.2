@@ -173,7 +173,7 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
 [`Q2/latex/main.pdf`](<Semestre 2/Projeto 3/Q2/latex/main.pdf>).
 - **Layout:** o mesmo do Q1 (capa, contracapa, `figuras/`, `imagens/`, `tabelas/`). Um arquivo por seção em
   `secoes/` e os diagramas em TikZ e circuitikz em `diagramas/`.
-- **Conteúdo** (~68 páginas):
+- **Conteúdo** (~71 páginas):
   - requisitos e arquitetura;
   - sensores, com a caracterização do LM35 e do MPU-6050;
   - condicionamento do LM35 (circuito, simulação, validação, filtro RC) e condicionamento digital;
@@ -184,12 +184,14 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
   - detecção de queda (resumo do Q1);
   - central;
   - o que foi verificado e o plano de testes em bancada;
-  - conclusões e apêndices (esquema completo, pinos, lista de materiais, reprodução).
+  - custo do sistema: quanto custa equipar um quarto (hub e pulseira), por grupo, e o que pesa;
+  - conclusões e apêndices (esquema completo, pinos, lista de materiais com o custo item por item,
+    reprodução).
 - **Geração:** gráficos, tabelas, números (`tabelas/numeros.tex`) e exportações da PCB saem de
   `modelo/experimentos/12_relatorio_q2.py`. Compila com `pdflatex main.tex`, duas vezes.
 - **Fotos a acrescentar:** cada uma tem um quadro tracejado com o nome do arquivo esperado. Basta salvar a foto
-  em `Q2/latex/imagens/` com esse nome e recompilar. A lista está no topo do `main.tex`:
-  - a PCB fabricada (cima e baixo);
+  em `Q2/latex/imagens/` com esse nome e recompilar. As da PCB fabricada (cima e baixo) já estão lá (2026-11-17).
+  A lista das que faltam está no topo do `main.tex`:
   - o monitor serial do hub com o ESP-NOW;
   - o Grafana e o Telegram;
   - a janela do `demo_pulseira.py`.

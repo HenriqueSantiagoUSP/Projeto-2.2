@@ -17,8 +17,9 @@ Gera em Q2/latex/figuras/:
 - da PCB: renders 3D e camadas de cobre em PDF (kicad-cli, que também roda o ERC e o DRC) e cada folha do
   esquema em PNG, recortada no circuito (pdftoppm).
 
-E em Q2/latex/tabelas/: a lista de materiais, a comparação dos modelos da pulseira e numeros.tex (macros com os
-números do texto que vêm de dados: ajuste do LM35, modelo, DRC/ERC, contagens).
+E em Q2/latex/tabelas/: a lista de materiais, o custo estimado do kit de um quarto (de
+hardware/placas/v1/custo-estimado.csv), a comparação dos modelos da pulseira e numeros.tex (macros com os
+números do texto que vêm de dados: ajuste do LM35, modelo, DRC/ERC, contagens, custo).
 """
 
 import csv
@@ -387,6 +388,95 @@ def tabela_bom():
     print("   bom.tex")
 
 
+def reais(valor):
+    """1234.5 -> '1.234,50' (R$, com vírgula)."""
+    return f"{valor:,.2f}".replace(",", " ").replace(".", ",").replace(" ", ".")
+
+
+def tabela_custo():
+    """Custo estimado do kit de um quarto (hub + pulseira), a partir de hardware/placas/v1/custo-estimado.csv."""
+    with open(PLACA / "custo-estimado.csv", encoding="utf-8", newline="") as f:
+        linhas = list(csv.DictReader(f))
+    total = {"hub": 0.0, "pulseira": 0.0}
+    devkits = 0.0
+    corpo, grupo = [], None
+    for r in linhas:
+        preco, hub, pulseira = float(r["preco_unitario"]), int(r["hub"]), int(r["pulseira"])
+        total["hub"] += preco * hub
+        total["pulseira"] += preco * pulseira
+        if r["referencias"] == "U1":
+            devkits += preco * (hub + pulseira)
+        if r["grupo"] != grupo:
+            grupo = r["grupo"]
+            corpo.append(f"\\multicolumn{{6}}{{@{{}}l}}{{\\textit{{{tex(grupo[0].upper() + grupo[1:])}}}}} \\\\")
+        unitario = ("$\\approx$\\," if r["origem_do_preco"].startswith("estimativa") else "") + reais(preco)
+        corpo.append(f"{tex(r['item'])} & {hub or '---'} & {pulseira or '---'} & {unitario} & "
+                     f"{reais(preco * (hub + pulseira))} & {tex(r['loja']) or 'estimativa'} \\\\")
+    kit = total["hub"] + total["pulseira"]
+    num("custoHub", reais(total["hub"]))
+    num("custoPulseira", reais(total["pulseira"]))
+    num("custoKit", reais(kit))
+    num("custoDevkitPct", str(round(100 * devkits / kit)))
+    num("custoData", "17/11/2026")
+    (TAB / "custo.tex").write_text(
+        "% Gerado por modelo/experimentos/12_relatorio_q2.py a partir de hardware/placas/v1/custo-estimado.csv\n"
+        "\\begin{tabularx}{\\linewidth}{@{}>{\\raggedright\\arraybackslash}X c c r r l@{}}\n\\toprule\n"
+        "Item & Hub & Pulseira & R\\$ unit. & R\\$ no kit & Loja \\\\\n\\midrule\n"
+        + "\n".join(corpo) + "\n\\midrule\n"
+        f"\\multicolumn{{4}}{{@{{}}l}}{{Hub: placa, módulos, portas, fonte e caixa}} & {reais(total['hub'])} & \\\\\n"
+        f"\\multicolumn{{4}}{{@{{}}l}}{{Pulseira: placa, MPU, botão, \\textit{{power bank}} e caixa}} & "
+        f"{reais(total['pulseira'])} & \\\\\n"
+        f"\\multicolumn{{4}}{{@{{}}l}}{{\\textbf{{Kit de um quarto (hub + pulseira)}}}} & \\textbf{{{reais(kit)}}} & \\\\\n"
+        "\\bottomrule\n\\end{tabularx}\n", encoding="utf-8", newline="\n")
+    print(f"   custo.tex (hub R$ {reais(total['hub'])}, pulseira R$ {reais(total['pulseira'])}, kit R$ {reais(kit)})")
+    tabela_custo_resumo(linhas, kit)
+
+
+# Grupos do resumo da seção de custo, na ordem da tabela.
+CUSTO_GRUPOS = ["ESP32-S3-DevKitC-1 (uma por placa)", "PCB v1 (estimada)", "Módulos, sensores das portas e cabo",
+                "Componentes da placa", "Alimentação", "Caixas"]
+
+
+def grupo_custo(r):
+    if r["referencias"] == "U1":
+        return CUSTO_GRUPOS[0]
+    if r["item"].startswith("PCB"):
+        return CUSTO_GRUPOS[1]
+    return {"placa e módulos": CUSTO_GRUPOS[2], "componentes": CUSTO_GRUPOS[3], "alimentação": CUSTO_GRUPOS[4],
+            "caixas": CUSTO_GRUPOS[5]}[r["grupo"]]
+
+
+def tabela_custo_resumo(linhas, kit):
+    """O custo por grupo, para a seção de custo: o que pesa no hub, na pulseira e no kit."""
+    soma = {g: {"hub": 0.0, "pulseira": 0.0} for g in CUSTO_GRUPOS}
+    for r in linhas:
+        preco = float(r["preco_unitario"])
+        soma[grupo_custo(r)]["hub"] += preco * int(r["hub"])
+        soma[grupo_custo(r)]["pulseira"] += preco * int(r["pulseira"])
+
+    def pct(*grupos):
+        return round(100 * sum(soma[g]["hub"] + soma[g]["pulseira"] for g in grupos) / kit)
+
+    num("custoPcbPct", str(pct(CUSTO_GRUPOS[1])))
+    num("custoAlimCaixasPct", str(pct(CUSTO_GRUPOS[4], CUSTO_GRUPOS[5])))
+    corpo = []
+    for g in CUSTO_GRUPOS:
+        hub, pulseira = soma[g]["hub"], soma[g]["pulseira"]
+        corpo.append(f"{g} & {reais(hub) if hub else '---'} & {reais(pulseira) if pulseira else '---'} & "
+                     f"{reais(hub + pulseira)} & {round(100 * (hub + pulseira) / kit)}\\,\\% \\\\")
+    hub = sum(s["hub"] for s in soma.values())
+    pulseira = sum(s["pulseira"] for s in soma.values())
+    (TAB / "custo_resumo.tex").write_text(
+        "% Gerado por modelo/experimentos/12_relatorio_q2.py a partir de hardware/placas/v1/custo-estimado.csv\n"
+        "\\begin{tabular}{@{}l r r r r@{}}\n\\toprule\n"
+        "Grupo & Hub (R\\$) & Pulseira (R\\$) & Kit (R\\$) & Parte do kit \\\\\n\\midrule\n"
+        + "\n".join(corpo) + "\n\\midrule\n"
+        f"\\textbf{{Total}} & \\textbf{{{reais(hub)}}} & \\textbf{{{reais(pulseira)}}} & "
+        f"\\textbf{{{reais(hub + pulseira)}}} & 100\\,\\% \\\\\n"
+        "\\bottomrule\n\\end{tabular}\n", encoding="utf-8", newline="\n")
+    print("   custo_resumo.tex")
+
+
 def tabela_modelos():
     vest = json.loads((R / "pulseira.json").read_text(encoding="utf-8"))
     svm = json.loads((R / "svm_pulseira.json").read_text(encoding="utf-8"))["modelos"]
@@ -436,6 +526,7 @@ def main():
     pcb()
     print("Tabelas:")
     tabela_bom()
+    tabela_custo()
     tabela_modelos()
     gravar_numeros()
 
