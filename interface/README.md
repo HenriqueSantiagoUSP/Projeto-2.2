@@ -181,4 +181,5 @@ python -m unittest test_demo_pulseira          # leitura da serial, filtro e ale
 | Mosquitto reinicia sem parar, com `set: illegal option -` no log | `mosquitto/entrypoint.sh` salvo com fim de linha CRLF | converta para LF (o `.gitattributes` já força LF nos `*.sh` do git) |
 | `docker compose up` reclama de variável | `.env` ausente ou incompleto | `copy .env.example .env` e preencha |
 | Painel do Grafana vazio | ainda não chegou nenhuma mensagem, ou o quarto escolhido no topo não é o do hub | rode o simulador e escolha o quarto no seletor |
+| Um tópico chega ao broker (`mosquitto_sub` mostra), mas não ao InfluxDB | o consumidor do Telegraf usa sessão persistente: o broker guarda as assinaturas antigas, e o Telegraf não assina os tópicos novos | ao mudar os `topics` de um consumidor no `telegraf.conf`, troque também o `client_id` dele e `docker compose restart telegraf` |
 | Hub não conecta | IP, usuário ou senha errados no `menuconfig`, ou firewall | veja o log do hub e `docker compose logs mosquitto`; libere a porta 1883 |

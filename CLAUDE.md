@@ -192,6 +192,9 @@ fica em `interface/mosquitto/acl` e as senhas no `.env`.
 captura as conexões a `localhost`. Para falar com a central em Docker, use o IP da máquina ou pare o serviço
 (`net stop mosquitto`, como administrador).
 
+**Telegraf:** os consumidores MQTT usam sessão persistente, e com ela o Telegraf não assina tópicos novos
+enquanto o broker guarda a sessão. Ao mudar os `topics` de um consumidor, troque também o `client_id` dele.
+
 ## Modelos de queda (PC)
 
 Em `modelo/`, com o `uv`. Ele instala o Python 3.12 em `modelo/.venv`, porque o 3.15 da máquina não tem o
