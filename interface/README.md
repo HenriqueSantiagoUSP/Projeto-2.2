@@ -95,7 +95,12 @@ Abra o Grafana (painel **Quartos**) e acompanhe; os alertas aparecem na tabela e
 
 A janela mostra:
 - o \|a\| filtrado rolando, com a linha do gatilho;
-- cada disparo com a P(queda) da placa (azul: não é queda; laranja: queda);
+- cada disparo com a P(queda) da placa:
+  - azul: não é queda;
+  - laranja: queda;
+  - laranja vazado: "já avisada". A placa achou queda, mas o disparo veio logo depois de uma queda avisada,
+    dentro da espera (5 s no perfil de demonstração, `CONFIG_GADGET_FALL_COOLDOWN_S`), e ela não avisa duas
+    vezes a mesma queda. Para ver cada queda avisada, espere uns 5 s entre uma e outra;
 - uma faixa grande "QUEDA DETECTADA" ou "PEDIDO DE AJUDA" (o botão da placa segurado por 3 s);
 - os atributos da última janela (pico, queda livre, quietude, inclinação);
 - os avisos da placa.

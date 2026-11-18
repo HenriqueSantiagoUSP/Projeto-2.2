@@ -180,6 +180,27 @@ class TestLinhasEstragadas(unittest.TestCase):
     def test_feat_com_pico_infinito_e_ignorado(self):
         self.assertIsNone(demo.interpretar_linha("FEAT:pico=inf,a_pico=2.5,prob=0.10,queda=0"))
 
+    def test_feat_cortada_por_uma_linha_csv_e_ignorada(self):
+        # Como chegava antes de a placa montar a FEAT inteira (sessão gravada em 2026-11-17).
+        linha = "FEAT:pico=1346,a_pico=2.1749CSV:7535,1728,1631,-2038,3001,10926,-6000"
+        self.assertIsNone(demo.interpretar_linha(linha))
+
+
+class TestRotuloDoDisparo(unittest.TestCase):
+    """A placa só avisa uma queda por vez: P acima do limiar logo depois de uma queda avisada é "já avisada"."""
+
+    def test_queda_avisada(self):
+        self.assertEqual(demo.rotulo_disparo(0.99, True, 0.73), "QUEDA")
+
+    def test_queda_na_espera_depois_de_outra(self):
+        self.assertEqual(demo.rotulo_disparo(0.88, False, 0.73), "já avisada")
+
+    def test_no_limiar_conta_como_queda(self):
+        self.assertEqual(demo.rotulo_disparo(0.73, False, 0.73), "já avisada")
+
+    def test_abaixo_do_limiar(self):
+        self.assertEqual(demo.rotulo_disparo(0.63, False, 0.73), "não")
+
 
 class SerialFalsa:
     """Imita o pyserial: cada abertura segue um plano, uma lista de linhas (bytes ou exceção) ou "falha"."""

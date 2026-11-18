@@ -71,6 +71,40 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-17 — quedas "não acionadas" na demo: linha FEAT cortada e espera depois de uma queda
+
+- **Pedido:** na demo, um disparo com P = 0,88 saiu como "não é queda" (o limiar é 0,73), picos acima do
+  gatilho não apareceram, e "diversas quedas não foram acionadas".
+- **Investigado:** sessão gravada com `--gravar` (11 disparos em ~25 s). Pelo log da placa:
+  - **4 quedas avisadas:** P de 0,80 a 0,99;
+  - **5 com P de 0,76 a 0,94 na espera:** caíram menos de 5 s depois de uma queda avisada
+    (`CONFIG_GADGET_FALL_COOLDOWN_S`, 5 s no perfil de demonstração), e por isso não foram avisadas. É o
+    funcionamento previsto, mas a demo as mostrava como "não";
+  - **2 abaixo do limiar:** P de 0,63 e 0,22;
+  - **4 das 11 linhas FEAT cortadas** por linhas CSV e descartadas pela demo, entre elas uma queda avisada
+    (P = 0,97) que nunca apareceu.
+
+  O `stdout` da picolibc (ESP-IDF 6) é um só, com *buffer* por linha, e cada `printf` segura a trava só
+  durante a chamada. A FEAT saía em ~26 `printf`, e o CSV da `sampling_task`, no outro núcleo, entrava entre
+  eles. Os 6 cortes caíram todos entre chamadas, e nenhuma das 10 799 linhas CSV chegou quebrada: um `printf`
+  só sai inteiro.
+- **Feito:**
+  - **firmware da pulseira:** a `log_window` monta a FEAT num *buffer* estático de 1024 caracteres (a maior real
+    tem 480) e a imprime num `printf` só. A `sampling_task` lê o FIFO do MPU em lotes de ~50 ms, então os
+    ~7 ms com a trava presa não perdem amostras;
+  - **demo:** a nova `rotulo_disparo` separa "QUEDA", "já avisada" (P acima do limiar, na espera) e "não". O
+    disparo já avisado aparece como triângulo laranja vazado, e a lista e a decisão dizem "já avisada". O README
+    da central explica as cores e a espera.
+- **Verificado:**
+  - **firmware:** os builds da pulseira, padrão e demonstração, sem avisos; o de demonstração gravado na placa
+    (COM3), com o boot e o fluxo CSV conferidos (~200 linhas/s);
+  - **demo:** 24 testes, com 5 novos (o rótulo e a FEAT cortada); um quadro da sessão gravada conferido na
+    imagem.
+  - **bancada:** uma sessão nova gravada na placa, com o usuário soltando a placa. Os 13 disparos do log
+    (`trigger at sample`) chegaram com a FEAT inteira, nenhum texto emendado e nenhuma das 10 239 linhas CSV
+    quebrada. O leitor da demo aceitou as 13 linhas: 5 quedas, 4 já avisadas e 4 abaixo do limiar. Uma das
+    que ficaram abaixo foi um pico de 10,2 g com P = 0,69, decisão do modelo, que ainda é provisório.
+
 ### 2026-11-17 — central em Docker com o simulador e captura do Grafana para o relatório
 
 - **Pedido:** subir a central, rodar o simulador e tirar a captura do painel "Quartos" para o relatório do Q2.
