@@ -278,14 +278,16 @@ Tudo isto já está no código e compila; falta rodar na placa.
 - [ ] **Baixar de novo 3 PDFs** de `relatorios/Semestre 2/Projeto 2/`: `Entrega 1.pdf`,
   `EnunciadoProjeto 2_parcial.pdf` e `EnunciadoProjeto 2_PCB.pdf`. Foram apagados por engano e não têm cópia no
   disco.
-- [ ] **Cópia fora deste PC:** o repositório não tem remoto, e os commits estão só neste disco. Decidir onde
-  hospedar (GitHub privado do grupo, por exemplo) e fazer o primeiro push.
-  - **Desde 2026-11-17, o relatório do Q2 cita `https://github.com/HenriqueSantiagoUSP/Projeto-2.2`**
-    (Apêndices C e D). Os caminhos citados, `hardware/fontes/esquematico/` e `hardware/placas/v1/` (com a
-    `custo-estimado.csv`, ainda sem commit), têm de estar lá antes da entrega. O repositório precisa estar
-    público, ou aberto a quem corrige.
-  - Antes do primeiro push, decidir se `aulas/` (14 MB de PDFs) sai também do histórico: ela saiu do git em
-    2026-11-16, mas continua nos commits antigos. Apagar exige reescrever o histórico.
+- [ ] **Primeiro push para o GitHub:** o remoto `origin` foi configurado em 2026-11-18
+  (`https://github.com/HenriqueSantiagoUSP/Projeto-2.2.git`). O repositório lá estava vazio, e nada foi enviado
+  ainda.
+  - **O relatório do Q2 cita esse endereço** (Apêndices C e D). Os caminhos citados,
+    `hardware/fontes/esquematico/` e `hardware/placas/v1/`, já têm commit e passam a existir lá com o push. O
+    repositório precisa estar público, ou aberto a quem corrige.
+  - **Antes do push, decidir se `aulas/` sai também do histórico:** são os slides da disciplina, 16 arquivos,
+    que saíram do git em 2026-11-16 mas continuam nos commits antigos. Um push publica tudo. Apagar exige
+    reescrever o histórico (os hashes de commit citados no diário mudariam).
+  - **Conferido em 2026-11-18:** nenhum `.env`, `sdkconfig`, senha ou chave em commit algum do histórico.
 - [ ] **Fim de linha na cópia de trabalho:** o `core.autocrlf=true` do sistema faz o checkout em CRLF (o
   repositório está em LF). Um `.gitattributes` com `* text=auto eol=lf` e um `git add --renormalize .` deixam a
   cópia em LF também.
