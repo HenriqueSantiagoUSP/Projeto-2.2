@@ -212,6 +212,13 @@ bool rules_wearable_offline(const rules_t *rules, const char *wearable);
  */
 bool rules_any_active(const rules_t *rules);
 
+/*
+ * True while a fall or a help request of any wearable is open: the hub's buzzer stops only
+ * when this turns false, so cancelling one alert does not silence another still open. The
+ * episode is already updated when the callback runs, so the callback can ask.
+ */
+bool rules_resident_alert_active(const rules_t *rules);
+
 /* The "tipo" and "estado" strings of the MQTT contract. */
 const char *rules_alert_type_name(alert_type_t type);
 const char *rules_alert_state_name(alert_state_t state);

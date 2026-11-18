@@ -29,6 +29,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from datetime import date
 from pathlib import Path
 
 import _comum
@@ -418,7 +419,9 @@ def tabela_custo():
     num("custoPulseira", reais(total["pulseira"]))
     num("custoKit", reais(kit))
     num("custoDevkitPct", str(round(100 * devkits / kit)))
-    num("custoData", "17/11/2026")
+    # A data da consulta mais recente da planilha (consultado_em, aaaa-mm-dd), para o texto não ficar velho.
+    consulta = max(date.fromisoformat(r["consultado_em"]) for r in linhas if r["consultado_em"])
+    num("custoData", consulta.strftime("%d/%m/%Y"))
     (TAB / "custo.tex").write_text(
         "% Gerado por modelo/experimentos/12_relatorio_q2.py a partir de hardware/placas/v1/custo-estimado.csv\n"
         "\\begin{tabularx}{\\linewidth}{@{}>{\\raggedright\\arraybackslash}X c c r r l@{}}\n\\toprule\n"

@@ -107,6 +107,38 @@ static void test_one_steady_hour(void){
     CHECK(feed(&r, values, 60, MIN_MS(1)) == 12);
 }
 
+static void test_scheduling_jitter_keeps_five_minutes(void){
+    /*
+     * The reading is taken every minute, but its time is when the task got it: a few ms late
+     * now and then. Without the margin, the 5th reading after a late one is 3 ms short of
+     * 5 min and the sign of life waits for the 6th.
+     */
+    const uint64_t max_ms = REPORT_MAX_MS_FOR_PERIOD(MAX_MS, MIN_MS(1));
+    report_t r = { 0 };
+    report_mark(&r, 22.0f, 1003);
+    CHECK(!report_due(&r, 22.0f, DELTA, MAX_MS, 300998));          /* no margin: 6 min */
+    CHECK(report_due(&r, 22.0f, DELTA, max_ms, 300998));
+    CHECK(!report_due(&r, 22.0f, DELTA, max_ms, 1003 + MIN_MS(4)));   /* not on the 4th */
+
+    /* One steady hour, every 3rd reading 3 ms late: still 12 messages, never 6 min apart. */
+    report_t h = { 0 };
+    int sent = 0;
+    uint64_t last = 0, widest = 0;
+    for (int i = 0; i < 60; i++) {
+        uint64_t now = 1000 + (uint64_t) i * MIN_MS(1) + (i % 3 == 0 ? 3 : 0);
+        if (report_due(&h, 22.0f, DELTA, max_ms, now)) {
+            if (h.sent && now - last > widest) {
+                widest = now - last;
+            }
+            report_mark(&h, 22.0f, now);
+            last = now;
+            sent++;
+        }
+    }
+    CHECK(sent == 12);
+    CHECK(widest <= MAX_MS + 3);
+}
+
 static void test_one_hour_of_ramp(void){
     /* 0.06 degC a minute (3.6 degC/h): a message every 4 min, when the change reaches 0.24 degC. */
     float values[60];
@@ -145,6 +177,7 @@ int main(void){
         { "reset",                           test_reset },
         { "one steady hour: 12 messages",    test_one_steady_hour },
         { "one hour of ramp",                test_one_hour_of_ramp },
+        { "scheduling jitter keeps 5 min",   test_scheduling_jitter_keeps_five_minutes },
         { "RMS of windows",                  test_rms },
     };
 

@@ -29,6 +29,15 @@ typedef struct {
  */
 bool report_due(const report_t *r, float value, float delta, uint64_t max_interval_ms, uint64_t now_ms);
 
+/*
+ * The max_interval_ms to give report_due for a reading taken every period_ms: the sign of
+ * life is due half a period early. With 300 s and a reading every 60 s, the 5th reading
+ * goes out even when it is a few ms early relative to the last one sent (task scheduling);
+ * with exactly 300 s it would wait for the 6th about half the time, and "every 5 min at
+ * most" would become 6.
+ */
+#define REPORT_MAX_MS_FOR_PERIOD(max_ms, period_ms)   ((uint64_t) (max_ms) - (uint64_t) (period_ms) / 2u)
+
 /* Call after publishing. */
 void report_mark(report_t *r, float value, uint64_t now_ms);
 

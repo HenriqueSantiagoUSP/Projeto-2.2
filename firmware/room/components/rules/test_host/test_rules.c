@@ -403,6 +403,39 @@ static void test_fall_and_help_are_separate(void){
     CHECK(rules_any_active(&r));   /* the help request is still open for the caregivers */
 }
 
+/* What the hub's buzzer sees: rules_resident_alert_active() asked from inside the callback. */
+static bool s_open_when_closed[MAX_EVENTS];
+static int s_closed_count;
+
+static void record_buzzer(const rules_alert_t *alert, void *ctx){
+    record(alert, NULL);
+    if ((alert->type == ALERT_FALL || alert->type == ALERT_HELP) && alert->state != ALERT_ACTIVE &&
+        s_closed_count < MAX_EVENTS) {
+        s_open_when_closed[s_closed_count++] = rules_resident_alert_active((const rules_t *) ctx);
+    }
+}
+
+static void test_buzzer_stops_only_with_nothing_open(void){
+    rules_t r;
+    setup(&r, 3, 0);
+    r.cb = record_buzzer;
+    r.cb_ctx = &r;
+    s_closed_count = 0;
+    CHECK(!rules_resident_alert_active(&r));
+
+    rules_on_help(&r, "a1b2c3", 10, 60000, &s_clock);
+    rules_on_fall(&r, "a1b2c3", 11, 61000, 7.88f, 0.97f, &s_clock);
+    rules_on_help(&r, "d4e5f6", 3, 62000, &s_clock);
+    CHECK(rules_resident_alert_active(&r));
+
+    rules_on_fall_cancel(&r, "a1b2c3", 11, &s_clock);   /* both help requests still open */
+    rules_on_help_cancel(&r, "a1b2c3", 10, &s_clock);   /* the other wearable's still open */
+    rules_on_help_cancel(&r, "d4e5f6", 3, &s_clock);    /* now nothing is */
+    CHECK(s_closed_count == 3);
+    CHECK(s_open_when_closed[0] && s_open_when_closed[1] && !s_open_when_closed[2]);
+    CHECK(!rules_resident_alert_active(&r));
+}
+
 static void test_wearable_offline_and_back(void){
     rules_t r;
     setup(&r, 3, 0);
@@ -465,6 +498,7 @@ int main(void){
         { "help and cancel",                       test_help_and_cancel },
         { "help after the wearable restarts",      test_help_after_the_wearable_restarts },
         { "fall and help are separate",            test_fall_and_help_are_separate },
+        { "buzzer stops only with nothing open",   test_buzzer_stops_only_with_nothing_open },
         { "wearable offline and back",             test_wearable_offline_and_back },
         { "low battery hysteresis",                test_low_battery_hysteresis },
         { "episode ids without clock",             test_episode_ids_without_clock },

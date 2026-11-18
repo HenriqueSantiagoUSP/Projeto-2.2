@@ -479,6 +479,16 @@ bool rules_any_active(const rules_t *rules){
     return false;
 }
 
+bool rules_resident_alert_active(const rules_t *rules){
+    for (size_t i = 0; i < rules->wearable_count; i++) {
+        const rules_wearable_t *w = &rules->wearables[i];
+        if (w->fall.episode.active || w->help.episode.active) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool rules_wearable_offline(const rules_t *rules, const char *wearable){
     for (size_t i = 0; i < rules->wearable_count; i++) {
         if (strcmp(rules->wearables[i].id, wearable) == 0) {

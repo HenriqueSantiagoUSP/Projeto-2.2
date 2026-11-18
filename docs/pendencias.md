@@ -52,6 +52,12 @@ Tudo isto já está no código e compila; falta rodar na placa.
       a mão: a mensagem sai logo que muda 0,2 °C;
     - `pulseira/<id>` no primeiro heartbeat e depois a cada 5 min; desligar a pulseira por 2 min e religar: o
       `offline` sai em 90 s, e a volta é publicada no primeiro heartbeat;
+    - **correções da revisão de 2026-11-18:**
+      - a temperatura aquecida até passar de `temperatura.max` sai na hora em que cruza o limite;
+      - os sinais de vida da temperatura e da pulseira saem a cada 5 min, nunca 6;
+      - com um pedido de ajuda aberto, uma queda cancelada não cala o buzzer;
+      - uma pulseira que volta de offline com uma queda publica `pulseira/<id>` só com estado e rssi, sem a
+        atividade de antes;
     - `status` offline (Last Will) até ~45 s depois de desligar;
   - **sem peças**, cada caso dá **um** aviso no log e o resto continua:
     - Wi-Fi sem SSID ou com senha errada (o aviso diz o motivo);
@@ -99,11 +105,15 @@ Tudo isto já está no código e compila; falta rodar na placa.
     - ficar com o botão apertado por 30 s dá um pedido só; ligar a placa com o botão apertado não dá nenhum;
     - calibrar com alguém mais velho os 3 s e o intervalo de 1 s entre os toques (`menuconfig`);
     - com o hub desligado, dois toques logo depois de uma queda ainda cancelam (a `comm` estará ocupada
-      reenviando, e a task `button` mede o gesto à parte);
+      reenviando, e a task `button` mede o gesto à parte). Desde 2026-11-18, a janela conta da detecção da
+      queda, e um gesto que encontra a fila cheia guarda a hora em que aconteceu: repetir com várias quedas
+      seguidas e o hub desligado, para encher a fila;
   - **pipeline de queda na placa:**
     - no boot, a linha `fall pipeline: trigger 2.00 g, random forest, fall when P >= 0.73`;
     - balançar ou bater a placa gera `trigger at sample …: peak … g, P(fall) …`;
-    - a linha `FEAT:` traz os 23 atributos, P e o custo em ciclos (esperado: bem abaixo de 1 ms);
+    - a linha `FEAT:` traz os 23 atributos, P, `acima`, `queda` e o custo em ciclos (esperado: bem abaixo de
+      1 ms). Na demo, um disparo com `acima=1` e `queda=0` aparece como "já avisada". O perfil de demonstração
+      com o `acima` compilou em 2026-11-18, mas ainda não foi gravado: a placa não estava ligada;
     - repetir com a regressão logística (`menuconfig` → Fall classifier).
   - **paridade na placa:** passar o CSV bruto do modo de coleta pelo Python (`gatilho_causal`, atributos,
     modelo) deve dar os mesmos picos e as mesmas P das linhas `FEAT:`. Falta um script que leia o log da
@@ -115,7 +125,9 @@ Tudo isto já está no código e compila; falta rodar na placa.
     ao recolocar.
 - [ ] **MQTT da pulseira**
   - com o hub desligado, uma queda simulada chega ao Telegram "enviado pela própria pulseira";
-  - com o hub ligado, chega uma só notificação.
+  - com o hub ligado, chega uma só notificação;
+  - sem hub (MAC vazio) e com o broker parado: uma queda, um pedido de ajuda e o cancelamento esperam o broker
+    voltar e saem nessa hora (desde 2026-11-18; antes, iam só para o log).
 - [ ] **As correções de erros não tratados (2026-11-13), na bancada** (só compilaram e passaram nos testes de PC):
   - **FALL atrasada:** hub desligado, queda simulada, hub religado em ~20 s. O alerta chega uma vez só, com o
     log "FALL seq … delivered late";
@@ -297,6 +309,26 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 ## Concluído
 
 O mais recente no topo.
+
+- [x] **2026-11-18 — Correções da revisão de código** (`c607918..75291f9`; detalhes no diário):
+  - **pulseira:**
+    - um gesto que encontra a fila cheia guarda a hora;
+    - a janela da queda conta da detecção;
+    - sem hub e com MQTT, o alerta e o cancelamento esperam o broker;
+    - a FEAT traz `acima`;
+  - **hub:**
+    - o buzzer só para sem queda ou ajuda aberta;
+    - a volta de offline não republica a atividade velha;
+    - a temperatura sai ao cruzar um limite;
+    - o sinal de vida não escorrega para 6 min;
+  - **demo:** cancela só o tipo que a placa cancelou;
+  - **relatório:** a data dos preços vem da planilha.
+  - Verificado:
+    - testes de host (regras 87, `report` 28, com um erro plantado pego em cada um; os demais sem mudança);
+    - demo 26 e notificador;
+    - builds sem avisos (hub; pulseira padrão, demonstração, sem hub com MQTT, com hub e todas as opções);
+    - o script 12, sem diferença nas tabelas.
+  - Falta a bancada: os itens do hub, da pulseira e do MQTT da pulseira acima.
 
 - [x] **2026-11-17 — Disparos que sumiam na demo:**
   - **causa:** a linha FEAT era cortada pelas linhas CSV, e a demo a descartava (4 de 11 numa sessão gravada,
