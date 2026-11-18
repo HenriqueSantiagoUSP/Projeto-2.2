@@ -71,6 +71,17 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-18 — remoto do GitHub configurado
+
+- **Pedido:** configurar o repositório remoto em `https://github.com/HenriqueSantiagoUSP/Projeto-2.2.git`.
+- **Feito:** `git remote add origin` com esse endereço (branch local `master`). Nada foi enviado.
+- **Verificado:**
+  - o repositório no GitHub responde e está vazio (`git ls-remote` sem nenhuma referência), então o primeiro
+    push não tem histórico remoto para conciliar;
+  - no histórico local, nenhum `.env`, `sdkconfig`, senha ou chave;
+  - os slides de `aulas/` (16 arquivos) continuam nos commits antigos. A decisão de tirá-los antes do push
+    está em `pendencias.md`.
+
 ### 2026-11-18 — revisão do relatório do Q2 e correções
 
 - **Pedido:** revisar o relatório inteiro (melhorias, o que falta, o que está bom, se as partes se conectam) e
