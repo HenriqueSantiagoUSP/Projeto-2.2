@@ -30,7 +30,7 @@ RF07 & Ter um modo de coleta que grava as amostras brutas, para formar o conjunt
 \multicolumn{2}{@{}l}{\textit{Hub do quarto}} \\
 RF08 & Detectar toda transição de cada porta (quantidade configurável) e publicar o estado \\
 RF09 & Detectar presença e publicar o estado \\
-RF10 & Medir a temperatura a cada 60\,s (16 amostras, curva de calibração da cadeia completa) e publicá-la quando mudar 0,2\,°C ou a cada 5\,min \\
+RF10 & Medir a temperatura a cada 60\,s (16 amostras, curva de calibração da cadeia completa) e publicá-la quando mudar 0,2\,°C, quando cruzar um limite da regra ou a cada 5\,min \\
 RF11 & Executar as regras de tempo e publicar os episódios de alerta \\
 RF12 & Sinalizar o estado e os alertas por um LED \\
 RF13 & Aplicar parâmetros recebidos por MQTT sem recompilar, guardando-os na memória não volátil \\
@@ -68,6 +68,7 @@ RNF08 & Detecção de queda & sensibilidade $\ge$ 90\,\%; $\le$ 1 alarme falso p
 RNF09 & Segurança & MQTT com usuário, senha e ACL; ESP-NOW cifrado; segredos fora do repositório & revisão da configuração \\
 RNF10 & Temperatura & resolução $\le$ 0,1\,°C; exatidão $\pm$1\,°C & comparação com termopar \\
 RNF11 & Sem internet & tudo funciona na rede local, exceto o Telegram & ensaio com a internet desligada \\
+RNF12 & Proteção física & caixas IP42 no mínimo, sobretudo perto do banheiro & inspeção \\
 RNF13 & Diagnóstico & log na serial: tasks, conexões, eventos & inspeção \\
 RNF14 & Autonomia da pulseira & a definir depois de medir o consumo & medição com bateria \\
 \bottomrule

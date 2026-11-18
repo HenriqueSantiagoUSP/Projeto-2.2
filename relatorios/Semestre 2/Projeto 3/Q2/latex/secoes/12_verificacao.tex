@@ -33,14 +33,14 @@ bancada & rodando na placa, com os sensores \\
 \toprule
 Parte & Como \\
 \midrule
-Firmware do hub & testes no computador das regras de alerta (82 verificações), da configuração por MQTT (60) e do envio por mudança (23) \\
+Firmware do hub & testes no computador das regras de alerta (87 verificações), da configuração por MQTT (60) e do envio por mudança (28) \\
 Firmware da pulseira & testes no computador do pipeline de queda (885 verificações, com a paridade C $\times$ Python), do processamento de sinal (25) e dos gestos do botão (42) \\
 Mapa de pinos, chaves e MAC & pino repetido ou proibido e MAC mal escrito fazem o build falhar \\
 Modelo de queda & validação por pessoa na SisFall; paridade C $\times$ Python \\
 Central & os 5 serviços sobem; o broker recusa conexão anônima e senha errada; o simulador publicou estados e alertas, o InfluxDB gravou, as consultas do painel rodaram e o notificador formatou cada episódio \\
-Notificador e demonstração & 22 e 19 testes automáticos \\
+Notificador e demonstração & 22 e 26 testes automáticos \\
 PCB v1 & \ercViolacoes{} violações de ERC e \drcErros{} erros de DRC; encaixe e ordem dos pinos no teste no papel 1:1 \\
-Pulseira na placa & perfil de demonstração: 200\,Hz contínuos por 16\,min e $\pm$8\,g confirmado (abaixo) \\
+Pulseira na placa & perfil de demonstração: 200\,Hz contínuos por 16\,min e $\pm$8\,g confirmado; o pipeline de queda rodando na placa, com quedas detectadas (abaixo) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -51,6 +51,15 @@ Parado, $\amag$ ficou em $\approx$4077 contagens, ou seja, $\approx$1\,g na esca
 4096 contagens por g: a faixa de $\pm$8\,g está configurada. No mesmo ensaio, o programa de
 demonstração parou de atualizar quando o link USB piscou, e a leitura da serial foi corrigida
 para reabrir a porta sozinha.
+
+Em 17/11/2026, com o mesmo perfil, a placa foi solta várias vezes sobre uma almofada: o
+gatilho, os atributos e o Random Forest rodaram na placa, e as quedas apareceram na janela da
+demonstração (Figura~\ref{fig:demo}). A sessão gravada mostrou um defeito: 4 de 11 linhas com
+os atributos de uma janela chegavam cortadas pelas linhas de amostras, que outra task imprime
+ao mesmo tempo, e a demonstração as descartava, entre elas uma queda detectada. Com cada linha
+impressa de uma vez, uma nova sessão teve os 13 disparos completos. Classificar uma janela
+levou de 1,5 a 2,5\,ms na placa (o primeiro disparo é o mais lento), medidos em ciclos pelo
+próprio firmware.
 
 \subsection{Plano de testes em bancada}
 

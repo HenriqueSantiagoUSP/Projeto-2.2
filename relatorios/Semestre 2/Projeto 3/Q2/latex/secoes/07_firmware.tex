@@ -95,8 +95,9 @@ Os recursos compartilhados seguem regras simples, que evitam corridas e travamen
 
 \paragraph{Fluxo.} Tudo o que acontece no quarto vira um evento na fila do hub, e uma única
 task, a \code{hub\_task}, roda as regras e publica (Figura~\ref{fig:tasks_hub}). Por isso o
-motor de regras não precisa de travas. As mudanças de porta e de presença e cada temperatura
-saem por MQTT e pelo CAN; as mensagens da pulseira chegam pela \code{espnow\_task}, que as
+motor de regras não precisa de travas. As mudanças de porta e de presença e a temperatura,
+quando muda (Seção~\ref{sec:mqtt}), saem por MQTT e pelo CAN; as mensagens da pulseira chegam
+pela \code{espnow\_task}, que as
 valida antes (versão, tipo, tamanho, remetente pareado e reenvios).
 
 \begin{figure}[H]
@@ -246,15 +247,15 @@ queda comparam o C, janela a janela, com o Python que treinou o modelo.
 \toprule
 Componente & O que verifica & Verificações \\
 \midrule
-\code{rules} (hub) & cada regra dispara e resolve como especificado, episódios sem repetição, queda e pedido de ajuda (também depois de a pulseira reiniciar), sensores ausentes & 82 \\
+\code{rules} (hub) & cada regra dispara e resolve como especificado, episódios sem repetição, queda e pedido de ajuda (também depois de a pulseira reiniciar), o buzzer só para sem alerta aberto, sensores ausentes & 87 \\
 \code{hub\_config} (hub) & validação do JSON da configuração, recusa de valores inválidos & 60 \\
 \code{fall\_pipeline} (pulseira) & filtro, gatilho e, em 26 janelas de 8 trechos da SisFall, os mesmos picos, atributos e probabilidades do Python & 885 \\
 \code{signal\_proc} (pulseira) & buffer circular, atributos, nível de atividade & 25 \\
 \code{button\_gesture} (pulseira) & dois toques, segurar, aperto simples e médio, repique, gesto atendido com atraso, volta do contador & 42 \\
-\code{report} (as duas) & envio por mudança: limiar contado do último envio, deriva lenta, sinal de vida a cada 5\,min, RMS do resumo & 23 \\
+\code{report} (as duas) & envio por mudança: limiar contado do último envio, deriva lenta, sinal de vida a cada 5\,min mesmo com atraso da task, RMS do resumo & 28 \\
 \midrule
 notificador (central) & formatação, reenvio ao Telegram, dados inesperados & 22 testes \\
-\code{demo\_pulseira.py} & leitura da serial, reconexão, linhas estragadas, botão da placa & 19 testes \\
+\code{demo\_pulseira.py} & leitura da serial, reconexão, linhas estragadas, botão da placa, rótulo de cada disparo & 26 testes \\
 \code{modelo/} (Python) & blocos do pipeline contra os exemplos das aulas, leitura dos dados & 30 testes \\
 \bottomrule
 \end{tabular}
@@ -275,9 +276,9 @@ a floresta do modelo de queda ocupa \rfKB\,kB.
 \toprule
 Firmware & Imagem (bytes) & Partição livre & RAM interna usada \\
 \midrule
-Hub & 992\,672 & 35\,\% & 112\,135 B (32,8\,\%) \\
-Pulseira com ESP-NOW & 960\,688 & 37\,\% & 130\,615 B (38,2\,\%) \\
-Pulseira sem hub (bancada) & 383\,184 & 75\,\% & 86\,203 B (25,2\,\%) \\
+Hub & 994\,528 & 35\,\% & 112\,519 B (32,9\,\%) \\
+Pulseira com ESP-NOW & 962\,656 & 37\,\% & 130\,667 B (38,2\,\%) \\
+Pulseira sem hub (bancada) & 385\,136 & 75\,\% & 86\,239 B (25,2\,\%) \\
 \bottomrule
 \end{tabular}
 \end{table}

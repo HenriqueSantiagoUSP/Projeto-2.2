@@ -191,9 +191,6 @@ Tudo isto já está no código e compila; falta rodar na placa.
 
 ## Firmware
 
-- [ ] **Refazer a captura da janela da demo** (Seção 11.3 do relatório do Q2, hoje a Figura 34) com o firmware e
-  a demo corrigidos. A atual mostra o defeito na lista de disparos ("P 0,88 não"); hoje o mesmo caso aparece
-  como "já avisada".
 - [ ] ***Light sleep* na pulseira.** A estratégia depende do consumo medido. O mapa de pinos já deixa o botão
   e o INT do MPU em RTC GPIO e o I²C no par do ULP.
 - [ ] **Hub sem internet:** apontar `APP_SNTP_SERVER` para o NTP local quando ele existir (ver Central).
@@ -309,6 +306,18 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 ## Concluído
 
 O mais recente no topo.
+
+- [x] **2026-11-18 — Revisão do relatório do Q2 e correções** (nota da revisão: 8,5; detalhes no diário):
+  - o Resumo deixou de misturar os dois pontos de operação;
+  - a vírgula decimal nas fórmulas saía com espaço (`icomma`), e os coeficientes do filtro ficaram legíveis;
+  - trechos desatualizados: as medições a cada 60 s, a temperatura que só sai quando muda ou cruza um limite,
+    as contagens de testes, os testes no Apêndice D e o uso de memória medido de novo;
+  - o RNF12 voltou à Tabela 2;
+  - a 12.2 ganhou o ensaio de 17/11 na placa;
+  - a 11.3 não promete mais o Telegram sem o bot;
+  - a captura da demo foi refeita pelo usuário, com o firmware corrigido.
+  - Verificado: `pdflatex` sem erros, sem referência indefinida, sem caractere faltando e sem *overfull*
+    (72 páginas); as páginas mudadas conferidas na imagem, e nenhum decimal com espaço no texto do PDF.
 
 - [x] **2026-11-18 — Correções da revisão de código** (`c607918..75291f9`; detalhes no diário):
   - **pulseira:**
