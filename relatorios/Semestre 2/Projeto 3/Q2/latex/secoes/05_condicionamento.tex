@@ -123,7 +123,7 @@ cerâmico de 1\,µF ao GND, colado no pino. É um passa-baixa de primeira ordem
   \item Atenua \rcSessenta\,dB em 60\,Hz (a rede elétrica) e \rcMil\,dB em 1\,kHz, e fica abaixo
         do Nyquist das rajadas do firmware (amostras a cada 10\,ms, ou seja, 50\,Hz). A
         temperatura muda em minutos e passa inteira.
-  \item Acomoda em $\sim$\rcAssentaMs\,ms ($5\tau$), muito menos que o intervalo de 30\,s entre
+  \item Acomoda em $\sim$\rcAssentaMs\,ms ($5\tau$), muito menos que o intervalo de 60\,s entre
         medições.
   \item O capacitor fornece a carga que o capacitor de amostragem do ADC puxa a cada
         conversão, o papel do \textit{bypass} de 100\,nF recomendado pela documentação do
@@ -176,7 +176,7 @@ dos dois toques (Seção~\ref{sec:botao}).
 sensor, em 44\,Hz, antes da decimação para 200\,Hz. O segundo é um passa-baixa Butterworth de
 segunda ordem, em \bqFc\,Hz, aplicado aos 6 eixos na pulseira (Figura~\ref{fig:biquad}). Ele é um
 \textit{biquad} da biblioteca ESP-DSP (\code{dsps\_biquad\_f32}), com os coeficientes
-$\{b_0, b_1, b_2, a_1, a_2\} = \{\bqCoefs\}$, gerados pelo mesmo código Python que treina o
+$\{b_0; b_1; b_2; a_1; a_2\} = \{\bqCoefs\}$, gerados pelo mesmo código Python que treina o
 modelo de queda. Assim, o firmware filtra exatamente como o treino filtrou. Os movimentos do
 corpo ficam abaixo de $\sim$12\,Hz e passam inteiros; o filtro tira o ruído e a vibração que
 não ajudam a reconhecer uma queda.

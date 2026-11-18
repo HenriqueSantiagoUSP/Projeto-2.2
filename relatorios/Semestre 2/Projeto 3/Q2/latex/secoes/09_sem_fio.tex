@@ -163,7 +163,7 @@ Tópico & QoS & Retido & Exemplo de conteúdo & Quando \\
 \code{status} & 1 & sim & \code{\{"estado":"online", "hora":true\}} & ao conectar; \textit{Last Will}: \code{offline} \\
 \code{porta/<id>} & 1 & sim & \code{\{"estado":"aberta"\}} & a cada mudança \\
 \code{presenca} & 1 & sim & \code{\{"estado":"detectada"\}} & a cada mudança \\
-\code{temperatura} & 0 & sim & \code{\{"valor":22.5\}} & ao mudar 0,2\,°C, ou a cada 5\,min \\
+\code{temperatura} & 0 & sim & \code{\{"valor":22.5\}} & ao mudar 0,2\,°C, ao cruzar um limite da regra, ou a cada 5\,min \\
 \code{pulseira/<id>} & 1 & sim & \code{\{"estado":"online", "atividade":0.12\}} & no primeiro heartbeat, depois a cada 5\,min; \code{offline} após 90\,s \\
 \code{alerta} & 1 & não & ver abaixo & início e fim de cada episódio \\
 \code{config/aplicada} & 1 & sim & a configuração em uso & no boot e a cada \code{config/desejada} \\
@@ -184,7 +184,9 @@ recebem toda leitura, e o MQTT e o CAN, só o que traz novidade.
 \begin{itemize}
   \item \textbf{Temperatura}: medida a cada 60\,s e publicada quando muda 0,2\,°C ou mais em
         relação ao \emph{último valor enviado}, ou a cada 5\,min como sinal de vida. Comparar com o
-        último enviado, e não com a leitura anterior, faz uma deriva lenta acabar aparecendo.
+        último enviado, e não com a leitura anterior, faz uma deriva lenta acabar aparecendo. Ela
+        também sai na hora em que cruza um limite da regra (18 ou 28\,°C, por padrão), para o
+        banco ter o valor que o alerta de temperatura cita.
   \item \textbf{Pulseira}: o heartbeat continua a cada 30\,s pelo ESP-NOW, porque é ele que dá o
         \code{offline} em 90\,s; mas \code{pulseira/<id>} sai no primeiro heartbeat e depois como
         um resumo a cada 5\,min, com a atividade calculada no período. O \code{offline} sai na hora.

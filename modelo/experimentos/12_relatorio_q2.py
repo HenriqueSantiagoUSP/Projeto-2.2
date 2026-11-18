@@ -196,7 +196,9 @@ def biquad():
     f, h = signal.freqz(b, a, worN=2048, fs=FS)
     db = 20 * np.log10(np.maximum(np.abs(h), 1e-6))
     num("bqFc", br(FC_PASSA_BAIXA, 0)), num("bqFs", br(FS, 0))
-    num("bqCoefs", ", ".join(br(v, 5).replace("-", "$-$") for v in firmware))
+    # Usado dentro de uma fórmula: o sinal fica "-" (um "$-$" fecharia o modo matemático e sairia hífen), e
+    # o separador é ";", porque a vírgula já é a decimal.
+    num("bqCoefs", "; ".join(br(v, 5) for v in firmware))
     fig, ax = plt.subplots(figsize=(L, 2.5))
     ax.plot(f, db, color=LARANJA, label="biquad da pulseira (Butterworth de 2ª ordem, 20 Hz)")
     ax.axvline(FC_PASSA_BAIXA, color=LARANJA, ls="--", lw=0.9)

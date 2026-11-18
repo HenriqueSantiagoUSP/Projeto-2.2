@@ -15,7 +15,7 @@ $T = (V - \lmBetaCadeia)/\lmAlfaCadeia$ ajustada em \lmPontos{} pontos), a placa
 interface CAN (TWAI a 250\,kbit/s, identificadores \code{0x0GS}), a interface sem fio
 (ESP-NOW da pulseira ao hub, MQTT do hub à central), o firmware em FreeRTOS, a detecção de
 queda e a central. Na base SisFall, o Random Forest da pulseira dá \rfAlarmes{} alarme
-falso por hora de atividade e detecta \rfQuedas\,\% das quedas; o modelo ainda é
+falso por hora de atividade, com \rfSensEnsaio\,\% das quedas detectadas; o modelo ainda é
 provisório, porque foi treinado com o sensor na cintura. Com peças compradas no varejo,
 alimentação e caixas, um quarto (hub e pulseira) custa cerca de R\$\,\custoKit.
 

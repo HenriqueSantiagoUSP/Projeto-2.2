@@ -71,6 +71,44 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-18 — revisão do relatório do Q2 e correções
+
+- **Pedido:** revisar o relatório inteiro (melhorias, o que falta, o que está bom, se as partes se conectam) e
+  dar uma nota; depois, corrigir os itens apontados. Ficaram como estão, por decisão do usuário:
+  - "relatório final" na capa (é a convenção da sala: primeira versão do último relatório);
+  - as limitações (o que ainda não rodou em placa entra até a última iteração);
+  - os itens de prioridade baixa.
+- **Revisão:** nota 8,5. Cobertura do enunciado e profundidade técnica fortes. Os descontos foram:
+  - a coerência, com trechos desatualizados pelas mudanças recentes;
+  - a tipografia dos decimais em fórmula;
+  - a evidência medida no hardware novo, que é da entrega final.
+- **Feito:**
+  - **Resumo:** "0,55 alarme por hora, com 94,3 % das quedas" (o mesmo ponto de operação; antes juntava o
+    0,55 com os 95,1 % do critério de no máximo 1 alarme por hora);
+  - **decimais em fórmula:**
+    - `\usepackage{icomma}`: "144,739" em vez de "144, 739" (Resumo, equações 1, 2, 4 e 5);
+    - os coeficientes do filtro: o `\bqCoefs` tinha um `$-$` que, dentro da fórmula, saía como hífen. Agora
+      vai com ";" como separador, já que a vírgula é a decimal;
+  - **desatualizados:**
+    - 5.4: o intervalo entre medições passou a 60 s;
+    - 7.3: a temperatura sai quando muda;
+    - Tabelas 15 e 27: regras 87, `report` 28, demo 26;
+    - Apêndice D: os testes de `button_gesture` e `report`;
+    - a temperatura que cruza um limite em RF10, 8.3, 9.3 e na Tabela 22;
+    - Tabela 16: medida de novo com `idf.py size`. Hub 994 528 B e DIRAM 32,9 %; pulseira com ESP-NOW (build
+      de teste só com o MAC) 962 656 B e 38,2 %; sem hub 385 136 B e 25,2 %;
+  - **RNF12** (proteção física, IP42) de volta à Tabela 2: a seção de custo o citava;
+  - **12.2:** o ensaio de 17/11, com a placa solta numa almofada. O pipeline rodou na placa, as linhas
+    cortadas foram corrigidas, e classificar uma janela levou de 1,5 a 2,5 ms. A linha "Pulseira na placa"
+    da Tabela 27 também;
+  - **11.3:** o Telegram "com o bot configurado";
+  - **Figura 34:** a captura refeita pelo usuário entrou com o mesmo recorte.
+- **Verificado:**
+  - o script 12 inteiro, com só o `\bqCoefs` mudando, e os renders da PCB restaurados;
+  - `pdflatex` sem erros, sem referência indefinida, sem caractere faltando e sem *overfull* (72 páginas);
+  - na imagem: o Resumo, as equações, os coeficientes, a Tabela 2, a 12.2 e a Figura 34;
+  - no texto do PDF, nenhum decimal com espaço (só listas e referências).
+
 ### 2026-11-18 — revisão de código da leva do Q2 e correções
 
 - **Pedido:** revisar (`/code-review`) as mudanças da leva (`4262bf5..HEAD`) contra o que está decidido e procurar
