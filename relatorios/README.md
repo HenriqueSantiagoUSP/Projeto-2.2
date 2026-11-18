@@ -173,7 +173,7 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
 [`Q2/latex/main.pdf`](<Semestre 2/Projeto 3/Q2/latex/main.pdf>).
 - **Layout:** o mesmo do Q1 (capa, contracapa, `figuras/`, `imagens/`, `tabelas/`). Um arquivo por seção em
   `secoes/` e os diagramas em TikZ e circuitikz em `diagramas/`.
-- **Conteúdo** (~71 páginas):
+- **Conteúdo** (~72 páginas):
   - requisitos e arquitetura;
   - sensores, com a caracterização do LM35 e do MPU-6050;
   - condicionamento do LM35 (circuito, simulação, validação, filtro RC) e condicionamento digital;
@@ -181,7 +181,8 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
   - firmware e testes no PC;
   - interface CAN;
   - interface sem fio (ESP-NOW e MQTT);
-  - detecção de queda (resumo do Q1);
+  - detecção de queda (resumo do Q1), com a métrica explicada: de onde vêm as horas de atividade, a conta dos
+    alarmes falsos por hora e por que ela foi escolhida;
   - central;
   - o que foi verificado e o plano de testes em bancada;
   - custo do sistema: quanto custa equipar um quarto (hub e pulseira), por grupo, e o que pesa;
@@ -190,8 +191,10 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
 - **Geração:** gráficos, tabelas, números (`tabelas/numeros.tex`) e exportações da PCB saem de
   `modelo/experimentos/12_relatorio_q2.py`. Compila com `pdflatex main.tex`, duas vezes.
 - **Fotos a acrescentar:** cada uma tem um quadro tracejado com o nome do arquivo esperado. Basta salvar a foto
-  em `Q2/latex/imagens/` com esse nome e recompilar. As da PCB fabricada (cima e baixo) já estão lá (2026-11-17).
-  A lista das que faltam está no topo do `main.tex`:
-  - o monitor serial do hub com o ESP-NOW;
-  - o Grafana e o Telegram;
-  - a janela do `demo_pulseira.py`.
+  em `Q2/latex/imagens/` com esse nome e recompilar. Já estão lá as da PCB fabricada (cima e baixo), a captura do
+  painel do Grafana com o simulador e a janela do `demo_pulseira.py` (2026-11-17). Ficaram para a entrega final,
+  com as figuras comentadas no texto (instruções no topo do `main.tex`):
+  - o monitor serial do hub com o ESP-NOW (`09_sem_fio.tex`);
+  - o Telegram (`11_central.tex`). Por enquanto, o texto mostra a mensagem que o notificador montou para uma
+    queda do simulador.
+- **Repositório:** os Apêndices C e D citam `https://github.com/HenriqueSantiagoUSP/Projeto-2.2`.

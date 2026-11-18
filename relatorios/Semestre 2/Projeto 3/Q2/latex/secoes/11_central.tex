@@ -33,12 +33,14 @@ O painel ``Quartos'' mostra, para o quarto escolhido: o estado do hub (online ou
 \textit{Last Will}), a presença, a temperatura atual e o histórico, as portas, o estado da
 pulseira, a linha do tempo de portas e presença, a tabela de alertas (com a probabilidade de
 queda dada pela pulseira), a bateria e o nível de atividade da pulseira
-(Figura~\ref{fig:grafana}). As consultas foram testadas com o simulador.
+(Figura~\ref{fig:grafana}). O painel foi conferido com a central em Docker e o simulador no papel
+do hub.
 
 \begin{figure}[H]
 \centering
 \fotoouespaco{grafana_quartos}{0.95\linewidth}{captura do painel ``Quartos'' do Grafana com dados do hub (ou do simulador)}
-\caption{Painel ``Quartos'' no Grafana.}
+\caption{Painel ``Quartos'' no Grafana, com 15 minutos do simulador: uma queda, um pedido de
+ajuda, uma saída noturna e uma temperatura alta, já resolvidas as duas últimas.}
 \label{fig:grafana}
 \end{figure}
 
@@ -57,12 +59,24 @@ pelo Telegram. Ele foi feito para não perder alertas:
         programa.
 \end{itemize}
 
-\begin{figure}[H]
-\centering
-\fotoouespaco{telegram_alerta}{0.42\linewidth}{captura do celular com um alerta de queda no Telegram}
-\caption{Alerta de queda chegando ao cuidador pelo Telegram.}
-\label{fig:telegram}
-\end{figure}
+Na rodada com o simulador da Figura~\ref{fig:grafana}, a última queda virou esta mensagem:
+\begin{lstlisting}
+ALERTA: Queda detectada
+Quarto quarto101 (butanta)
+Pico de |a|²: 6.33 g²; confiança do modelo: 76 %
+17/11 21:42:17
+\end{lstlisting}
+O cancelamento e a resolução chegam do mesmo jeito, com o estado no lugar de ``ALERTA''. Sem o
+token do bot no \code{.env}, o notificador só imprime a mensagem no log, como nessa rodada; com o
+bot configurado, é ela que chega ao celular do cuidador.
+
+% Entrega final: precisa do bot do Telegram configurado (docs/pendencias.md).
+% \begin{figure}[H]
+% \centering
+% \fotoouespaco{telegram_alerta}{0.42\linewidth}{captura do celular com um alerta de queda no Telegram}
+% \caption{Alerta de queda chegando ao cuidador pelo Telegram.}
+% \label{fig:telegram}
+% \end{figure}
 
 \subsection{Demonstração com uma placa}\label{sec:demo}
 
@@ -76,7 +90,10 @@ reabre a porta sozinha.
 
 \begin{figure}[H]
 \centering
-\fotoouespaco{demo_pulseira}{0.85\linewidth}{janela do demo\_pulseira.py durante uma queda simulada}
-\caption{A janela da demonstração com uma placa.}
+% Captura de tela a 144 dpi (1 px = 0,5 pt): o corte tira a barra de título da janela,
+% em cima, e os avisos e a barra de ferramentas, embaixo.
+\includegraphics[width=\linewidth, trim=0 48 0 18, clip]{imagens/demo_pulseira.png}
+\caption{A janela da demonstração com uma placa: uma queda detectada (P = 0,99), com os atributos
+da última janela e os últimos disparos.}
 \label{fig:demo}
 \end{figure}

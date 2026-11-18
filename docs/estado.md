@@ -71,6 +71,66 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-17 — relatório do Q2 sem os quadros de foto vazios; link do GitHub nos apêndices
+
+- **Pedido:**
+  - tirar do relatório os quadros das fotos que não entraram (ESP-NOW e Telegram, adiadas para a entrega
+    final) e ajustar o texto para fazer sentido sem elas;
+  - pôr no Apêndice C o link do repositório no GitHub.
+- **Feito:**
+  - **as duas figuras** ficaram comentadas no código, com o motivo e as instruções para voltarem (topo do
+    `main.tex`):
+    - **ESP-NOW (`09_sem_fio.tex`):** estava solta no fim de "Segurança", e nenhum texto a citava; o texto
+      ficou como estava;
+    - **Telegram (`11_central.tex`):** no lugar da foto entrou a mensagem que o notificador montou para a
+      última queda da rodada com o simulador (a das 21:42:17, a mesma do topo da tabela da Figura 33). Uma
+      frase diz que, sem o token do bot, ela só vai para o log, e que com o bot é ela que chega ao celular. Para
+      o "²" da mensagem, a regra de acentos das listagens ganhou o `²`;
+  - **link do GitHub:**
+    - **Apêndice C:** está na frase que diz onde ficam os links dos preços, junto com o projeto do KiCad, a
+      lista de materiais e os Gerbers. Um parágrafo próprio antes do "Custo item por item" empurrava a tabela
+      de custo para a página seguinte e deixava meia página em branco (73 páginas);
+    - **Apêndice D:** "Tudo está no repositório do projeto" passou a mostrar o link, centralizado.
+  - **pendências:** o repositório local não tem remoto. O item "Cópia fora deste PC" agora diz que os caminhos
+    citados têm de estar no GitHub antes da entrega.
+- **Verificado:** `pdflatex` no lugar sem erros, sem referência indefinida, sem caractere faltando e sem
+  *overfull* (72 páginas); nenhum "Inserir foto" no PDF; o link aparece nos dois apêndices; as páginas do
+  notificador e dos Apêndices C e D conferidas na imagem.
+
+### 2026-11-17 — a métrica de alarmes falsos por hora explicada no relatório do Q2; fotos adiadas
+
+- **Pedido:**
+  - explicar melhor, na parte de processamento, a métrica de alarmes falsos por hora de atividade: quais são
+    essas horas, como se chega às contas e por que é uma boa métrica;
+  - deixar para a entrega final as fotos do ESP-NOW (só uma placa em mãos) e do Telegram (o bot ainda não
+    existe), porque esta entrega é provisória.
+- **Feito:**
+  - **relatório:** a nova Seção 10.4, "A métrica: alarmes falsos por hora de atividade", entre o pipeline e a
+    comparação. Ela tem:
+    - **as horas:** os 2707 ensaios sem queda da SisFall somam 14,5 h, e a Tabela 23 mostra de quais grupos
+      de atividade elas vêm (andar e correr são 29 %). São horas só de movimento, escolhido para parecer queda;
+    - **a conta do Random Forest:** 10 939 janelas de atividade (753/h); limiar no ponto que deixa 95 % das
+      1784 janelas de impacto acima dele; 8 alarmes ÷ 14,5 h ≈ 0,55/h, com 94,3 % das quedas; e a coluna
+      "≤ 1 alarme/h" (14 alarmes admitidos → 95,1 %);
+    - **por que essa métrica:** é o que custa na ILPI; a especificidade de 99,93 % por janela engana, porque
+      depende de quantas janelas o gatilho abre; compara métodos com janelas diferentes; vem sempre com a
+      fração das quedas; e liga ao RNF08 (≤ 1/dia ⇒ até 1,8 h/dia de movimento como o da SisFall);
+    - **os limites:** ensaios encenados, sensor na cintura, e o pulso tem movimentos que a cintura não vê.
+
+    A Comparação e a introdução da seção apontam para ela, e o item "Dados" passou a usar os números gerados;
+  - **script** `12_relatorio_q2.py`: a nova `tabela_horas_atividade()` lê a SisFall e gera
+    `tabelas/horas_atividade.tex` e os números da conta (`\adlHoras`, `\adlJanelas`, `\rfAlarmesN`,
+    `\rfSensEnsaio`, `\rfEspecJanela`, `\alarmesPermitidos`, `\rnfHorasDia` e outros). Ela confere que as
+    horas batem com os disparos por hora do `09` e que os alarmes dão um número inteiro de janelas. As partes
+    da tabela fecham em 100 % (maiores restos);
+  - **tipografia:** os números com vírgula dentro de fórmula (o limiar e o gatilho, também no RF02) passaram a
+    `\text{}`, para não sair "0, 73";
+  - **pendências:** as fotos do ESP-NOW e do Telegram foram para a entrega final, ligadas aos itens de
+    bancada de que dependem.
+- **Verificado:** o script inteiro rodou (68 números), e os renders da PCB que ele refez foram restaurados do
+  commit; `pdflatex` sem erros, sem referência indefinida e sem *overfull* (72 páginas); as páginas 49 a 51
+  conferidas na imagem.
+
 ### 2026-11-17 — quedas "não acionadas" na demo: linha FEAT cortada e espera depois de uma queda
 
 - **Pedido:** na demo, um disparo com P = 0,88 saiu como "não é queda" (o limiar é 0,73), picos acima do
@@ -104,6 +164,17 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     (`trigger at sample`) chegaram com a FEAT inteira, nenhum texto emendado e nenhuma das 10 239 linhas CSV
     quebrada. O leitor da demo aceitou as 13 linhas: 5 quedas, 4 já avisadas e 4 abaixo do limiar. Uma das
     que ficaram abaixo foi um pico de 10,2 g com P = 0,69, decisão do modelo, que ainda é provisório.
+
+### 2026-11-17 — janela da demo no relatório do Q2
+
+- **Pedido:** compilar o relatório com a captura da janela do `demo_pulseira.py` que o usuário tirou
+  (`imagens/demo_pulseira.png`, 1917 × 1197 px a 144 dpi).
+- **Feito:** a Figura 36 (seção 11.3) usa a captura direto, na largura do texto, com um corte no próprio LaTeX
+  (`trim`, sem mexer no arquivo). O corte tira a barra de título da janela, em cima, e os avisos da placa e a
+  barra de ferramentas do matplotlib, embaixo. A legenda cita a queda detectada (P = 0,99). A demo saiu da
+  lista de fotos pendentes.
+- **Verificado:** `pdflatex` sem erros, sem referência indefinida e sem *overfull* (71 páginas); a página da
+  figura conferida na imagem.
 
 ### 2026-11-17 — central em Docker com o simulador e captura do Grafana para o relatório
 

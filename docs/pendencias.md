@@ -14,14 +14,24 @@ Pedidos e prazos em [`relatorios/README.md`](../relatorios/README.md), Projeto 3
 
 - [ ] **Q2 (17/11):** relatório com sensores, condicionamento de sinais, interface CAN, interface sem fio e a
   placa desenvolvida (primeira interação de entrega).
-  - Pronto: o relatório final, em `relatorios/Semestre 2/Projeto 3/Q2/latex/` (68 páginas, com os gestos do
-    botão desde 2026-11-17).
+  - Pronto: o relatório final, em `relatorios/Semestre 2/Projeto 3/Q2/latex/` (72 páginas, com os gestos do
+    botão, as fotos da PCB fabricada, a seção de custo e a explicação da métrica de alarmes falsos desde
+    2026-11-17).
   - Falta:
     - a revisão do grupo;
-    - as fotos nos quadros tracejados: a PCB fabricada, o monitor serial do ESP-NOW, o Grafana, o Telegram e a
-      demo. A lista está no topo do `main.tex`. Saíram do relatório (2026-11-17) a PCB montada e a bancada CAN,
-      porque ainda faltam componentes para montar a placa, e a pulseira no pulso, porque o protótipo é a placa
-      2 em 1, não uma pulseira pronta;
+    - **para a entrega final** (decidido em 2026-11-17: esta entrega é provisória, e o grupo revisa e completa
+      depois), as duas fotos que faltam. As figuras foram tiradas desta entrega: os blocos estão comentados no
+      `09_sem_fio.tex` e no `11_central.tex`. Para voltar, basta salvar a foto em `imagens/` e tirar o `%`
+      (instruções no topo do `main.tex`):
+      - **monitor serial do hub recebendo a pulseira por ESP-NOW** (`imagens/serial_espnow`): precisa das duas
+        placas gravadas e pareadas, e hoje só uma está em mãos. Depende dos itens "Hub gravado e conferido" e
+        "Pulseira gravada e conferida" da bancada;
+      - **alerta de queda no Telegram** (`imagens/telegram_alerta`): depende do item "Bot do Telegram" da
+        bancada. Com o bot no `.env`, o simulador ou a demo levam a queda ao celular.
+
+      Já entraram as da PCB fabricada, a captura do Grafana com o simulador e a janela da demo (2026-11-17).
+      Saíram do relatório (2026-11-17) a PCB montada e a bancada CAN, porque ainda faltam componentes para
+      montar a placa, e a pulseira no pulso, porque o protótipo é a placa 2 em 1, não uma pulseira pronta;
     - preencher `\docentes`, se o grupo quiser.
 - [ ] **Q3 (24/11):** apresentação em sala da comunicação sem fio funcionando com os sensores. Depende da
   bancada abaixo: pulseira → ESP-NOW → hub → MQTT → central.
@@ -169,6 +179,9 @@ Tudo isto já está no código e compila; falta rodar na placa.
 
 ## Firmware
 
+- [ ] **Refazer a captura da janela da demo** (Seção 11.3 do relatório do Q2, hoje a Figura 34) com o firmware e
+  a demo corrigidos. A atual mostra o defeito na lista de disparos ("P 0,88 não"); hoje o mesmo caso aparece
+  como "já avisada".
 - [ ] ***Light sleep* na pulseira.** A estratégia depende do consumo medido. O mapa de pinos já deixa o botão
   e o INT do MPU em RTC GPIO e o I²C no par do ULP.
 - [ ] **Hub sem internet:** apontar `APP_SNTP_SERVER` para o NTP local quando ele existir (ver Central).
@@ -258,6 +271,10 @@ Tudo isto já está no código e compila; falta rodar na placa.
   disco.
 - [ ] **Cópia fora deste PC:** o repositório não tem remoto, e os commits estão só neste disco. Decidir onde
   hospedar (GitHub privado do grupo, por exemplo) e fazer o primeiro push.
+  - **Desde 2026-11-17, o relatório do Q2 cita `https://github.com/HenriqueSantiagoUSP/Projeto-2.2`**
+    (Apêndices C e D). Os caminhos citados, `hardware/fontes/esquematico/` e `hardware/placas/v1/` (com a
+    `custo-estimado.csv`, ainda sem commit), têm de estar lá antes da entrega. O repositório precisa estar
+    público, ou aberto a quem corrige.
   - Antes do primeiro push, decidir se `aulas/` (14 MB de PDFs) sai também do histórico: ela saiu do git em
     2026-11-16, mas continua nos commits antigos. Apagar exige reescrever o histórico.
 - [ ] **Fim de linha na cópia de trabalho:** o `core.autocrlf=true` do sistema faz o checkout em CRLF (o

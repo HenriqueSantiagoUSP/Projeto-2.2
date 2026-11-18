@@ -9,7 +9,7 @@ computador, e descreve a versão que roda na pulseira.
 O primeiro detector da pulseira era um limiar: queda quando $\amag$ passa de 2,5\,g. Ele pega
 as quedas, mas também correr, pular, subir escada depressa e sentar com força. Na base
 pública SisFall, com o sensor na faixa da pulseira, esse limiar deu \textbf{69,9 alarmes falsos
-por hora} de atividade. O que separa uma queda de uma corrida não é o tamanho do pico, e sim
+por hora} de atividade (a métrica está na Seção~\ref{sec:metrica}). O que separa uma queda de uma corrida não é o tamanho do pico, e sim
 o que vem antes e depois dele: a queda livre ($\amag$ abaixo de 1\,g) logo antes do impacto e,
 depois, o corpo parado em outra posição (Figura~\ref{fig:janela}).
 
@@ -17,8 +17,8 @@ depois, o corpo parado em outra posição (Figura~\ref{fig:janela}).
 
 \begin{itemize}
   \item \textbf{SisFall}~\cite{sisfall}: \sisPessoas{} pessoas (23 jovens e 15 idosos), 4505
-        ensaios a 200\,Hz, com o sensor na cintura: 2707 atividades de 19 tipos (14,5\,h) e
-        1798 quedas de 15 tipos. Os sinais foram saturados em $\pm$8\,g para imitar a
+        ensaios a 200\,Hz, com o sensor na cintura: \adlEnsaios{} atividades de \adlTipos{} tipos
+        (\adlHoras\,h) e \quedasEnsaios{} quedas de 15 tipos. Os sinais foram saturados em $\pm$8\,g para imitar a
         pulseira.
   \item \textbf{Nossos ensaios}: os 18 do primeiro semestre (Seção~\ref{sec:mpu}), na cintura e
         em $\pm$2\,g, usados só como teste.
@@ -56,14 +56,94 @@ impacto e o corpo parado em outra posição (a gravidade muda de eixo).}
 \label{fig:janela}
 \end{figure}
 
+\subsection{A métrica: alarmes falsos por hora de atividade}\label{sec:metrica}
+
+Um detector de queda erra de dois jeitos: deixa passar uma queda, ou chama o cuidador sem que
+ninguém tenha caído. O primeiro erro se mede pela fração das quedas detectadas. O segundo, pelos
+\textbf{alarmes falsos por hora de atividade}: quantas vezes o sistema chamaria o cuidador à toa
+a cada hora em que o residente está se movimentando. As duas medidas andam juntas: baixar o
+limiar pega mais quedas e dá mais alarmes, e subir faz o contrário.
+
+\paragraph{Que horas são essas.} São as \adlHoras\,h de atividades da SisFall: os
+\adlEnsaios{} ensaios sem queda, de \adlTipos{} tipos, feitos pelas \sisPessoas{} pessoas
+(Tabela~\ref{tab:horas_atividade}). Cada tipo de ensaio tem uma duração prevista, de 100\,s
+para andar e correr a 12\,s para os movimentos curtos, como sentar, deitar e agachar, e a soma
+das durações de todos os ensaios é o denominador. São horas só de movimento, e de movimentos escolhidos para parecer queda: correr,
+descer escada depressa, sentar de uma vez numa cadeira baixa, desabar na cadeira, tropeçar e
+pular. Ficam de fora as horas paradas de um dia real, como dormir, comer e ver televisão, em
+que o gatilho quase não dispara. Por isso, uma hora de atividade da SisFall gera mais alarmes
+que uma hora qualquer do dia.
+
+\begin{table}[H]
+\centering
+\caption{As horas de atividade da SisFall, o denominador da métrica.}
+\label{tab:horas_atividade}
+\small
+\input{tabelas/horas_atividade}
+\end{table}
+
+\paragraph{A conta.} Para o Random Forest da pulseira (Seção~\ref{sec:rf_pulseira}):
+\begin{enumerate}
+  \item Cada janela recebe a probabilidade dada por um modelo treinado sem a pessoa dela
+        (validação cruzada por pessoa, em 5 dobras). Assim, o resultado vale para alguém que o
+        modelo nunca viu.
+  \item O gatilho abre \adlJanelas{} janelas nas atividades, \gatilhoDisparosH{} por hora, e
+        \impactos{} janelas de impacto nas \quedasEnsaios{} quedas.
+  \item O limiar é o que deixa 95\,\% das janelas de impacto acima dele: $P \ge \text{\rfLimiar}$.
+  \item Com esse limiar, \rfAlarmesN{} das \adlJanelas{} janelas de atividade passam como
+        queda. São os alarmes falsos:
+        \[
+          \frac{\text{\rfAlarmesN{} alarmes falsos}}{\text{\adlHoras\,h de atividade}}
+          \approx \text{\rfAlarmes{} alarme falso por hora.}
+        \]
+  \item Nesse ponto, o modelo detecta \rfSensEnsaio\,\% das quedas. A conta é por queda, e não
+        por janela: entram também as quedas que o gatilho perdeu, e por isso o número fica abaixo
+        dos 95\,\%.
+\end{enumerate}
+A coluna ``Quedas com $\le$1 alarme/h'' da Tabela~\ref{tab:modelos_pulseira} faz a pergunta ao
+contrário. Se o cuidador aceitar até um alarme falso por hora de atividade, ou seja,
+\alarmesPermitidos{} nas \adlHoras\,h, o limiar pode descer até ficarem só
+\alarmesPermitidos{} janelas de atividade acima dele. Quantas quedas passam então? Para o
+Random Forest, \rfQuedas\,\%.
+
+\paragraph{Por que essa métrica.}
+\begin{itemize}
+  \item \textbf{Mede o que custa na ILPI.} Cada alarme falso tira o cuidador de outro
+        residente. Com alarmes demais, a equipe deixa de acreditar no sistema, e a queda de
+        verdade também fica sem resposta. Contado por hora, o número vira alarmes por dia e por
+        plantão: basta multiplicar pelas horas de atividade e pelo número de residentes.
+  \item \textbf{Não engana como a acurácia.} Quase todas as janelas são de atividade, e um
+        detector que nunca chama acerta quase todas elas. A especificidade por janela também
+        engana. A do Random Forest é de \rfEspecJanela\,\%, o que parece perfeito, mas o número
+        de alarmes depende de quantas janelas o gatilho abre: com o mesmo acerto por janela, um
+        gatilho que abrisse dez vezes mais janelas daria dez vezes mais alarmes. Contados por
+        hora, os alarmes já levam o gatilho em conta.
+  \item \textbf{Compara métodos diferentes.} O AR, o DTW, a rede convolucional e os
+        classificadores de atributos olham janelas de tamanhos diferentes, abertas em momentos
+        diferentes. Dividir pelo tempo põe todos na mesma unidade.
+  \item \textbf{Vem sempre com as quedas detectadas.} Zero alarme é fácil: basta nunca chamar.
+        Por isso os métodos são comparados no mesmo ponto, o limiar que deixa 95\,\% das
+        janelas de impacto acima dele, como num ponto da curva ROC.
+  \item \textbf{Liga ao requisito.} O RNF08 pede no máximo um alarme falso por dia por
+        residente (Tabela~\ref{tab:rnf}). Com \rfAlarmes{} alarme por hora de atividade, a conta
+        fecha enquanto o residente tiver até \rnfHorasDia\,h por dia de movimento parecido com o
+        da SisFall.
+\end{itemize}
+
+\paragraph{Limites.} A conta vale para os ensaios da SisFall: curtos, encenados em laboratório
+e com o sensor na cintura. No pulso, o braço faz movimentos que a cintura não vê, como
+gesticular e bater a mão na mesa, e eles também podem disparar o gatilho. A conversão para
+alarmes por dia dá só a ordem de grandeza. A medida que vale é a do uso contínuo da pulseira,
+prevista na verificação do RNF08.
+
 \subsection{Comparação}
 
 O Q1 comparou 22 métodos: os das aulas (modelos autorregressivos AR e ARX, correlação com
 sinais de referência, DTW, atributos no tempo e em frequência, distâncias) e os usuais na
 literatura (regras, regressão logística, árvore, SVM, Random Forest e redes convolucionais).
 A avaliação é por pessoa: nenhuma pessoa aparece no treino e no teste ao mesmo tempo. A métrica
-é o número de alarmes falsos por hora de atividade com cerca de 94\,\% das quedas detectadas
-(Figura~\ref{fig:resumo}). O AR descreve bem a atividade normal, mas, usado como detector de
+é a da Seção~\ref{sec:metrica}: alarmes falsos por hora de atividade, com cerca de 94\,\% das
+quedas detectadas (Figura~\ref{fig:resumo}). O AR descreve bem a atividade normal, mas, usado como detector de
 anomalia, dispara em qualquer movimento brusco; os métodos de atributos com um classificador
 foram muito melhores.
 
@@ -75,7 +155,7 @@ fração de quedas detectadas entre parênteses. Cenário A: $\pm$8\,g, como a p
 \label{fig:resumo}
 \end{figure}
 
-\subsection{O modelo da pulseira}
+\subsection{O modelo da pulseira}\label{sec:rf_pulseira}
 
 Na configuração exata da pulseira (gatilho causal, os \nAtributos{} atributos no tempo,
 $\pm$8\,g), três classificadores ficaram na disputa (Tabela~\ref{tab:modelos_pulseira}). As
@@ -101,7 +181,7 @@ firmware se ganhasse com folga, porque exigiria outro classificador em C e outro
 \end{figure}
 
 O modelo tem 60 árvores de profundidade até 10 (\rfNos{} nós) e decide queda quando
-$P \ge \rfLimiar$. No pipeline completo, sobre toda a SisFall, ele dá \rfAlarmes{} alarme falso
+$P \ge \text{\rfLimiar}$. No pipeline completo, sobre toda a SisFall, ele dá \rfAlarmes{} alarme falso
 por hora de atividade e detecta \rfQuedas\,\% das quedas com no máximo um alarme falso por hora
 (Figura~\ref{fig:funil}).
 
