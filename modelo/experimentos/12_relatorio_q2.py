@@ -18,8 +18,9 @@ Gera em Q2/latex/figuras/:
   esquema em PNG, recortada no circuito (pdftoppm).
 
 E em Q2/latex/tabelas/: a lista de materiais, o custo estimado do kit de um quarto (de
-hardware/placas/v1/custo-estimado.csv), a comparação dos modelos da pulseira e numeros.tex (macros com os
-números do texto que vêm de dados: ajuste do LM35, modelo, DRC/ERC, contagens, custo).
+hardware/placas/v1/custo-estimado.csv), a comparação dos modelos da pulseira, as horas de atividade da
+SisFall por grupo (o denominador dos alarmes falsos por hora) e numeros.tex (macros com os números do texto que
+vêm de dados: ajuste do LM35, modelo e a conta da métrica, DRC/ERC, contagens, custo).
 """
 
 import csv
@@ -36,7 +37,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 
-from queda.dados import carregar_proprios
+from queda.dados import carregar_proprios, carregar_sisfall
 from queda.pipeline import FC_PASSA_BAIXA, FS, coeficientes_passa_baixa
 
 RAIZ = _comum.RAIZ_MODELO.parent
@@ -505,6 +506,78 @@ def tabela_modelos():
     print("   modelos_pulseira.tex")
 
 
+# As 19 atividades da SisFall em grupos, para mostrar de onde vêm as horas do denominador da métrica.
+GRUPOS_ATIVIDADE = [
+    ("Andar e correr", ("D01", "D02", "D03", "D04")),
+    ("Subir e descer escada", ("D05", "D06")),
+    ("Sentar e levantar da cadeira", ("D07", "D08", "D09", "D10", "D11")),
+    ("Deitar e virar na cama", ("D12", "D13", "D14")),
+    ("Agachar e curvar", ("D15", "D16")),
+    ("Entrar e sair do carro", ("D17",)),
+    ("Tropeçar e pular", ("D18", "D19")),
+]
+
+
+def milhar(n):
+    """Inteiro com o espaço fino de milhar a partir de 10 000, como no resto do texto (4505, 12 723)."""
+    return f"{n:,}".replace(",", "\\,") if n >= 10_000 else str(n)
+
+
+def tabela_horas_atividade():
+    """
+    A métrica dos alarmes falsos por hora de atividade, passo a passo:
+    - o denominador: as horas dos ensaios sem queda da SisFall, por grupo de atividade;
+    - a conta do Random Forest da pulseira: as janelas que o gatilho abre, os alarmes falsos no limiar e as quedas
+      detectadas.
+    """
+    ensaios = carregar_sisfall()
+    adl = [e for e in ensaios if not e.queda]
+    horas = sum(e.duracao_s for e in adl) / 3600
+    codigos = {e.codigo for e in adl}
+    agrupados = {c for _, cs in GRUPOS_ATIVIDADE for c in cs}
+    assert codigos == agrupados, f"atividades fora dos grupos: {sorted(codigos ^ agrupados)}"
+
+    vest = json.loads((R / "pulseira.json").read_text(encoding="utf-8"))
+    rf = vest["rf"]
+    janelas_adl = vest["janelas"] - vest["impactos"]
+    # O 09 calculou os disparos por hora com estas mesmas horas: se não baterem, os dados mudaram.
+    assert abs(janelas_adl / horas - vest["gatilho_disparos_h"]) < 0.01, "horas de atividade diferentes das do 09"
+    alarmes = rf["alarmes_h"] * horas
+    assert abs(alarmes - round(alarmes)) < 1e-6, "alarmes falsos deveriam ser um número inteiro de janelas"
+    alarmes = round(alarmes)
+
+    num("adlHoras", br(horas, 1)), num("adlEnsaios", milhar(len(adl))), num("adlTipos", str(len(codigos)))
+    num("quedasEnsaios", milhar(len(ensaios) - len(adl))), num("adlJanelas", milhar(janelas_adl))
+    num("impactos", milhar(vest["impactos"])), num("rfAlarmesN", str(alarmes))
+    num("rfSensEnsaio", br(rf["sens_ensaio"] * 100, 1))
+    num("rfEspecJanela", br((1 - alarmes / janelas_adl) * 100, 2))
+    num("alarmesPermitidos", str(int(np.floor(horas))))
+    num("rnfHorasDia", br(1 / rf["alarmes_h"], 1))
+
+    grupos = []
+    for nome, cs in GRUPOS_ATIVIDADE:
+        grupo = [e for e in adl if e.codigo in cs]
+        grupos.append((nome, cs, grupo, sum(e.duracao_s for e in grupo) / 3600))
+    # Partes inteiras que somam 100 (maiores restos): arredondadas uma a uma, dariam 101 %.
+    exatas = [100 * h / horas for *_, h in grupos]
+    partes = [int(p) for p in exatas]
+    for i in sorted(range(len(exatas)), key=lambda i: exatas[i] - partes[i], reverse=True)[:100 - sum(partes)]:
+        partes[i] += 1
+    corpo = []
+    for (nome, cs, grupo, h), parte in zip(grupos, partes):
+        cada = round(float(np.median([e.duracao_s for e in grupo])))
+        tipos = cs[0] if len(cs) == 1 else f"{cs[0]}--{cs[-1]}"
+        corpo.append(f"{nome} & {tipos} & {milhar(len(grupo))} & {cada} & {br(h, 1)} & {parte}\\,\\% \\\\")
+    (TAB / "horas_atividade.tex").write_text(
+        "% Gerado por modelo/experimentos/12_relatorio_q2.py a partir da SisFall (dados/publicos)\n"
+        "\\begin{tabular}{@{}l l r r r r@{}}\n\\toprule\n"
+        "Atividades & Tipos & Ensaios & \\makecell[r]{Cada ensaio\\\\(s)} & Horas & Parte \\\\\n\\midrule\n"
+        + "\n".join(corpo) + "\n\\midrule\n"
+        f"\\textbf{{Total}} & {len(codigos)} tipos & {milhar(len(adl))} & & \\textbf{{{br(horas, 1)}}} & 100\\,\\% \\\\\n"
+        "\\bottomrule\n\\end{tabular}\n", encoding="utf-8", newline="\n")
+    print("   horas_atividade.tex")
+
+
 def gravar_numeros():
     corpo = "\n".join(f"\\newcommand{{\\{k}}}{{{v}}}" for k, v in sorted(numeros.items()))
     (TAB / "numeros.tex").write_text(
@@ -528,6 +601,7 @@ def main():
     tabela_bom()
     tabela_custo()
     tabela_modelos()
+    tabela_horas_atividade()
     gravar_numeros()
 
 

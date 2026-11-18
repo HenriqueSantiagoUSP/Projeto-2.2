@@ -115,7 +115,9 @@ e a pulseira, cada um numa PCB v1 só com as peças da sua função, mais os sen
 alimentação e as caixas.
 
 Os preços são do varejo brasileiro, por unidade, consultados nos sites das lojas em
-\custoData{}, sem frete; os links estão em \code{hardware/placas/v1/custo-estimado.csv}. Uma
+\custoData{}, sem frete; os links estão em \code{hardware/placas/v1/custo-estimado.csv}, no
+repositório do projeto (\url{https://github.com/HenriqueSantiagoUSP/Projeto-2.2}), junto com o
+projeto do KiCad, a lista de materiais e os Gerbers. Uma
 peça vendida em pacote entra pelo preço de uma unidade. Duas linhas são estimativas
 ($\approx$). Uma é o capacitor de poliéster. A outra é a PCB: a JLCPCB cobra US\$\,2 pelas cinco
 placas, mas o frete até o Brasil e os impostos só aparecem no pedido. A conta usa frete de cerca
@@ -133,7 +135,11 @@ protótipo, a pulseira é a mesma placa de $100 \times 60$\,mm, numa caixa igual
 %======================================================================
 \section{Como reproduzir}\label{ap:reproducao}
 %======================================================================
-Tudo está no repositório do projeto. Os comandos abaixo partem da raiz dele.
+Tudo está no repositório do projeto:
+\begin{center}
+\url{https://github.com/HenriqueSantiagoUSP/Projeto-2.2}
+\end{center}
+Os comandos abaixo partem da raiz dele.
 
 \paragraph{Firmware} (ESP-IDF 6.0.1, alvo \code{esp32s3}). Os comandos rodam na pasta da
 placa: \code{firmware/room} para o hub e \code{firmware/gadget} para a pulseira.

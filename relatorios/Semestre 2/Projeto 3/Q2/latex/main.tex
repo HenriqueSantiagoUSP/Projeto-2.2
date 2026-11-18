@@ -10,12 +10,12 @@
 %  modelo/experimentos/12_relatorio_q2.py; renders e camadas da PCB, do kicad-cli,
 %  pelo mesmo script. Os diagramas ficam em diagramas/ (TikZ), um por arquivo.
 %
-%  FOTOS A ACRESCENTAR: salve em imagens/ com estes nomes (.jpg ou .png) e
-%  recompile; enquanto o arquivo não existe, aparece um quadro tracejado.
-%    serial_espnow           monitor serial do hub recebendo a pulseira por ESP-NOW
-%    grafana_quartos         painel "Quartos" do Grafana com dados
-%    telegram_alerta         alerta de queda chegando no Telegram
-%    demo_pulseira           janela do demo_pulseira.py durante uma queda
+%  FOTOS DA ENTREGA FINAL: as figuras abaixo estão comentadas no texto, porque
+%  esta entrega é provisória. Salve a foto em imagens/ com o nome (.jpg ou .png),
+%  tire o % do bloco da figura e recompile.
+%    serial_espnow     secoes/09_sem_fio.tex   hub recebendo a pulseira por ESP-NOW
+%    telegram_alerta   secoes/11_central.tex   alerta de queda chegando no Telegram
+%  Sem o arquivo, \fotoouespaco desenha um quadro tracejado no lugar da foto.
 % ============================================================
 \documentclass[12pt,a4paper]{article}
 
@@ -85,7 +85,8 @@
   xleftmargin=2pt, xrightmargin=2pt,
   aboveskip=6pt, belowskip=6pt,
   literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ã}{{\~a}}1 {õ}{{\~o}}1
-           {ç}{{\c{c}}}1 {ê}{{\^e}}1 {â}{{\^a}}1 {ô}{{\^o}}1 {à}{{\`a}}1 {|}{{\textbar}}1,
+           {ç}{{\c{c}}}1 {ê}{{\^e}}1 {â}{{\^a}}1 {ô}{{\^o}}1 {à}{{\`a}}1 {|}{{\textbar}}1
+           {²}{{\textsuperscript{2}}}1,
 }
 \lstdefinelanguage{json}{
   morestring=[b]",
