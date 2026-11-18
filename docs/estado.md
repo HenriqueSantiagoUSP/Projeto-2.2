@@ -71,6 +71,30 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-18 — `aulas/` fora do histórico do git
+
+- **Pedido:** tirar a pasta `aulas/` (slides da disciplina) de todos os commits antes do primeiro push.
+- **Feito:**
+  - **cópia de segurança:** um *bundle* com todas as referências, conferido com `git bundle verify`, no
+    scratchpad da sessão;
+  - **reescrita:** `git filter-branch --index-filter 'git rm -r --cached --ignore-unmatch aulas'` na `master`.
+    Os 32 commits continuam; os 27 a partir do que adicionou `aulas/` ganharam hash novo;
+  - **segunda passada (`--msg-filter`):** a única mensagem de commit que citava hashes antigos, a das
+    correções da revisão de código, passou a citar os novos;
+  - **limpeza:** as referências velhas em `refs/original/` foram apagadas (inclusive uma de uma reescrita
+    antiga, de `fix/build-and-naming`), com `reflog expire` e `gc --aggressive --prune=now`. A `.git` caiu de
+    129 MB para 55 MB;
+  - **citações de hash** no diário e nas pendências trocadas pelas novas:
+    - `9a17edd` → `14f70f3`;
+    - `4262bf5` → `6670531`;
+    - `c607918` → `21cb342`;
+    - `75291f9` → `c8b0ed9`.
+- **Verificado:**
+  - nenhum caminho `aulas/` em commit ou objeto do repositório;
+  - a árvore do último commit é a mesma de antes (`a49fb06…`), então o conteúdo não mudou;
+  - `git fsck` sem erros, só a `master` como referência, e o remoto `origin` mantido;
+  - a pasta `aulas/` continua no disco, fora do git (`.gitignore`).
+
 ### 2026-11-18 — remoto do GitHub configurado
 
 - **Pedido:** configurar o repositório remoto em `https://github.com/HenriqueSantiagoUSP/Projeto-2.2.git`.
@@ -122,7 +146,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ### 2026-11-18 — revisão de código da leva do Q2 e correções
 
-- **Pedido:** revisar (`/code-review`) as mudanças da leva (`4262bf5..HEAD`) contra o que está decidido e procurar
+- **Pedido:** revisar (`/code-review`) as mudanças da leva (`6670531..c8b0ed9`) contra o que está decidido e procurar
   defeitos parecidos com o da linha FEAT cortada, que dependem de tempo entre tasks.
 - **Revisão:** 15 achados, conferidos no código. Três ficaram sem mudança:
   - a versão do ESP-NOW, que não mudou com o `HELP` de propósito; mudá-la nem resolveria, porque o ACK é da
@@ -284,7 +308,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   - **defeitos achados e corrigidos:**
     - **pulseira fora do InfluxDB:** o consumidor `telegraf-ids` usa sessão persistente, e com ela o Telegraf
       não assina tópicos novos enquanto o broker guarda a sessão. Ele ficou assinando `vestivel/+` desde a troca
-      de nomes (commit 9a17edd). Corrigido com o `client_id` `telegraf-ids-2`, comentado no `telegraf.conf`, e
+      de nomes (commit 14f70f3). Corrigido com o `client_id` `telegraf-ids-2`, comentado no `telegraf.conf`, e
       a sessão velha apagada no broker. A pegadinha entrou no README da central e no `CLAUDE.md`;
     - **tabela de alertas:** erro do Flux (`schema collision`), por juntar campos de texto com o `detalhe_prob`
       numérico antes do `pivot`. Agora é `pivot` e depois `group()`;
