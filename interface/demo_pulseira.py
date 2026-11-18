@@ -162,30 +162,36 @@ def agora_ms():
     return int(time.time() * 1000)
 
 
-def alerta_queda(pulseira, seq, estado, a_pico=None, prob=None, ts=None):
-    """O alerta de queda como o hub o publica (docs/protocolo.md §1)."""
+def alerta_pulseira(tipo, pulseira, seq, estado, a_pico=None, prob=None, ts=None):
+    """
+    Um alerta da pulseira ("queda" ou "ajuda") como o hub o publica (docs/protocolo.md §1). Só a queda ativa
+    tem detalhe (o pico e a P); o pedido de ajuda e os cancelamentos vão sem.
+    """
     detalhe = {}
-    if estado == "ativo":
+    if tipo == "queda" and estado == "ativo":
         detalhe = {"a2": round(a_pico * a_pico, 2), "prob": round(prob, 2)}
-    return {"v": 1, "id": f"{pulseira}-{seq}", "tipo": "queda", "estado": estado,
+    return {"v": 1, "id": f"{pulseira}-{seq}", "tipo": tipo, "estado": estado,
             "origem": f"pulseira/{pulseira}", "detalhe": detalhe, "ts": ts if ts is not None else agora_ms()}
 
 
-def alerta_ajuda(pulseira, seq, estado, ts=None):
-    """O pedido de ajuda (botão segurado) como o hub o publica: sem detalhe."""
-    return {"v": 1, "id": f"{pulseira}-{seq}", "tipo": "ajuda", "estado": estado,
-            "origem": f"pulseira/{pulseira}", "detalhe": {}, "ts": ts if ts is not None else agora_ms()}
-
-
-def rotulo_disparo(prob, queda, limiar):
+def rotulo_disparo(prob, queda, limiar, acima=None):
     """
-    O que a placa decidiu num disparo. "queda" é o que ela avisou; com P acima do limiar e sem aviso, o disparo
-    caiu na espera depois de uma queda avisada (CONFIG_GADGET_FALL_COOLDOWN_S, 5 s no perfil de demonstração):
-    a placa achou queda, mas não avisa duas vezes a mesma.
+    O que a placa decidiu num disparo. "queda" é o que ela avisou; "acima", que o classificador disse queda. Acima
+    e sem aviso, o disparo caiu na espera depois de uma queda avisada (CONFIG_GADGET_FALL_COOLDOWN_S, 5 s no
+    perfil de demonstração): a placa achou queda, mas não avisa duas vezes a mesma. Sessões gravadas antes do
+    campo "acima" usam o limiar do log de boot, que vem arredondado.
     """
     if queda:
         return "QUEDA"
-    return "já avisada" if prob >= limiar else "não"
+    if acima is None:
+        acima = prob >= limiar
+    return "já avisada" if acima else "não"
+
+
+def acima_do_limiar(atributos):
+    """O campo "acima" de uma linha FEAT (0 ou 1), ou None nas sessões gravadas antes dele."""
+    valor = atributos.get("acima")
+    return None if valor is None else bool(valor)
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -285,7 +291,7 @@ class Leitor:
         elif tipo == "ajuda":
             self.ponte.ajuda()
         elif tipo == "cancelamento":
-            self.ponte.cancelar()
+            self.ponte.cancelar(dados)          # o tipo que a placa cancelou: "queda" ou "ajuda"
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -469,22 +475,27 @@ class Ponte:
     def queda(self, a_pico, prob):
         self.seq += 1
         self.aberto = (self.seq, "queda")
-        self.publicar("alerta", alerta_queda(self.e.pulseira, self.seq, "ativo", a_pico, prob), False)
+        self.publicar("alerta", alerta_pulseira("queda", self.e.pulseira, self.seq, "ativo", a_pico, prob), False)
 
     def ajuda(self):
         self.seq += 1
         self.aberto = (self.seq, "ajuda")
-        self.publicar("alerta", alerta_ajuda(self.e.pulseira, self.seq, "ativo"), False)
+        self.publicar("alerta", alerta_pulseira("ajuda", self.e.pulseira, self.seq, "ativo"), False)
 
-    def cancelar(self):
-        """Como na pulseira: o "estou bem" vale para o último alerta dela, queda ou ajuda."""
+    def cancelar(self, tipo_cancelado=None):
+        """
+        Como na pulseira: o "estou bem" vale para o último alerta dela, queda ou ajuda. tipo_cancelado: o que a
+        placa cancelou (FALL_CANCEL ou HELP_CANCEL); se o aberto aqui for de outro tipo, a demo não publicou o
+        alerta que a placa cancelou, e o aberto continua aberto. Sem ele (a tecla c), cancela o último.
+        """
         if self.aberto is None:
             print("(nenhum alerta aberto para cancelar)")
             return
         seq, tipo = self.aberto
-        alerta = alerta_queda(self.e.pulseira, seq, "cancelado") if tipo == "queda" else \
-            alerta_ajuda(self.e.pulseira, seq, "cancelado")
-        self.publicar("alerta", alerta, False)
+        if tipo_cancelado is not None and tipo_cancelado != tipo:
+            print(f"(a placa cancelou um alerta de {tipo_cancelado} que a demo não publicou; o de {tipo} continua)")
+            return
+        self.publicar("alerta", alerta_pulseira(tipo, self.e.pulseira, seq, "cancelado"), False)
         self.aberto = None
 
     def encerrar(self):
@@ -553,7 +564,7 @@ def janela(estado, ponte, args, parar):
             x = d.t - t_fim
             if x < -args.janela_s:
                 continue
-            rotulo = rotulo_disparo(d.prob, d.queda, modelo["limiar"])
+            rotulo = rotulo_disparo(d.prob, d.queda, modelo["limiar"], acima_do_limiar(d.atributos))
             cor = AZUL if rotulo == "não" else LARANJA
             # Já avisada: a mesma cor da queda, com o triângulo vazado.
             preenchimento = "white" if rotulo == "já avisada" else cor
@@ -585,14 +596,14 @@ def janela(estado, ponte, args, parar):
             for chave, nome, unidade, casas in ATRIBUTOS_PAINEL:
                 if chave in ultima:
                     linhas.append(f"  {nome:<27}{br(ultima[chave], casas):>7} {unidade}")
-            decisao = rotulo_disparo(ultima["prob"], ultima["queda"], modelo["limiar"])
+            decisao = rotulo_disparo(ultima["prob"], ultima["queda"], modelo["limiar"], acima_do_limiar(ultima))
             decisao = "não é queda" if decisao == "não" else decisao
             linhas += [f"  {'P(queda)':<27}{br(ultima['prob']):>7}", f"  {'decisão':<27}{decisao:>7}"]
         else:
             linhas.append("  (nenhum disparo ainda)")
         linhas += ["", "Últimos disparos (pico e P)"]
         for d in list(reversed(disparos))[:6]:
-            rotulo = rotulo_disparo(d.prob, d.queda, modelo["limiar"])
+            rotulo = rotulo_disparo(d.prob, d.queda, modelo["limiar"], acima_do_limiar(d.atributos))
             linhas.append(f"  {br(d.t - t_fim, 1):>6} s  {br(d.a_pico):>5} g  P {br(d.prob)}  {rotulo}")
         texto_painel.set_text("\n".join(linhas))
         rodape.set_text("Avisos da placa: " + " | ".join(avisos) if avisos else

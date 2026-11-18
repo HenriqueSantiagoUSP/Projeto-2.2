@@ -44,6 +44,9 @@ static const char *TAG = "main";
 #define FALL_BUZZER_MS      60000   /* local alarm on a fall or a help request; the cancel stops it earlier */
 #define JSON_MAX            384
 #define REPORT_MAX_MS       ((uint64_t) MQTT_REPORT_MAX_INTERVAL_S * 1000u)
+/* The sign of life of each periodic reading, due on the reading that falls on the 5th minute. */
+#define TEMP_REPORT_MAX_MS      REPORT_MAX_MS_FOR_PERIOD(REPORT_MAX_MS, LM35_PERIOD_MS)
+#define WEARABLE_REPORT_MAX_MS  REPORT_MAX_MS_FOR_PERIOD(REPORT_MAX_MS, ESPNOW_HEARTBEAT_PERIOD_MS)
 
 /* Every door needs a CAN nibble of its own (docs/protocolo.md §2). */
 #define DOOR_ONE(index, gpio, id, role)   + 1
@@ -297,7 +300,8 @@ static void on_alert(const rules_alert_t *alert, void *ctx){
     if (alert->type == ALERT_FALL || alert->type == ALERT_HELP) {
         if (alert->state == ALERT_ACTIVE) {
             indicators_buzzer_start(FALL_BUZZER_MS);
-        } else {
+        } else if (!rules_resident_alert_active(&s_rules)) {
+            /* Only when nothing is open: cancelling a fall must not silence a help request still open. */
             indicators_buzzer_stop();
         }
     }
@@ -315,6 +319,14 @@ static void can_send(uint8_t sensor, const uint8_t *data, size_t len){
     if (err != ESP_OK) {
         ESP_LOGD(TAG, "CAN 0x%X not sent: %s", (unsigned) sensor, esp_err_to_name(err));
     }
+}
+
+/* Which side of the temperature rule's range a reading is on: -1 below, 0 inside, +1 above. */
+static int temp_side(float celsius){
+    if (celsius < s_params.temp_min_c) {
+        return -1;
+    }
+    return celsius > s_params.temp_max_c ? 1 : 0;
 }
 
 static void handle_reading(const sensor_reading_t *reading, const rules_clock_t *now){
@@ -345,9 +357,13 @@ static void handle_reading(const sensor_reading_t *reading, const rules_clock_t 
         }
         case SENSOR_KIND_TEMPERATURE: {
             rules_on_temperature(&s_rules, reading->celsius, now);
-            /* Out only when it changed, or as a sign of life (docs/protocolo.md §1). */
-            if (!report_due(&s_state.temp_report, reading->celsius, MQTT_TEMP_REPORT_DELTA_C, REPORT_MAX_MS,
-                            now->mono_ms)) {
+            /*
+             * Out only when it changed, or as a sign of life (docs/protocolo.md §1); and at once when
+             * it crosses a limit of the temperature rule, so the series shows what an alert is about.
+             */
+            bool crossed = s_state.temp_known && temp_side(reading->celsius) != temp_side(s_state.temp_c);
+            if (!crossed && !report_due(&s_state.temp_report, reading->celsius, MQTT_TEMP_REPORT_DELTA_C,
+                                        TEMP_REPORT_MAX_MS, now->mono_ms)) {
                 break;
             }
             report_mark(&s_state.temp_report, reading->celsius, now->mono_ms);
@@ -373,9 +389,14 @@ static void handle_espnow(const espnow_rx_msg_t *msg, const rules_clock_t *now){
     w->rssi = msg->rssi;
     rules_on_wearable_seen(&s_rules, msg->wearable, now);
     if (was_offline) {
-        /* Back: the next heartbeat is published at once, without the activity from before the silence. */
+        /*
+         * Back: the next heartbeat is published at once, without the activity from before the
+         * silence. Until it arrives, the battery and activity cached here are old: "online"
+         * goes out without them (a heartbeat sets this again).
+         */
         report_reset(&w->report);
         (void) report_rms_take(&w->activity);
+        w->heard_heartbeat = false;
     }
 
     switch (msg->type) {
@@ -391,7 +412,7 @@ static void handle_espnow(const espnow_rx_msg_t *msg, const rules_clock_t *now){
              * pulseira/<id> gets the first one and then a summary every few minutes
              * (docs/protocolo.md §1): the database stores what changed, not each 30 s.
              */
-            if (report_due(&w->report, 0.0f, 0.0f, REPORT_MAX_MS, now->mono_ms)) {
+            if (report_due(&w->report, 0.0f, 0.0f, WEARABLE_REPORT_MAX_MS, now->mono_ms)) {
                 w->activity_mg = report_rms_take(&w->activity);
                 publish_wearable(w, true);
                 report_mark(&w->report, 0.0f, now->mono_ms);

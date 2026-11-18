@@ -71,6 +71,52 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-18 — revisão de código da leva do Q2 e correções
+
+- **Pedido:** revisar (`/code-review`) as mudanças da leva (`4262bf5..HEAD`) contra o que está decidido e procurar
+  defeitos parecidos com o da linha FEAT cortada, que dependem de tempo entre tasks.
+- **Revisão:** 15 achados, conferidos no código. Três ficaram sem mudança:
+  - a versão do ESP-NOW, que não mudou com o `HELP` de propósito; mudá-la nem resolveria, porque o ACK é da
+    camada de rádio;
+  - o episódio de queda, que só fecha com cancelamento (decisão registrada);
+  - o reenvio de todos os pendentes por rodada, que deixa de importar com as correções de tempo abaixo.
+- **Feito:**
+  - **pulseira:**
+    - **gesto com a fila cheia:** guardava só o tipo, numa vaga só, e era julgado pela hora em que o `comm_task`
+      o lia. Agora há uma vaga por gesto, com a hora, sob `portMUX`. Ele é tratado com a fila vazia, depois do
+      que veio antes dele (a queda que os dois toques cancelam);
+    - **a janela da queda conta da detecção:** o `COMM_EV_FALL` leva a hora em que a `classify_window` decidiu;
+      antes, era a hora em que o `comm_task` tirava a queda da fila;
+    - **sem hub e com MQTT:** um alerta ou um cancelamento com o broker fora ia só para o log. Agora fica
+      guardado e é reenviado quando o broker volta, contra a regra de que uma queda que não chegou a lugar
+      nenhum é reenviada. A volta do broker adianta o reenvio;
+    - **FEAT com `acima`:** a decisão do classificador antes da espera. A demo usa esse campo em vez do limiar
+      do log, que vem arredondado (com a regressão logística, 0,96356 virava 0,96);
+  - **hub:**
+    - **buzzer:** a nova `rules_resident_alert_active()` diz se resta queda ou ajuda aberta. O `emit()` já
+      atualiza o episódio antes do callback. Antes, cancelar uma queda calava a ajuda ainda aberta;
+    - **volta de offline:** com uma mensagem que não é heartbeat, `pulseira/<id>` sai só com estado e rssi, sem
+      a atividade e a bateria de antes do silêncio;
+    - **temperatura:** sai na hora quando cruza `temp_min_c` ou `temp_max_c` em relação ao último valor enviado
+      (`protocolo.md` §1 e `decisoes.md`);
+  - **comum:** `REPORT_MAX_MS_FOR_PERIOD` dá ao sinal de vida meio período de folga, nos três usos. Com 300 s
+    exatos, alguns ms de atraso adiavam o envio para a leitura seguinte, e o "5 min no máximo" virava 6;
+  - **demo:**
+    - `Ponte.cancelar(tipo)` só cancela se o aberto for do tipo que a placa cancelou;
+    - `alerta_pulseira()` substitui as duas funções de alerta;
+  - **relatório:** a data dos preços (`custoData`) vem da maior `consultado_em` da planilha. O README dos
+    relatórios aponta para `pendencias.md`, em vez de repetir a lista das fotos que faltam.
+- **Verificado:**
+  - **testes de host:** regras 87 (5 novos), `report` 28 (5 novos), cada um com um erro plantado numa cópia
+    que o teste pegou. Os outros sem mudança: `hub_config` 60, `fall_pipeline` 885, `signal_proc` 25,
+    `button_gesture` 42;
+  - **Python:** demo 26 testes (5 novos) e notificador;
+  - **builds sem avisos:** hub; pulseira padrão e demonstração; e dois builds de teste, um sem hub com MQTT e
+    outro com hub, MQTT, queda simulada e modo de coleta;
+  - **script 12:** rodou inteiro, sem diferença nas tabelas.
+  - **Falta:** a placa não estava ligada, então o perfil de demonstração novo não foi gravado. As correções de
+    tempo e de buzzer precisam da bancada (`pendencias.md`).
+
 ### 2026-11-17 — relatório do Q2 sem os quadros de foto vazios; link do GitHub nos apêndices
 
 - **Pedido:**

@@ -191,10 +191,7 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
 - **Geração:** gráficos, tabelas, números (`tabelas/numeros.tex`) e exportações da PCB saem de
   `modelo/experimentos/12_relatorio_q2.py`. Compila com `pdflatex main.tex`, duas vezes.
 - **Fotos a acrescentar:** cada uma tem um quadro tracejado com o nome do arquivo esperado. Basta salvar a foto
-  em `Q2/latex/imagens/` com esse nome e recompilar. Já estão lá as da PCB fabricada (cima e baixo), a captura do
-  painel do Grafana com o simulador e a janela do `demo_pulseira.py` (2026-11-17). Ficaram para a entrega final,
-  com as figuras comentadas no texto (instruções no topo do `main.tex`):
-  - o monitor serial do hub com o ESP-NOW (`09_sem_fio.tex`);
-  - o Telegram (`11_central.tex`). Por enquanto, o texto mostra a mensagem que o notificador montou para uma
-    queda do simulador.
+  em `Q2/latex/imagens/` com esse nome e recompilar. As figuras das fotos que ainda faltam estão comentadas no
+  texto, com as instruções no topo do `main.tex`; quais são e do que dependem está em
+  [`docs/pendencias.md`](../docs/pendencias.md) (item do Q2).
 - **Repositório:** os Apêndices C e D citam `https://github.com/HenriqueSantiagoUSP/Projeto-2.2`.

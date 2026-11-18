@@ -60,7 +60,7 @@ Todo payload JSON tem:
 | `status` (Last Will) | 1 | sim | `{"v":1,"estado":"offline"}` | o broker publica se o hub cair |
 | `porta/<id>` | 1 | sim | `{"v":1,"sensor":"MC-38","estado":"aberta","ts":…}` | a cada mudança |
 | `presenca` | 1 | sim | `{"v":1,"sensor":"HC-SR501","estado":"detectada","ts":…}` | a cada mudança |
-| `temperatura` | 0 | sim | `{"v":1,"sensor":"LM35DZ","valor":22.5,"ts":…}` | quando muda 0,2 °C ou mais desde o último envio, ou a cada 5 min (o hub mede a cada 60 s) |
+| `temperatura` | 0 | sim | `{"v":1,"sensor":"LM35DZ","valor":22.5,"ts":…}` | quando muda 0,2 °C ou mais desde o último envio, quando cruza um limite da regra, ou a cada 5 min (o hub mede a cada 60 s) |
 | `pulseira/<id>` | 1 | sim | `{"v":1,"estado":"online","bateria_mV":3900,"rssi":-61,"atividade":0.12,"ts":…}` | no primeiro heartbeat (do boot ou da volta do offline) e depois um resumo a cada 5 min |
 | `pulseira/<id>` | 1 | sim | `{"v":1,"estado":"offline","ts":…}` | 90 s sem mensagens da pulseira |
 | `pulseira/<id>/telemetria` | 0 | não | `{"v":1,"bateria_mV":3900,"atividade":0.05,"canal":6,"hub":true,"ts":…}` | publicado **pela pulseira** com MQTT ligado: no primeiro heartbeat, a cada 5 min e na hora em que `hub` muda |
@@ -78,14 +78,19 @@ presença e alertas já saem só quando mudam. A temperatura e a pulseira, que o
 seguem a regra do componente `firmware/common/report` (valores em `protocol_mqtt.h`):
 
 - **temperatura:** o hub mede a cada 60 s e entrega toda leitura às regras, mas só a publica (e só manda o
-  quadro CAN `0x0F2`) quando ela muda 0,2 °C ou mais em relação ao **último valor enviado**, ou quando passam
-  5 min sem envio, como sinal de vida;
+  quadro CAN `0x0F2`):
+  - quando ela muda 0,2 °C ou mais em relação ao **último valor enviado**;
+  - quando cruza um limite da regra de temperatura (`temperatura.min` ou `.max` da config): o valor publicado
+    está de um lado do limite e a leitura, do outro. Assim, o banco tem o valor que o alerta de temperatura cita;
+  - ou quando passam 5 min sem envio, como sinal de vida;
 - **pulseira:** o heartbeat por ESP-NOW continua a cada 30 s (é ele que mantém a pulseira viva nas regras), mas
   `pulseira/<id>` sai no primeiro heartbeat e depois como um resumo a cada 5 min. O `offline` sai na hora.
   A urgência da bateria fica com o alerta `bateria_baixa`, que é imediato.
 
 Com o quarto estável, são cerca de 300 pontos por dia de cada um, em vez de 2.880. Quem consome pode contar
-com um valor novo de cada um a cada 5 min no máximo.
+com um valor novo de cada um a cada 5 min no máximo. O sinal de vida sai na leitura que cai no 5º minuto: a
+conta tem meio período de folga (`REPORT_MAX_MS_FOR_PERIOD`), para alguns ms de atraso da task não
+empurrá-lo para a leitura seguinte.
 
 ### Campos específicos
 

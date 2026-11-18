@@ -261,6 +261,13 @@ enviar a cada 30 s.
 Resultado: com o quarto estável, cerca de 300 pontos por dia de cada fluxo, ~10× menos; uma mudança real de
 temperatura aparece no painel na hora. Os painéis do Grafana (`last()` e `aggregateWindow`) não precisaram mudar.
 
+**Ajustes da revisão de código (2026-11-18):**
+
+| Decisão | Por quê |
+|---|---|
+| A temperatura também sai na hora quando **cruza um limite da regra** (`temp_min_c` ou `temp_max_c`) em relação ao último valor enviado | com só a faixa de 0,2 °C, o painel podia mostrar 27,9 °C (dentro da faixa) por até 5 min enquanto o alerta de temperatura citava 28,05 °C |
+| O sinal de vida tem **meio período de folga**: devido aos 270 s para uma leitura a cada 60 s, aos 285 s para o heartbeat de 30 s (`REPORT_MAX_MS_FOR_PERIOD`) | 300 s é múltiplo exato do período: alguns ms de atraso da task decidiam se a 5ª leitura contava, e o "5 min no máximo" virava 6 min em cerca de metade das vezes |
+
 ## Gestos do botão (2026-11-17)
 
 Até aqui, um aperto simples no botão cancelava a queda nos 15 s seguintes, e o botão não servia para mais nada.

@@ -23,9 +23,15 @@ documentação do ESP-IDF v6.0.1.
 - **O modelo é gerado, não escrito à mão:** `fall_model.h`/`fall_model.c` saem de
   `modelo/experimentos/09_exportar_pulseira.py`, junto com os vetores de teste de paridade. Ele foi treinado na
   SisFall (cintura, ±8 g) e é **provisório até retreinar com os dados do pulso**.
-- **Modo de coleta:** imprime cada amostra bruta em CSV e, a cada disparo do gatilho, uma linha `FEAT:` com os 23
-  atributos, P(queda) e o custo em ciclos. Serve para formar o conjunto de dados do modelo
-  ([`docs/coleta-de-dados.md`](../../docs/coleta-de-dados.md)).
+- **Modo de coleta:** imprime cada amostra bruta em CSV e, a cada disparo do gatilho, uma linha `FEAT:`. Ela traz:
+  - o pico (`pico`, `a_pico`) e os 23 atributos;
+  - `prob`, a P(queda);
+  - `acima`: o classificador disse queda (P ≥ limiar);
+  - `queda`: a queda foi avisada. Ele é 0 quando `acima` é 1, mas o disparo caiu na espera depois de outra queda;
+  - `cycles`, o custo em ciclos.
+
+  A linha sai inteira, num `printf` só, para o CSV da outra task não entrar no meio. Serve para formar o conjunto
+  de dados do modelo ([`docs/coleta-de-dados.md`](../../docs/coleta-de-dados.md)).
 - **ESP-NOW:** varredura de canal, heartbeat a cada 30 s com bateria e atividade, `FALL` (com o pico e a
   P(queda)) e `HELP` com reenvio até o ACK.
 - **Botão** (task `button`, componente `button_gesture`; o porquê em

@@ -84,7 +84,7 @@ class TestFiltro(unittest.TestCase):
 
 class TestPonte(unittest.TestCase):
     def test_alerta_como_o_do_hub_e_o_notificador_entende(self):
-        alerta = demo.alerta_queda("a1b2c3", 42, "ativo", a_pico=3.0, prob=0.97, ts=1792497600000)
+        alerta = demo.alerta_pulseira("queda", "a1b2c3", 42, "ativo", a_pico=3.0, prob=0.97, ts=1792497600000)
         self.assertEqual(alerta, {"v": 1, "id": "a1b2c3-42", "tipo": "queda", "estado": "ativo",
                                   "origem": "pulseira/a1b2c3", "detalhe": {"a2": 9.0, "prob": 0.97},
                                   "ts": 1792497600000})
@@ -94,11 +94,11 @@ class TestPonte(unittest.TestCase):
         self.assertIn("confiança do modelo: 97 %", texto)
 
     def test_cancelado_sem_detalhe(self):
-        alerta = demo.alerta_queda("a1b2c3", 42, "cancelado", ts=1)
+        alerta = demo.alerta_pulseira("queda", "a1b2c3", 42, "cancelado", ts=1)
         self.assertEqual((alerta["estado"], alerta["detalhe"]), ("cancelado", {}))
 
     def test_pedido_de_ajuda_como_o_do_hub(self):
-        alerta = demo.alerta_ajuda("a1b2c3", 43, "ativo", ts=1792497600000)
+        alerta = demo.alerta_pulseira("ajuda", "a1b2c3", 43, "ativo", ts=1792497600000)
         self.assertEqual(alerta, {"v": 1, "id": "a1b2c3-43", "tipo": "ajuda", "estado": "ativo",
                                   "origem": "pulseira/a1b2c3", "detalhe": {}, "ts": 1792497600000})
         texto = formatar(interpretar("idoso/butanta/quarto101/alerta", json.dumps(alerta).encode()))
@@ -120,6 +120,21 @@ class TestPonte(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             ponte.cancelar()                    # nada mais aberto
         self.assertEqual(len(publicados), 3)
+
+    def test_placa_cancela_so_o_tipo_que_ela_cancelou(self):
+        # A placa cancelou uma queda que a demo não publicou (a FEAT não chegou): a ajuda aberta fica aberta.
+        ponte = object.__new__(demo.Ponte)
+        ponte.e = demo.Estado(janela_s=10.0)
+        ponte.e.pulseira = "a1b2c3"
+        ponte.seq, ponte.aberto = 10, None
+        publicados = []
+        ponte.publicar = lambda sufixo, dados, retain: publicados.append(dados)
+        ponte.ajuda()
+        with contextlib.redirect_stdout(io.StringIO()):
+            ponte.cancelar("queda")
+        self.assertEqual([(a["tipo"], a["estado"]) for a in publicados], [("ajuda", "ativo")])
+        ponte.cancelar("ajuda")
+        self.assertEqual([(a["tipo"], a["estado"]) for a in publicados][-1], ("ajuda", "cancelado"))
 
 
 class TestLeitor(unittest.TestCase):
@@ -147,7 +162,7 @@ class TestLeitor(unittest.TestCase):
         chamadas = []
         ponte = types.SimpleNamespace(queda=lambda *a: chamadas.append("queda"),
                                       ajuda=lambda: chamadas.append("ajuda"),
-                                      cancelar=lambda: chamadas.append("cancelar"))
+                                      cancelar=lambda tipo=None: chamadas.append(("cancelar", tipo)))
         leitor = demo.Leitor(estado, ponte)
         leitor.linha("CSV:t_ms,ax,ay,az,gx,gy,gz")
         leitor.linha("CSV:0,0,0,4096,0,0,0")
@@ -156,7 +171,7 @@ class TestLeitor(unittest.TestCase):
         self.assertGreater(estado.faixa_ate, estado.t_ultimo)
         leitor.linha("I (950) main: HELP_CANCEL for seq 5")
         self.assertEqual(estado.faixa_ate, 0.0)
-        self.assertEqual(chamadas, ["ajuda", "cancelar"])
+        self.assertEqual(chamadas, ["ajuda", ("cancelar", "ajuda")])
 
     def test_sinal_limitado_depois_de_um_tempo_absurdo(self):
         # Bytes perdidos na serial podem juntar dois tempos numa linha só ("CSV:1234" + "123455,...").
@@ -200,6 +215,13 @@ class TestRotuloDoDisparo(unittest.TestCase):
 
     def test_abaixo_do_limiar(self):
         self.assertEqual(demo.rotulo_disparo(0.63, False, 0.73), "não")
+
+    def test_decisao_da_placa_vale_mais_que_o_limiar_arredondado(self):
+        # Regressão logística: limiar 0,96356, impresso 0,96 no boot. P = 0,962 não é queda para a placa.
+        self.assertEqual(demo.rotulo_disparo(0.962, False, 0.96, acima=False), "não")
+        self.assertEqual(demo.rotulo_disparo(0.80, False, 0.73, acima=True), "já avisada")
+        self.assertEqual(demo.rotulo_disparo(0.80, True, 0.73, acima=True), "QUEDA")
+
 
 
 class SerialFalsa:
