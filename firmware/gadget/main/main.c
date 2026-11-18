@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdarg.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
@@ -707,6 +708,20 @@ static void retry_undelivered(comm_state_t *st){
     }
 }
 
+#ifdef CONFIG_GADGET_COLLECT_MODE
+/* Appends to line[0..len) and returns the new length; size once the line no longer fits. */
+static size_t line_append(char *line, size_t size, size_t len, const char *fmt, ...){
+    if (len >= size) {
+        return size;
+    }
+    va_list args;
+    va_start(args, fmt);
+    int n = vsnprintf(line + len, size - len, fmt, args);
+    va_end(args);
+    return (n < 0 || (size_t) n >= size - len) ? size : len + (size_t) n;
+}
+#endif
+
 static void log_window(const fp_result_t *r, uint32_t cycles, bool reported){
     uint32_t us = cycles / CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
     const char *verdict = reported ? "FALL" : (r->fall ? "fall (cooldown)" : "no fall");
@@ -714,12 +729,26 @@ static void log_window(const fp_result_t *r, uint32_t cycles, bool reported){
              (unsigned long) r->peak_index, r->a_peak, r->prob, verdict, (unsigned long) cycles,
              (unsigned long) us);
 #ifdef CONFIG_GADGET_COLLECT_MODE
-    /* One line per window, every feature by its Python name (modelo/queda/atributos.py). */
-    printf("FEAT:pico=%lu,a_pico=%.4f", (unsigned long) r->peak_index, r->a_peak);
+    /*
+     * One line per window, every feature by its Python name (modelo/queda/atributos.py).
+     * Built whole and printed in a single call: stdout is one line-buffered stream shared
+     * by every task, and each printf holds its lock only for that call. Printed in pieces,
+     * the line got the sampling task's CSV lines spliced into it, and the reader dropped
+     * the window (4 of 11 in a bench session, a reported fall among them).
+     */
+    static char line[1024];   /* comm_task only; the longest line is ~630 characters */
+    size_t len = line_append(line, sizeof(line), 0, "FEAT:pico=%lu,a_pico=%.4f", (unsigned long) r->peak_index,
+                             r->a_peak);
     for (int i = 0; i < FF_COUNT; i++) {
-        printf(",%s=%.6g", fall_feature_names[i], r->features[i]);
+        len = line_append(line, sizeof(line), len, ",%s=%.6g", fall_feature_names[i], r->features[i]);
     }
-    printf(",prob=%.4f,queda=%d,cycles=%lu\n", r->prob, reported ? 1 : 0, (unsigned long) cycles);
+    len = line_append(line, sizeof(line), len, ",prob=%.4f,queda=%d,cycles=%lu", r->prob, reported ? 1 : 0,
+                      (unsigned long) cycles);
+    if (len >= sizeof(line)) {
+        ESP_LOGW(TAG, "FEAT line longer than %u characters: not printed", (unsigned) sizeof(line) - 1);
+        return;
+    }
+    printf("%s\n", line);
 #endif
 }
 

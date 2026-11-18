@@ -281,6 +281,15 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-17 — Disparos que sumiam na demo:**
+  - **causa:** a linha FEAT era cortada pelas linhas CSV, e a demo a descartava (4 de 11 numa sessão gravada,
+    uma delas uma queda avisada);
+  - **correção:** a linha agora sai num `printf` só. A demo também mostra como "já avisada" a queda que cai na
+    espera de 5 s depois de outra, que antes aparecia como "não";
+  - **verificado na placa:** numa sessão nova gravada, os 13 disparos do log chegaram com a FEAT inteira, e a
+    demo leu os 13. Nenhuma linha CSV chegou quebrada. Os builds da pulseira saem sem avisos, e os 24 testes da
+    demo passam.
+
 - [x] **2026-11-17 — Painel "Quartos" conferido no navegador,** com a central em Docker e o simulador. Saíram
   quatro defeitos, corrigidos:
   - o Telegraf não gravava a pulseira;

@@ -177,6 +177,17 @@ def alerta_ajuda(pulseira, seq, estado, ts=None):
             "origem": f"pulseira/{pulseira}", "detalhe": {}, "ts": ts if ts is not None else agora_ms()}
 
 
+def rotulo_disparo(prob, queda, limiar):
+    """
+    O que a placa decidiu num disparo. "queda" é o que ela avisou; com P acima do limiar e sem aviso, o disparo
+    caiu na espera depois de uma queda avisada (CONFIG_GADGET_FALL_COOLDOWN_S, 5 s no perfil de demonstração):
+    a placa achou queda, mas não avisa duas vezes a mesma.
+    """
+    if queda:
+        return "QUEDA"
+    return "já avisada" if prob >= limiar else "não"
+
+
 # ---------------------------------------------------------------------------------------------------------
 # Estado compartilhado entre a leitura (thread) e a janela
 # ---------------------------------------------------------------------------------------------------------
@@ -542,8 +553,13 @@ def janela(estado, ponte, args, parar):
             x = d.t - t_fim
             if x < -args.janela_s:
                 continue
-            cor = LARANJA if d.queda else AZUL
-            marcas.append(ax.plot([x], [d.a_pico], "v", color=cor, ms=10, mec="white", mew=0.8)[0])
+            rotulo = rotulo_disparo(d.prob, d.queda, modelo["limiar"])
+            cor = AZUL if rotulo == "não" else LARANJA
+            # Já avisada: a mesma cor da queda, com o triângulo vazado.
+            preenchimento = "white" if rotulo == "já avisada" else cor
+            contorno = cor if rotulo == "já avisada" else "white"
+            marcas.append(ax.plot([x], [d.a_pico], "v", color=cor, ms=10, mfc=preenchimento, mec=contorno,
+                                  mew=1.5 if rotulo == "já avisada" else 0.8)[0])
             marcas.append(ax.text(x, d.a_pico, f" P={br(d.prob)}", color=cor, fontsize=10, fontweight="bold",
                                   va="bottom"))
 
@@ -569,15 +585,15 @@ def janela(estado, ponte, args, parar):
             for chave, nome, unidade, casas in ATRIBUTOS_PAINEL:
                 if chave in ultima:
                     linhas.append(f"  {nome:<27}{br(ultima[chave], casas):>7} {unidade}")
-            decisao = "QUEDA" if ultima["queda"] else ("queda (espera)" if ultima["prob"] >= modelo["limiar"]
-                                                         else "não é queda")
+            decisao = rotulo_disparo(ultima["prob"], ultima["queda"], modelo["limiar"])
+            decisao = "não é queda" if decisao == "não" else decisao
             linhas += [f"  {'P(queda)':<27}{br(ultima['prob']):>7}", f"  {'decisão':<27}{decisao:>7}"]
         else:
             linhas.append("  (nenhum disparo ainda)")
-        linhas += ["", "Últimos disparos"]
+        linhas += ["", "Últimos disparos (pico e P)"]
         for d in list(reversed(disparos))[:6]:
-            rotulo = "QUEDA" if d.queda else "não"
-            linhas.append(f"  {br(d.t - t_fim, 1):>6} s  pico {br(d.a_pico):>5} g  P {br(d.prob)}  {rotulo}")
+            rotulo = rotulo_disparo(d.prob, d.queda, modelo["limiar"])
+            linhas.append(f"  {br(d.t - t_fim, 1):>6} s  {br(d.a_pico):>5} g  P {br(d.prob)}  {rotulo}")
         texto_painel.set_text("\n".join(linhas))
         rodape.set_text("Avisos da placa: " + " | ".join(avisos) if avisos else
                         "c = estou bem (cancela o último alerta na central)   q = sair")
