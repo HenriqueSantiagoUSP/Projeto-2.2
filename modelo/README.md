@@ -142,7 +142,7 @@ duas CNNs, leva ~3 min por cenário.
 | `experimentos/09_exportar_pulseira.py` | treina os classificadores da pulseira com o gatilho causal e gera `fall_model.h`/`.c`, os vetores de teste de paridade e `resultados/pulseira.json` |
 | `experimentos/11_svm_pulseira.py` | SVM (RBF) na configuração da pulseira (gatilho causal, 23 atributos no tempo, ±8 g) contra o Random Forest 60 × 10 e a regressão logística: métricas, tamanho, operações por janela e bootstrap por pessoa. Grava `resultados/svm_pulseira.json` |
 | `experimentos/10_figuras_apresentacao.py` | figuras em tamanho de slide (`ap_*.png`), tabelas e números da apresentação Beamer do Q1. Inclui o sinal antes e depois do filtro, a árvore de decisão, a fronteira árvore × floresta e os votos das 60 árvores |
-| `experimentos/12_relatorio_q2.py` | gráficos, tabelas, números e exportações da PCB do relatório do Q2 (o relatório final); confere que o ajuste do LM35 reproduz a curva do firmware e que o biquad é o do `fall_model.c` |
+| `experimentos/12_relatorio_q2.py` | gráficos, tabelas (inclusive o custo, de `hardware/placas/v1/custo-estimado.csv`), números e exportações da PCB do relatório do Q2 (o relatório final); confere que o ajuste do LM35 reproduz a curva do firmware e que o biquad é o do `fall_model.c` |
 | `experimentos/_estilo.py` | paleta, parâmetros do matplotlib e nomes dos atributos, comuns ao `07`, ao `10` e ao `12` |
 
 ## Principais resultados

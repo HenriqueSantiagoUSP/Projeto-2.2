@@ -71,6 +71,46 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-17 — custo estimado de um quarto no relatório do Q2
+
+- **Pedido:** na lista de materiais, o preço aproximado de cada item e o custo de produção do produto.
+- **Decidido com o usuário:** o kit de um quarto (hub + pulseira, cada PCB só com as peças da sua função), com
+  preços do varejo brasileiro em R$, alimentação (fonte do hub, power bank da pulseira) e caixas; sem a central
+  e sem montagem. A PCB entra como estimativa, porque não se sabe o total pago.
+- **Feito:**
+  - **preços** pesquisados nos sites das lojas (Eletrogate, AutoCore Robótica, Usinainfo, Curto Circuito,
+    Smart Kits, KaBuM!) em 17/11/2026, em `hardware/placas/v1/custo-estimado.csv`, com o link de cada um.
+    Ficaram como estimativa a PCB (US$ 2 pelas 5 + frete de ~US$ 15 + 60 % de imposto de importação e 20 % de
+    ICMS, a R$ 5,15/US$) e o capacitor de poliéster de 1 µF;
+  - **script** `12_relatorio_q2.py`: `tabela_custo()` gera `tabelas/custo.tex` (item por item) e
+    `tabelas/custo_resumo.tex` (por grupo), e os números `\custoHub`, `\custoPulseira`, `\custoKit`,
+    `\custoDevkitPct`, `\custoPcbPct` e `\custoAlimCaixasPct`;
+  - **relatório:** a pedido do usuário, o custo virou uma seção própria antes das conclusões, a 13, "Custo do
+    sistema". Ela tem o resumo por grupo, o critério, o que pesa (as DevKits são 33 %, a alimentação e as
+    caixas 36 %, os sensores e componentes menos de um quinto) e o que mudaria em série. A tabela item por
+    item ficou no Apêndice C, "Lista de materiais e custo". O resumo, a introdução (organização), a seção 6.7 e
+    as conclusões citam o total. O arquivo das conclusões passou a `14_conclusoes.tex`;
+  - **resultado:** hub R$ 288,92, pulseira R$ 274,92, kit R$ 563,84; as duas DevKits são 33 % do total.
+- **Verificado:** os totais do script batem com a soma à mão; `pdflatex` sem erros, sem referência
+  indefinida e sem *overfull* (71 páginas); a seção 13, o apêndice e o resumo conferidos na imagem. Os
+  renders da PCB que o script refez (só os bytes mudaram) foram restaurados do commit.
+
+### 2026-11-17 — fotos da PCB fabricada no relatório do Q2
+
+- **Pedido:** pôr as fotos da PCB v1 (frente e costas) nos quadros reservados do relatório.
+- **Feito:**
+  - as fotos do usuário viraram `imagens/pcb_fabricada_cima.jpg` e `pcb_fabricada_baixo.jpg`, reduzidas a
+    2000 px de largura e sem os metadados da câmera (EXIF);
+  - a Figura 17 (seção 6.7) passou de duas fotos lado a lado para uma embaixo da outra, na largura do texto e
+    com legenda própria, porque fotos deitadas pela metade da largura não deixavam ler a serigrafia. Ela
+    flutua (`[tbp]`) para não deixar meia página em branco, e o texto passou a citá-la;
+  - saíram da lista de fotos pendentes (`main.tex`, `relatorios/README.md`, `pendencias.md`);
+  - a Figura 18 (a PCB do S1) estava pequena: a foto vertical tem mesa em cima e embaixo. Ela é recortada no
+    próprio LaTeX (`trim` e `clip`, sem mexer no arquivo), fica quase quadrada e passou de 7,5 cm de altura
+    para 75 % da largura do texto.
+- **Verificado:** `pdflatex` sem erros, sem referência indefinida e sem *overfull* (69 páginas); as páginas das
+  figuras 17 e 18 conferidas na imagem.
+
 ### 2026-11-17 — envio por mudança: temperatura e pulseira
 
 - **Pedido:** os dados vão para um banco, e enviar a temperatura e a pulseira a cada 30 s enche o banco de

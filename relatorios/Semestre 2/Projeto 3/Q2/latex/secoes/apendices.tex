@@ -94,7 +94,7 @@ cria a entrada, o tópico \code{porta/<id>} e o identificador CAN. São até 8 p
 identificador (\code{0x0F3} a \code{0x0FA}); o build falha se passar disso.
 
 %======================================================================
-\section{Lista de materiais}\label{ap:bom}
+\section{Lista de materiais e custo}\label{ap:bom}
 %======================================================================
 \begin{table}[H]
 \centering
@@ -107,6 +107,28 @@ identificador (\code{0x0F3} a \code{0x0FA}); o build falha se passar disso.
 Além das peças da placa: a ESP32-S3-DevKitC-1, os módulos HC-SR501, GY-521 (MPU-6050),
 WCMCU-230 (SN65HVD230) e USB-C, os reed switches MC-38 com fio até as portas e, por placa, um
 carregador USB-A ou um \textit{power bank} com cabo USB-A $\to$ C.
+
+\subsection*{Custo item por item}
+
+A Tabela~\ref{tab:custo} detalha o custo de um quarto, resumido na Seção~\ref{sec:custo}: o hub
+e a pulseira, cada um numa PCB v1 só com as peças da sua função, mais os sensores de porta, a
+alimentação e as caixas.
+
+Os preços são do varejo brasileiro, por unidade, consultados nos sites das lojas em
+\custoData{}, sem frete; os links estão em \code{hardware/placas/v1/custo-estimado.csv}. Uma
+peça vendida em pacote entra pelo preço de uma unidade. Duas linhas são estimativas
+($\approx$). Uma é o capacitor de poliéster. A outra é a PCB: a JLCPCB cobra US\$\,2 pelas cinco
+placas, mas o frete até o Brasil e os impostos só aparecem no pedido. A conta usa frete de cerca
+de US\$\,15, 60\,\% de imposto de importação, 20\,\% de ICMS e R\$\,5,15 por dólar. No
+protótipo, a pulseira é a mesma placa de $100 \times 60$\,mm, numa caixa igual à do hub.
+
+\begin{table}[H]
+\centering
+\caption{Custo estimado do kit de um quarto (hub e pulseira), em reais.}
+\label{tab:custo}
+\footnotesize
+\input{tabelas/custo}
+\end{table}
 
 %======================================================================
 \section{Como reproduzir}\label{ap:reproducao}
