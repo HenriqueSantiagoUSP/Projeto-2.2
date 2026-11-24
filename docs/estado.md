@@ -75,6 +75,20 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-24 — READMEs: como parar a central e onde ficam os menus do hub
+
+- **Pedido:** o `interface/README.md` ensinava a subir a central, mas não a parar.
+- **Feito:**
+  - **`interface/README.md`:** subseção "Parar a central", com:
+    - `down`, `stop`/`start`, `restart` de um serviço e `down -v` (o único que apaga dados);
+    - fechar o Docker Desktop depois;
+    - o efeito do `restart: unless-stopped`;
+    - como sair do log;
+  - **`firmware/room/README.md`:** os menus do hub (Wi-Fi, MQTT, ESP-NOW, PCB) ficam dentro de **Component
+    config** no `menuconfig`, o que o README não dizia.
+- **Verificado:** só documentação. A posição dos menus foi conferida no `kconfig_menus.json` do build de
+  demonstração.
+
 ### 2026-11-23 — commits com o e-mail privado do GitHub, e o push
 
 - **Pedido:** fazer os commits e o push.

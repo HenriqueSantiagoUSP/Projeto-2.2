@@ -80,6 +80,7 @@ Para mostrar a pulseira chegando ao hub por ESP-NOW e o hub publicando na centra
    idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" menuconfig
    ```
 
+   Os menus do hub ficam dentro de **Component config** (a tecla `/` busca pelo nome, por exemplo `SSID`).
    Preencha:
    - **Network (Wi-Fi):** SSID e senha de uma rede de 2,4 GHz. O hotspot do próprio PC é o mais seguro, porque o
      PC fica sempre em `192.168.137.1`;

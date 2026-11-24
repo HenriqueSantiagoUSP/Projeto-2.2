@@ -43,7 +43,24 @@ Os usuários do broker são fixos (`hub`, `pulseira`, `telegraf`, `notificador`,
 `mosquitto/acl` se refere a eles; só as senhas vêm do `.env`. Trocou uma senha? `docker compose restart mosquitto`.
 O usuário `pulseira` só existe para o MQTT opcional da pulseira e só pode publicar a própria telemetria e o alerta.
 
-Para apagar todo o histórico e começar do zero: `docker compose down -v`.
+### Parar a central
+
+Sempre na pasta `interface`:
+
+| Quer | Comando | O que acontece com os dados |
+|---|---|---|
+| parar de usar por hoje | `docker compose down` | para e remove os containers e a rede deles; o histórico do InfluxDB, o Grafana e as mensagens retidas do Mosquitto ficam nos volumes |
+| só pausar, para voltar logo | `docker compose stop` (e `docker compose start` para voltar) | nada muda, os containers só param |
+| reiniciar um serviço depois de mudar a configuração dele | `docker compose restart grafana` (ou `mosquitto`, `telegraf`…) | nada muda |
+| **apagar tudo** e começar do zero | `docker compose down -v` | **apaga os volumes**: histórico, Grafana e mensagens retidas. Não tem volta |
+
+Depois do `down`, feche o Docker Desktop (botão direito no ícone da baleia, na bandeja → *Quit Docker Desktop*)
+para liberar a memória da máquina virtual dele (`vmmem` no Gerenciador de Tarefas). Os serviços têm
+`restart: unless-stopped`: se o Docker Desktop for fechado sem o `down`, eles voltam sozinhos da próxima vez que
+ele abrir. Para subir de novo, abra o Docker Desktop, espere o "Engine running" e rode `docker compose up -d`.
+
+Para ver o que está acontecendo, sem parar nada: `docker compose logs -f <serviço>` (Ctrl+C sai do log, e o
+serviço continua rodando).
 
 ## 2. Testar sem hardware
 
