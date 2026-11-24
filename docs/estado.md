@@ -75,6 +75,35 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-23 — commits com o e-mail privado do GitHub, e o push
+
+- **Pedido:** fazer os commits e o push.
+- **Achado antes do envio:**
+  - o repositório do GitHub é público;
+  - os commits tinham o Gmail pessoal como autor e committer;
+  - o GitHub já tinha os 33 commits até "aulas/ fora do histórico", enviados num push feito fora destas sessões.
+- **Decisão do usuário:** reescrever os 35 commits com o noreply do GitHub e substituir o histórico de lá
+  (*force push*).
+- **Feito:**
+  - cópia de segurança (*bundle* com todas as referências, conferido) no scratchpad da sessão;
+  - `git filter-branch --env-filter`, para trocar o e-mail de autor e committer;
+  - uma segunda passada (`--msg-filter`) para as mensagens que citavam hashes;
+  - as citações nos documentos trocadas:
+    - `14f70f3` → `746ced7`;
+    - `6670531` → `54ce6b7`;
+    - `21cb342` → `e6379cd`;
+    - `c8b0ed9` → `604a13c`;
+  - o noreply configurado no `git config` do repositório.
+
+  O diário do dia 18 mostra agora, à direita, os hashes desta reescrita.
+- **Verificado:**
+  - 70 campos de e-mail, todos com o noreply;
+  - a árvore final igual à de antes (`252b25a…`);
+  - os hashes citados nas mensagens existem no histórico novo;
+  - `git fsck` sem erros;
+  - nenhum dos 8 valores reais do `.env` e dos `sdkconfig` em commit algum. A busca foi conferida com um texto
+    de controle.
+
 ### 2026-11-23 — painel "Quartos": o estado atual é só o da conexão atual do hub
 
 - **Pedido:** o Grafana mostrava a pulseira "Online" e o estado dos sensores sem nada conectado. Corrigir o painel.
@@ -164,10 +193,10 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
     antiga, de `fix/build-and-naming`), com `reflog expire` e `gc --aggressive --prune=now`. A `.git` caiu de
     129 MB para 55 MB;
   - **citações de hash** no diário e nas pendências trocadas pelas novas:
-    - `9a17edd` → `14f70f3`;
-    - `4262bf5` → `6670531`;
-    - `c607918` → `21cb342`;
-    - `75291f9` → `c8b0ed9`.
+    - `9a17edd` → `746ced7`;
+    - `4262bf5` → `54ce6b7`;
+    - `c607918` → `e6379cd`;
+    - `75291f9` → `604a13c`.
 - **Verificado:**
   - nenhum caminho `aulas/` em commit ou objeto do repositório;
   - a árvore do último commit é a mesma de antes (`a49fb06…`), então o conteúdo não mudou;
@@ -225,7 +254,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ### 2026-11-18 — revisão de código da leva do Q2 e correções
 
-- **Pedido:** revisar (`/code-review`) as mudanças da leva (`6670531..c8b0ed9`) contra o que está decidido e procurar
+- **Pedido:** revisar (`/code-review`) as mudanças da leva (`54ce6b7..604a13c`) contra o que está decidido e procurar
   defeitos parecidos com o da linha FEAT cortada, que dependem de tempo entre tasks.
 - **Revisão:** 15 achados, conferidos no código. Três ficaram sem mudança:
   - a versão do ESP-NOW, que não mudou com o `HELP` de propósito; mudá-la nem resolveria, porque o ACK é da
@@ -387,7 +416,7 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   - **defeitos achados e corrigidos:**
     - **pulseira fora do InfluxDB:** o consumidor `telegraf-ids` usa sessão persistente, e com ela o Telegraf
       não assina tópicos novos enquanto o broker guarda a sessão. Ele ficou assinando `vestivel/+` desde a troca
-      de nomes (commit 14f70f3). Corrigido com o `client_id` `telegraf-ids-2`, comentado no `telegraf.conf`, e
+      de nomes (commit 746ced7). Corrigido com o `client_id` `telegraf-ids-2`, comentado no `telegraf.conf`, e
       a sessão velha apagada no broker. A pegadinha entrou no README da central e no `CLAUDE.md`;
     - **tabela de alertas:** erro do Flux (`schema collision`), por juntar campos de texto com o `detalhe_prob`
       numérico antes do `pivot`. Agora é `pivot` e depois `group()`;

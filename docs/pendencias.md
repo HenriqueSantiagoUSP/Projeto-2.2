@@ -301,16 +301,6 @@ Tudo isto já está no código e compila; falta rodar na placa.
 - [ ] **Baixar de novo 3 PDFs** de `relatorios/Semestre 2/Projeto 2/`: `Entrega 1.pdf`,
   `EnunciadoProjeto 2_parcial.pdf` e `EnunciadoProjeto 2_PCB.pdf`. Foram apagados por engano e não têm cópia no
   disco.
-- [ ] **Primeiro push para o GitHub:** o remoto `origin` foi configurado em 2026-11-18
-  (`https://github.com/HenriqueSantiagoUSP/Projeto-2.2.git`). O repositório lá estava vazio, e nada foi enviado
-  ainda.
-  - **O relatório do Q2 cita esse endereço** (Apêndices C e D). Os caminhos citados,
-    `hardware/fontes/esquematico/` e `hardware/placas/v1/`, já têm commit e passam a existir lá com o push. O
-    repositório precisa estar público, ou aberto a quem corrige.
-  - **`aulas/` saiu do histórico em 2026-11-18,** a pedido do usuário: os slides da disciplina não vão para o
-    GitHub. Os commits a partir do que a adicionou ganharam hashes novos, e as citações no diário foram
-    corrigidas.
-  - **Conferido em 2026-11-18:** nenhum `.env`, `sdkconfig`, senha ou chave em commit algum do histórico.
 - [ ] **Fim de linha na cópia de trabalho:** o `core.autocrlf=true` do sistema faz o checkout em CRLF (o
   repositório está em LF). Um `.gitattributes` com `* text=auto eol=lf` e um `git add --renormalize .` deixam a
   cópia em LF também.
@@ -332,6 +322,21 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-23 — Repositório no GitHub com o e-mail privado.** O GitHub
+  (`https://github.com/HenriqueSantiagoUSP/Projeto-2.2`, público) já tinha recebido os 33 commits até
+  "aulas/ fora do histórico", num push feito fora destas sessões, com o Gmail pessoal como autor.
+  - A pedido do usuário, os 35 commits foram reescritos com o noreply do GitHub
+    (`236665487+HenriqueSantiagoUSP@users.noreply.github.com`) e enviados com *force push*. O noreply ficou
+    configurado neste repositório (`git config user.email`).
+  - **Não some de tudo:** o GitHub ainda pode mostrar os commits antigos por link direto e no registro de
+    atividade, e quem já tinha clonado tem a cópia antiga; essa pessoa precisa clonar de novo.
+  - **Conferido antes do envio:**
+    - nenhum `.env`, `sdkconfig`, senha ou chave do ESP-NOW em commit algum (8 valores reais procurados no
+      histórico);
+    - a árvore final igual à de antes;
+    - `git fsck` sem erros;
+    - os hashes citados nas mensagens e nos documentos trocados pelos novos.
+  - O relatório do Q2 cita o endereço (Apêndices C e D), e os caminhos citados existem lá.
 - [x] **2026-11-23 — Painel "Quartos": o estado atual é só o da conexão atual do hub.** Antes, os painéis do topo
   mostravam o último valor dos últimos 30 dias, e a rodada do simulador de 17/11 aparecia como se estivesse
   conectada (a pulseira "Online", portas e temperatura).
@@ -355,7 +360,7 @@ O mais recente no topo.
   - Verificado: `pdflatex` sem erros, sem referência indefinida, sem caractere faltando e sem *overfull*
     (72 páginas); as páginas mudadas conferidas na imagem, e nenhum decimal com espaço no texto do PDF.
 
-- [x] **2026-11-18 — Correções da revisão de código** (`21cb342..c8b0ed9`; detalhes no diário):
+- [x] **2026-11-18 — Correções da revisão de código** (`e6379cd..604a13c`; detalhes no diário):
   - **pulseira:**
     - um gesto que encontra a fila cheia guarda a hora;
     - a janela da queda conta da detecção;
