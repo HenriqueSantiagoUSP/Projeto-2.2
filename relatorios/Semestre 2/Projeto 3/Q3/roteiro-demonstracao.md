@@ -74,6 +74,9 @@ Os passos de cada placa estão nos READMEs:
    senha do Grafana no `.env`. Devem aparecer:
    - **Hub** e **Pulseira** "Online";
    - temperatura e portas como "sem leitura", porque não estão instaladas.
+
+   Antes de o hub conectar, todo o topo fica em "sem leitura": o painel só mostra o que chegou na conexão atual
+   do hub, e nada da rodada do simulador nem do ensaio de hoje.
 5. **Tela:** o monitor do hub de um lado e o Grafana do outro. Opcional: a pulseira na USB, com o
    `demo_pulseira.py --porta COMy` **sem** `--mqtt-host`, mostrando o sinal ao vivo.
 

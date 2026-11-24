@@ -251,6 +251,13 @@ Tudo isto já está no código e compila; falta rodar na placa.
 - [ ] **Painel no Grafana para `pulseira_telemetria`**, a telemetria que a pulseira publica direto (hoje ela só
   é gravada).
 - [ ] **Servidor NTP local** (no Raspberry Pi ou num container da central), para a ILPI funcionar sem internet.
+- [ ] **Estado atual do painel com o hub conectado há mais de 30 dias** (limite achado em 2026-11-23,
+  [`decisoes.md`](decisoes.md), *Estado atual no painel*). Os painéis do topo só mostram o que chegou depois do
+  `status` "online" da conexão atual, e a retenção de 30 dias apaga esse ponto. O mesmo já acontecia com uma porta
+  parada há mais de 30 dias. Opções: o hub republicar os estados retidos uma vez por dia, ou guardar o `status`
+  mais tempo.
+- [ ] **Estado atual do painel com o hub de verdade:** conferir, no ensaio do Q3, que os estados aparecem logo
+  depois que o hub conecta e que somem ("sem leitura") quando ele cai. Só foi testado com dados sintéticos.
 - [ ] **Banco relacional da central**, para integrar com a interface. O banco final vai ser PostgreSQL.
   - **Protótipo:** a atividade de Fundamentos de Software em SQLite (`C:\Users\henri\dev\tarefa python sql`,
     repositório do grupo) já tem um esquema de 9 tabelas, revisado em 2026-11-10:
@@ -325,6 +332,17 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-23 — Painel "Quartos": o estado atual é só o da conexão atual do hub.** Antes, os painéis do topo
+  mostravam o último valor dos últimos 30 dias, e a rodada do simulador de 17/11 aparecia como se estivesse
+  conectada (a pulseira "Online", portas e temperatura).
+  - Agora presença, portas, pulseira e temperatura só valem depois do `status` "online" da conexão atual, e a
+    temperatura também só se chegou nos últimos 15 min. Com o hub offline, mostram "sem leitura".
+  - Verificado:
+    - 13 casos com dados sintéticos no InfluxDB, e dois erros plantados pegos;
+    - os dados reais dão "sem leitura";
+    - o Grafana carrega e executa as consultas.
+
+    Falta o hub de verdade (item na Central).
 - [x] **2026-11-18 — Revisão do relatório do Q2 e correções** (nota da revisão: 8,5; detalhes no diário):
   - o Resumo deixou de misturar os dois pontos de operação;
   - a vírgula decimal nas fórmulas saía com espaço (`icomma`), e os coeficientes do filtro ficaram legíveis;

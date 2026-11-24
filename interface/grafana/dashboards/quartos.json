@@ -41,6 +41,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "sem leitura",
           "displayName": "Hub",
           "color": { "mode": "fixed", "fixedColor": "text" },
           "mappings": [
@@ -70,11 +71,12 @@
         {
           "refId": "A",
           "datasource": { "type": "influxdb", "uid": "influxdb" },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> last()\n  |> keep(columns: [\"_value\"])"
+          "query": "import \"date\"\n\n// \"Now\" means sent during the hub's current MQTT connection: on every connection the hub\n// publishes status \"online\" and then every retained state again (docs/protocolo.md §1).\n// With the hub offline nothing is current, and what an older connection (or the simulator)\n// sent is history, shown in the panels below.\nstatus = from(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"status\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> group()\n  |> sort(columns: [\"_time\"])\nlastStatus = status |> last() |> findRecord(fn: (key) => true, idx: 0)\nlastOffline = status |> filter(fn: (r) => r._value == \"offline\") |> last() |> findRecord(fn: (key) => true, idx: 0)\nconnected = status\n  |> filter(fn: (r) => r._value == \"online\" and (not exists lastOffline._time or r._time > lastOffline._time))\n  |> first()\n  |> findRecord(fn: (key) => true, idx: 0)\n// 5 s of slack: the states come through another Telegraf consumer, a few ms apart.\nsince = if exists lastStatus._value and lastStatus._value == \"online\" and exists connected._time\n  then date.sub(d: 5s, from: connected._time)\n  else date.add(d: 1m, to: now())\n\nfrom(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> filter(fn: (r) => r._time >= since)\n  |> last()\n  |> keep(columns: [\"_value\"])"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "sem leitura",
           "displayName": "Presença",
           "color": { "mode": "fixed", "fixedColor": "text" },
           "mappings": [
@@ -104,7 +106,7 @@
         {
           "refId": "A",
           "datasource": { "type": "influxdb", "uid": "influxdb" },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"temperatura\" and r._field == \"valor\" and r.quarto == \"${quarto}\")\n  |> last()\n  |> keep(columns: [\"_value\"])"
+          "query": "import \"date\"\n\n// \"Now\" means sent during the hub's current MQTT connection: on every connection the hub\n// publishes status \"online\" and then every retained state again (docs/protocolo.md §1).\n// With the hub offline nothing is current, and what an older connection (or the simulator)\n// sent is history, shown in the panels below.\nstatus = from(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"status\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> group()\n  |> sort(columns: [\"_time\"])\nlastStatus = status |> last() |> findRecord(fn: (key) => true, idx: 0)\nlastOffline = status |> filter(fn: (r) => r._value == \"offline\") |> last() |> findRecord(fn: (key) => true, idx: 0)\nconnected = status\n  |> filter(fn: (r) => r._value == \"online\" and (not exists lastOffline._time or r._time > lastOffline._time))\n  |> first()\n  |> findRecord(fn: (key) => true, idx: 0)\n// 5 s of slack: the states come through another Telegraf consumer, a few ms apart.\nsince = if exists lastStatus._value and lastStatus._value == \"online\" and exists connected._time\n  then date.sub(d: 5s, from: connected._time)\n  else date.add(d: 1m, to: now())\n\n// 15m = three missed signs of life (one every 5 min, docs/protocolo.md §1).\nfrom(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"temperatura\" and r._field == \"valor\" and r.quarto == \"${quarto}\")\n  |> filter(fn: (r) => r._time >= since and r._time >= date.sub(d: 15m, from: now()))\n  |> last()\n  |> keep(columns: [\"_value\"])"
         }
       ],
       "fieldConfig": {
@@ -143,7 +145,7 @@
         {
           "refId": "A",
           "datasource": { "type": "influxdb", "uid": "influxdb" },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"porta\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> last()\n  |> keep(columns: [\"_value\", \"id\"])"
+          "query": "import \"date\"\n\n// \"Now\" means sent during the hub's current MQTT connection: on every connection the hub\n// publishes status \"online\" and then every retained state again (docs/protocolo.md §1).\n// With the hub offline nothing is current, and what an older connection (or the simulator)\n// sent is history, shown in the panels below.\nstatus = from(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"status\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> group()\n  |> sort(columns: [\"_time\"])\nlastStatus = status |> last() |> findRecord(fn: (key) => true, idx: 0)\nlastOffline = status |> filter(fn: (r) => r._value == \"offline\") |> last() |> findRecord(fn: (key) => true, idx: 0)\nconnected = status\n  |> filter(fn: (r) => r._value == \"online\" and (not exists lastOffline._time or r._time > lastOffline._time))\n  |> first()\n  |> findRecord(fn: (key) => true, idx: 0)\n// 5 s of slack: the states come through another Telegraf consumer, a few ms apart.\nsince = if exists lastStatus._value and lastStatus._value == \"online\" and exists connected._time\n  then date.sub(d: 5s, from: connected._time)\n  else date.add(d: 1m, to: now())\n\nfrom(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"porta\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> filter(fn: (r) => r._time >= since)\n  |> last()\n  |> keep(columns: [\"_value\", \"id\"])"
         }
       ],
       "fieldConfig": {
@@ -178,11 +180,12 @@
         {
           "refId": "A",
           "datasource": { "type": "influxdb", "uid": "influxdb" },
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"pulseira\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> last()\n  |> keep(columns: [\"_value\", \"id\"])"
+          "query": "import \"date\"\n\n// \"Now\" means sent during the hub's current MQTT connection: on every connection the hub\n// publishes status \"online\" and then every retained state again (docs/protocolo.md §1).\n// With the hub offline nothing is current, and what an older connection (or the simulator)\n// sent is history, shown in the panels below.\nstatus = from(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"status\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> group()\n  |> sort(columns: [\"_time\"])\nlastStatus = status |> last() |> findRecord(fn: (key) => true, idx: 0)\nlastOffline = status |> filter(fn: (r) => r._value == \"offline\") |> last() |> findRecord(fn: (key) => true, idx: 0)\nconnected = status\n  |> filter(fn: (r) => r._value == \"online\" and (not exists lastOffline._time or r._time > lastOffline._time))\n  |> first()\n  |> findRecord(fn: (key) => true, idx: 0)\n// 5 s of slack: the states come through another Telegraf consumer, a few ms apart.\nsince = if exists lastStatus._value and lastStatus._value == \"online\" and exists connected._time\n  then date.sub(d: 5s, from: connected._time)\n  else date.add(d: 1m, to: now())\n\nfrom(bucket: v.defaultBucket)\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"pulseira\" and r._field == \"estado\" and r.quarto == \"${quarto}\")\n  |> filter(fn: (r) => r._time >= since)\n  |> last()\n  |> keep(columns: [\"_value\", \"id\"])"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "sem leitura",
           "displayName": "${__field.labels.id}",
           "color": { "mode": "fixed", "fixedColor": "text" },
           "mappings": [

@@ -75,6 +75,40 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-23 — painel "Quartos": o estado atual é só o da conexão atual do hub
+
+- **Pedido:** o Grafana mostrava a pulseira "Online" e o estado dos sensores sem nada conectado. Corrigir o painel.
+- **Causa** (consultada no InfluxDB):
+  - os últimos pontos de tudo eram da rodada do simulador de 17/11, às 21:52–21:53 (pulseira `a1b2c3`, a do
+    simulador);
+  - os painéis do topo pegavam o último valor dos 30 dias, sem olhar a idade;
+  - o hub aparecia "Offline" por causa do Last Will. A pulseira continuava "Online": quem publica o estado dela é
+    o hub, e o hub tinha sumido.
+
+  Na demonstração, isso mostraria a pulseira do simulador e duas portas que o hub de demonstração não tem.
+- **Feito** (`interface/grafana/dashboards/quartos.json`):
+  - presença, portas, pulseira e temperatura do topo só valem depois do `status` "online" que segue o último
+    "offline", com 5 s de folga;
+  - a temperatura também só vale se chegou nos últimos 15 min;
+  - com o hub offline, os quatro mostram "sem leitura", o que também vale para o hub e a presença sem dado
+    nenhum;
+  - decisão em `decisoes.md`; o limite dos 30 dias foi para as pendências.
+- **Verificado:**
+  - 13 casos com dados sintéticos rodados no InfluxDB do Docker, com a mesma consulta e só a origem dos dados
+    trocada:
+    - nova conexão;
+    - temperatura recente e velha;
+    - hub offline;
+    - sem status;
+    - sem queda;
+    - a folga de 5 s;
+  - os testes pegaram dois erros plantados: sem o filtro da conexão, 6 falhas; sem a folga, 1;
+  - nos dados reais, as quatro consultas voltam vazias;
+  - o Grafana recarregado devolve o painel novo e executa as cinco consultas sem erro, com o hub "Offline" e o
+    resto "sem leitura". A tela não foi capturada.
+
+  Falta conferir com o hub de verdade conectando.
+
 ### 2026-11-23 — demonstração do Q3 preparada: pulseira → ESP-NOW → hub só com o PIR → central
 
 - **Pedido:** mostrar no Q3 (24/11) a comunicação sem fio com os sensores, sem a PCB (ainda não soldada). São

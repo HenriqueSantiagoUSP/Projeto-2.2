@@ -296,6 +296,31 @@ quando a queda não foi detectada ou quando é outra situação.
 | O código C continua em inglês: `firmware/gadget`, `wearable`, o menu "Wearable" | regra do projeto (código e comentários em inglês) |
 | Os materiais já entregues do Q1 (`relatorios/Semestre 2/Projeto 3/Q1/`) e o `interface/legado/` ficam como foram entregues, com "vestível" | são registro do que foi entregue; reescrevê-los separaria o fonte do PDF entregue |
 
+## Estado atual no painel: só a conexão atual do hub (2026-11-23)
+
+O painel "Quartos" mostrava a pulseira "Online", a presença, as portas e a temperatura sem nada conectado. Eram os
+valores da rodada do simulador de 17/11: os painéis do topo pegavam o último valor dos últimos 30 dias, sem olhar
+a idade. O hub aparecia "Offline", porque o Last Will avisa a queda dele. A pulseira não tem quem avise: quem
+publica `pulseira/<id>` é o hub, e um hub que sumiu não publica o offline dela.
+
+Na demonstração do Q3, os valores do simulador apareceriam ao lado da placa real: a pulseira `a1b2c3` e duas
+portas que o hub de demonstração nem tem.
+
+| Decisão | Por quê |
+|---|---|
+| Presença, temperatura, portas e pulseira, no topo do painel, mostram **só o que chegou na conexão atual do hub**: depois do primeiro `status` "online" que segue o último "offline", com 5 s de folga. Com o hub offline, nada é atual, e os quatro mostram "sem leitura" | o hub republica todo estado retido a cada conexão ([`protocolo.md`](protocolo.md) §1), então o que ele sabe agora sempre chega depois do "online". O que veio de uma conexão anterior, ou do simulador, é histórico e continua nos gráficos de baixo. A folga cobre os estados que chegam por outro consumidor do Telegraf, alguns ms antes do status |
+| A temperatura também precisa ter chegado nos **últimos 15 min** | ela tem sinal de vida a cada 5 min; sem três seguidos, o LM35 saiu ou o hub parou de medir |
+| O "online" de quando `hora` muda não abre conexão nova | o hub publica `status` de novo quando acerta o relógio, sem republicar os estados |
+| O painel do hub continua com o último `status` dos 30 dias | o Last Will garante que ele está certo |
+
+Verificado: 13 casos com dados sintéticos no InfluxDB, com dois erros plantados pegos; as consultas sobre os dados
+reais (só o simulador, com o hub offline) dão "sem leitura"; o Grafana carrega e executa as cinco. Falta ver com
+o hub de verdade conectando.
+
+**Limite:** um hub conectado há mais de 30 dias sem reconectar perde o `status` "online" pela retenção, e os
+painéis do topo ficam em "sem leitura". O mesmo já acontecia com uma porta parada há mais de 30 dias. A
+correção está em [`pendencias.md`](pendencias.md) (Central).
+
 ## `aulas/` fora do git (2026-11-16)
 
 | Decisão | Por quê |

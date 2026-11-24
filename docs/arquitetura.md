@@ -222,7 +222,7 @@ Wearable, mais os menus comuns Network (Wi-Fi), MQTT e CAN bus (TWAI) quando os 
 | Mosquitto | broker com usuário/senha e ACL (`hub`, `pulseira`, `telegraf`, `notificador`, `painel`) |
 | Telegraf | grava todos os tópicos MQTT no InfluxDB, sem código. Cada mensagem vira um ponto, por isso o hub só publica o que mudou ([`protocolo.md`](protocolo.md) §1, *Envio por mudança*) |
 | InfluxDB | séries temporais, retenção de 30 dias |
-| Grafana | painel "Quartos", com seletor de quarto: estado atual, histórico e alertas; versionado em JSON |
+| Grafana | painel "Quartos", com seletor de quarto: estado atual (só o que chegou na conexão atual do hub), histórico e alertas; versionado em JSON |
 | Notificador (Python) | assina `idoso/+/+/alerta` e envia ao Telegram do cuidador |
 | Simulador (Python) | faz o papel de um hub, para testar a central sem hardware |
 
