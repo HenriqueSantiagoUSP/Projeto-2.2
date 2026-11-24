@@ -28,7 +28,8 @@ para o git. Os três primeiros menus vêm de `firmware/common/` e são os mesmas
 | PCB | versão da DevKitC-1 (LED de status no GPIO48 na v1.0, no GPIO38 na v1.1) |
 
 Sem SSID, o hub fica só com ESP-NOW num canal fixo, o que basta para testar a pulseira sem roteador. O MAC do
-hub, que a pulseira precisa, aparece no log de boot.
+hub, que a pulseira precisa, aparece no log de boot (`hub MAC aa:bb:…`). Antes de gravar, ele também sai com
+`python -m esptool --port COMx read-mac`.
 
 ### Sem alguma peça
 
@@ -60,6 +61,60 @@ usa. Para outra porta (a placa tem 4 entradas e mais 4 na expansão), acrescente
 `BOARD_DOORS` (até 8: uma por nibble CAN). Os parâmetros das regras (tempos, faixa de temperatura, papel de cada
 porta) **não** ficam aqui: chegam por MQTT em `config/desejada` e são guardados em NVS (`interface/README.md`,
 seção 5).
+
+## Demonstração: hub só com o PIR
+
+Para mostrar a pulseira chegando ao hub por ESP-NOW e o hub publicando na central, com uma DevKit que só tem o PIR
+(HC-SR501: VCC no 5V, GND e OUT no GPIO 8). O roteiro completo da apresentação do Q3 está em
+[`relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md`](<../../relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md>).
+
+1. **Perfil** [`sdkconfig.demo.defaults`](sdkconfig.demo.defaults):
+   - o PIR fica ligado;
+   - o LM35 e as duas portas ficam declarados ausentes (um aviso de cada no boot, e nada mais);
+   - o CAN fica em modo bancada: sem transceptor, cada mudança de presença volta como quadro CAN no log.
+
+   Ele fica numa pasta de build própria, sem mexer no `sdkconfig` do dia a dia.
+2. **`menuconfig` nessa mesma pasta:**
+
+   ```powershell
+   idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" menuconfig
+   ```
+
+   Preencha:
+   - **Network (Wi-Fi):** SSID e senha de uma rede de 2,4 GHz. O hotspot do próprio PC é o mais seguro, porque o
+     PC fica sempre em `192.168.137.1`;
+   - **MQTT:** `mqtt://<IP do PC>:1883`, usuário `hub`, senha = `MQTT_HUB_PASSWORD` do `interface/.env`;
+   - **Room hub: ESP-NOW:**
+     - o MAC da pulseira (`wearable …, MAC …` no boot dela, ou `esptool read-mac`);
+     - PMK e LMK de 16 caracteres, as mesmas da pulseira;
+   - **PCB:** a versão da DevKit, para o LED.
+3. **Gravar e abrir o monitor**, com o mesmo `-B build/demo`:
+
+   ```powershell
+   idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" -p COMx build flash monitor
+   ```
+
+   No boot devem aparecer:
+   - `hub MAC …`;
+   - `paired with …, encrypted`;
+   - `connected, ip …, channel N`;
+   - `connected to mqtt://…`;
+   - os avisos esperados: `temperature sensor not fitted` e `door … not fitted`.
+
+   O PIR começa a valer depois de 60 s de aquecimento.
+4. **Com a pulseira ligada** (perfil em [`firmware/gadget/README.md`](../gadget/README.md), "Demonstração com o hub")
+   o hub registra:
+   - `PING from <id>: the wearable found the hub`, quando ela acha o canal;
+   - `heartbeat from <id>: rssi … dBm` a cada 30 s;
+   - `FALL from <id>`, `HELP from <id>` e o `alert …` de cada um.
+
+| Sintoma | Causa provável |
+|---|---|
+| A pulseira diz `hub found on channel N`, mas o hub não mostra nada | PMK ou LMK diferentes nas duas placas, ou o MAC da pulseira errado no hub: o rádio do hub pode confirmar o quadro e descartá-lo sem avisar |
+| `frames from … ignored: only the paired wearable is accepted` | o MAC da pulseira no `menuconfig` do hub não é o dela |
+| A pulseira diz `hub not found on any channel` | hub desligado, MAC do hub errado na pulseira, ou a rede no canal 12 ou 13: sem o país configurado, a pulseira só procura do 1 ao 11. O canal sai na linha `connected, ip …, channel N` do hub |
+| `broker refused the connection` | usuário ou senha do broker |
+| `broker … not reachable` | IP errado na URI, a central parada, ou o firewall do PC (`interface/README.md`, seção 4) |
 
 ## Componentes
 

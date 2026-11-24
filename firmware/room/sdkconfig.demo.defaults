@@ -1,0 +1,24 @@
+# Demonstration of the wireless link (S2 P3, Q3) on a bare DevKit: the PIR on GPIO 8 and
+# nothing else (no LM35, no reed switch, no CAN transceiver, no buzzer). Applied on top of
+# sdkconfig.defaults, in its own build directory, so the everyday sdkconfig is left alone
+# (README, "Demonstração: hub só com o PIR"):
+#
+#   idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" build flash
+#
+# Defaults only fill options the sdkconfig does not have yet: after changing this file,
+# delete build/demo/sdkconfig so it is generated again. The Wi-Fi, the broker and its
+# password, the wearable's MAC and the ESP-NOW keys belong to the installation: set them
+# with menuconfig on the same build directory (-B build/demo -D SDKCONFIG=...).
+
+# The PIR is the only sensor wired.
+CONFIG_HUB_PIR_FITTED=y
+
+# Declared absent, so each one gives one warning at boot and nothing else: an unplugged
+# LM35 is dropped anyway, but an unplugged reed switch reads "open" and would raise false
+# night exit alerts.
+# CONFIG_HUB_LM35_FITTED is not set
+CONFIG_HUB_DOORS_ABSENT="quarto,banheiro"
+
+# No transceiver: the node acknowledges and receives its own frames (internal loopback),
+# so every presence change also shows as a CAN frame in the log.
+CONFIG_APP_CAN_SELF_TEST=y

@@ -195,3 +195,12 @@ Entrega: [`Entrega 1.pdf`](<Semestre 2/Projeto 2/Entrega 1.pdf>)
   texto, com as instruções no topo do `main.tex`; quais são e do que dependem está em
   [`docs/pendencias.md`](../docs/pendencias.md) (item do Q2).
 - **Repositório:** os Apêndices C e D citam `https://github.com/HenriqueSantiagoUSP/Projeto-2.2`.
+
+**Q3: demonstração em sala** (24/11): a comunicação sem fio com os sensores, sem a PCB (ainda não soldada), em duas
+DevKits. A pulseira tem só o MPU-6050, e o hub só o PIR. O caminho é pulseira → ESP-NOW → hub → Wi-Fi + MQTT →
+central.
+- **Roteiro:** [`Q3/roteiro-demonstracao.md`](<Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md>), com a
+  preparação, a ordem de ligar, a sequência com o que dizer e os planos B.
+- **Perfis de firmware:**
+  - `firmware/room/sdkconfig.demo.defaults`: só o PIR;
+  - na pulseira, o perfil de demonstração com o MAC do hub, no build `build/dupla`.

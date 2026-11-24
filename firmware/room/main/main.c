@@ -13,6 +13,7 @@
 #include "esp_app_desc.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "nvs_flash.h"
@@ -400,7 +401,19 @@ static void handle_espnow(const espnow_rx_msg_t *msg, const rules_clock_t *now){
     }
 
     switch (msg->type) {
+        case ESPNOW_MSG_PING:
+            /* Only the PING on the hub's channel arrives: the wearable's channel search ends here. */
+            ESP_LOGI(TAG, "PING from %s: the wearable found the hub (rssi %d dBm)", msg->wearable, msg->rssi);
+            break;
         case ESPNOW_MSG_HEARTBEAT:
+            /* One line every 30 s: on the bench, the proof that the wearable is heard. */
+            if (msg->heartbeat.battery_mv != ESPNOW_BATTERY_UNKNOWN) {
+                ESP_LOGI(TAG, "heartbeat from %s: rssi %d dBm, activity %u mg, battery %u mV", msg->wearable,
+                         msg->rssi, msg->heartbeat.activity_mg, msg->heartbeat.battery_mv);
+            } else {
+                ESP_LOGI(TAG, "heartbeat from %s: rssi %d dBm, activity %u mg", msg->wearable, msg->rssi,
+                         msg->heartbeat.activity_mg);
+            }
             w->heard_heartbeat = true;
             w->battery_mv = msg->heartbeat.battery_mv;
             report_rms_add(&w->activity, msg->heartbeat.activity_mg);
@@ -752,6 +765,12 @@ void app_main(void){
         .on_change = on_net,
     };
     ESP_ERROR_CHECK(net_init(&net_config));
+    uint8_t hub_mac[6];
+    if (esp_read_mac(hub_mac, ESP_MAC_WIFI_STA) == ESP_OK) {
+        /* ESP-NOW goes to the station MAC: the wearable needs exactly this one. */
+        ESP_LOGI(TAG, "hub MAC " MACSTR " (set it in the wearable: menu Wearable > MAC of the room hub)",
+                 MAC2STR(hub_mac));
+    }
     err = espnow_link_init(on_espnow, NULL);
     if (err != ESP_OK) {
         /* Doors, presence and temperature carry on; the wearable it expects will be reported offline. */

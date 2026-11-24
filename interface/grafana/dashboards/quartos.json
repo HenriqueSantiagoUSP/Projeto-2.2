@@ -109,6 +109,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "sem leitura",
           "displayName": "Temperatura",
           "unit": "celsius",
           "decimals": 1,
@@ -147,6 +148,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "sem leitura",
           "displayName": "${__field.labels.id}",
           "color": { "mode": "fixed", "fixedColor": "text" },
           "mappings": [
@@ -215,6 +217,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "sem leitura",
           "displayName": "Temperatura",
           "unit": "celsius",
           "decimals": 1,
@@ -321,6 +324,7 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "noValue": "sem leitura",
           "displayName": "${__field.labels.id}",
           "unit": "mvolt",
           "custom": { "lineWidth": 2, "thresholdsStyle": { "mode": "line" } },

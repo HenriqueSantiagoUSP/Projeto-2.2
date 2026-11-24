@@ -33,8 +33,19 @@ Pedidos e prazos em [`relatorios/README.md`](../relatorios/README.md), Projeto 3
       Saíram do relatório (2026-11-17) a PCB montada e a bancada CAN, porque ainda faltam componentes para
       montar a placa, e a pulseira no pulso, porque o protótipo é a placa 2 em 1, não uma pulseira pronta;
     - preencher `\docentes`, se o grupo quiser.
-- [ ] **Q3 (24/11):** apresentação em sala da comunicação sem fio funcionando com os sensores. Depende da
-  bancada abaixo: pulseira → ESP-NOW → hub → MQTT → central.
+- [ ] **Q3 (24/11):** apresentação em sala da comunicação sem fio funcionando com os sensores: pulseira →
+  ESP-NOW → hub → MQTT → central.
+  - **Pronto (2026-11-23):**
+    - o roteiro, em
+      [`relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md`](<../relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md>);
+    - o perfil do hub só com o PIR (`firmware/room/sdkconfig.demo.defaults`);
+    - os logs de PING e heartbeat no hub;
+    - "sem leitura" no Grafana.
+
+    Duas DevKits sem a PCB: a pulseira só com o MPU-6050, e o hub só com o PIR.
+  - **Falta o ensaio com as duas placas antes da aula.** Será a primeira vez do hub numa placa, do ESP-NOW entre
+    as duas e do hub falando com a central em Docker. O que for visto nele confere os itens "Hub gravado e
+    conferido" e "Pulseira gravada e conferida" abaixo (descoberta de canal, heartbeat no Grafana, queda).
 
 ## Agora: verificação em bancada
 
@@ -194,6 +205,11 @@ Tudo isto já está no código e compila; falta rodar na placa.
 - [ ] ***Light sleep* na pulseira.** A estratégia depende do consumo medido. O mapa de pinos já deixa o botão
   e o INT do MPU em RTC GPIO e o I²C no par do ULP.
 - [ ] **Hub sem internet:** apontar `APP_SNTP_SERVER` para o NTP local quando ele existir (ver Central).
+- [ ] **País do Wi-Fi nas duas placas** (achado em 2026-11-23, na preparação do Q3).
+  - Hoje fica o padrão do ESP-IDF ("01", canais 1–11). O hub segue o canal do roteador, mas a pulseira, que não
+    entra na rede, não consegue mudar para o 12 nem para o 13, e não acharia um hub num roteador nesses canais.
+  - Correção: `esp_wifi_set_country_code("BR", …)` no `net`, com o país no `menuconfig` (menu "Network").
+  - Deixado para depois da apresentação. Até lá, a rede da demonstração fica num canal de 1 a 11.
 - [ ] **CAN de outros grupos da sala no MQTT:** hoje só vai para o log; falta definir os tópicos em
   [`protocolo.md`](protocolo.md) §4.
 - [ ] **Decidir: tirar do treino as janelas que passam da borda do ensaio** (item 19 da revisão de 2026-11-13).

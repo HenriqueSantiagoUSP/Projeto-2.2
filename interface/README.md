@@ -156,6 +156,20 @@ Libere as portas 1883 e 9001 no firewall se o hub estiver em outra máquina:
 New-NetFirewallRule -DisplayName "Mosquitto MQTT" -Direction Inbound -Protocol TCP -LocalPort 1883,9001 -Action Allow
 ```
 
+**Rede para uma demonstração:** o IP da máquina vai compilado na URI do hub, então convém uma rede em que ele não
+mude. O "Hotspot móvel" do Windows (Configurações → Rede e Internet) deixa o PC sempre em `192.168.137.1`:
+- escolha a banda de **2,4 GHz**, porque o ESP32 não usa 5 GHz;
+- confira o canal na linha `connected, ip …, channel N` do hub: a pulseira só procura do 1 ao 11.
+
+Para ver o hub chegando ao broker, sem o Grafana:
+
+```powershell
+docker compose exec mosquitto mosquitto_sub -u painel -P <MQTT_PAINEL_PASSWORD> -v -t "idoso/#"
+```
+
+Dentro do container não há o problema do serviço Mosquitto do Windows. Os passos da demonstração de duas placas
+estão em [`firmware/room/README.md`](../firmware/room/README.md), "Demonstração: hub só com o PIR".
+
 ## 5. Ajustar as regras de um quarto
 
 As regras rodam no hub, e os parâmetros mudam sem regravar a placa: publique em `config/desejada` com o

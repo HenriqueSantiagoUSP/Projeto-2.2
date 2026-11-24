@@ -117,6 +117,43 @@ Para mostrar o modelo funcionando só com a ESP e o MPU-6050, ligada ao computad
 O modelo foi treinado com o sensor na **cintura** (SisFall), então movimentos de mão podem dar resultados
 diferentes dos de uma pessoa caindo.
 
+## Demonstração com o hub (duas placas)
+
+Para mostrar a queda indo da pulseira ao hub por ESP-NOW e do hub à central (o Q3; roteiro em
+[`relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md`](<../../relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md>)).
+O hub usa o perfil "Demonstração: hub só com o PIR" do [`firmware/room/README.md`](../room/README.md).
+
+1. **Ligação:** a mesma da demonstração com uma placa. O botão é opcional: um botão (ou um fio) do GPIO 18 ao GND
+   mostra o "estou bem" (dois toques) e o pedido de ajuda (segurar 3 s). Solto, o pull-up interno o deixa em
+   repouso.
+2. **Perfil:** o mesmo `sdkconfig.demo.defaults` (coleta, espera de 5 s entre quedas, 921600 baud), numa pasta de
+   build própria, `build/dupla`, e com o MAC do hub no `menuconfig`:
+
+   ```powershell
+   idf.py -B build/dupla -D SDKCONFIG=build/dupla/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" menuconfig
+   ```
+
+   Em **Wearable**:
+   - o MAC do hub (`hub MAC …` no boot dele, ou `python -m esptool --port COMx read-mac`);
+   - PMK e LMK de 16 caracteres, as mesmas do hub.
+
+   Sem Wi-Fi nem broker: a pulseira não entra em rede nenhuma.
+3. **Gravar:**
+
+   ```powershell
+   idf.py -B build/dupla -D SDKCONFIG=build/dupla/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" -p COMx build flash
+   ```
+
+   No boot, em vez do aviso `no hub configured`, aparecem:
+   - `hub …, encrypted`;
+   - `hub found on channel N`, o canal da rede do hub.
+
+   Com o hub ainda desligado, sai um aviso só, e ela o acha sozinha quando ele liga.
+4. **Dois modos, o mesmo binário:**
+   - **sozinha, num power bank:** como seria no pulso;
+   - **na USB do PC:** com o `demo_pulseira.py --porta COMx`, **sem** `--mqtt-host`, para mostrar o sinal ao vivo.
+     Quem leva a queda à central é o hub; com `--mqtt-host`, ela chegaria duas vezes.
+
 ## Componentes e tasks
 
 Próprios, em `components/`: `board`, `mpu6050`, `fall_pipeline` e `signal_proc` (os dois dependem de

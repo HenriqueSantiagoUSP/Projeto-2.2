@@ -28,8 +28,12 @@ conferida (ERC e DRC sem erros) e com os arquivos de fabricação em
 [`hardware/placas/v1/`](../hardware/placas/v1/README.md). Ela já foi fabricada e está em mãos; falta montar
 e testar.
 
-**S2 P3:** o Q1 (modelos) foi entregue e apresentado. Os próximos são o Q2, um relatório para 17/11, e o Q3, a
-comunicação sem fio funcionando com os sensores, para 24/11.
+**S2 P3:**
+- **Q1 (modelos):** entregue e apresentado.
+- **Q2 (relatório, 17/11):** entregue como primeira versão, a ser completada na entrega final.
+- **Q3 (24/11):** a comunicação sem fio com os sensores, em duas DevKits sem a PCB. Está preparada, com o roteiro
+  em [`relatorios/Semestre 2/Projeto 3/Q3/`](<../relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md>), e
+  falta o ensaio com as duas placas.
 
 **Modelo de queda:**
 - **2026-11-09 (S2 P3 Q1):** o pipeline e 22 métodos foram desenvolvidos e comparados **no PC**
@@ -70,6 +74,47 @@ A lista de pendências e próximos passos fica em [`pendencias.md`](pendencias.m
 Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
+
+### 2026-11-23 — demonstração do Q3 preparada: pulseira → ESP-NOW → hub só com o PIR → central
+
+- **Pedido:** mostrar no Q3 (24/11) a comunicação sem fio com os sensores, sem a PCB (ainda não soldada). São
+  duas DevKits: a pulseira só com o MPU-6050, e o hub só com o PIR, sem erro pela falta dos outros sensores.
+  Também verificar o que faltava implementar.
+- **O que a verificação do código mostrou:** funcionalmente, nada faltava.
+  - O menu "Room hub: sensors" já declara o LM35 e as portas ausentes.
+  - O CAN em modo bancada dispensa o transceptor.
+  - A pulseira acha o canal do hub sozinha.
+  - O botão solto fica em repouso pelo pull-up interno.
+
+  O risco é ser a primeira vez em placa: o hub nunca foi gravado, e o ESP-NOW entre as duas e o hub na central
+  em Docker nunca rodaram.
+- **Feito:**
+  - **hub:**
+    - linha `hub MAC …` no boot (o README já dizia que ela existia);
+    - `PING from <id>` e `heartbeat from <id>: rssi …, activity …` no log, para a recepção aparecer no monitor
+      entre uma queda e outra;
+  - **perfil** `firmware/room/sdkconfig.demo.defaults`: só o PIR, o LM35 e as duas portas ausentes, CAN em
+    autoteste. A pulseira usa o perfil de demonstração dela em `build/dupla`, com o MAC do hub no `menuconfig`;
+  - **Grafana:** "sem leitura" no lugar de "No data" nos painéis de temperatura, portas e bateria;
+  - **documentação:**
+    - seções de demonstração nos READMEs do hub e da pulseira, e a rede da demonstração no
+      `interface/README.md` (hotspot do PC em 2,4 GHz, `mosquitto_sub` no container);
+    - o roteiro em `relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md`;
+    - o `CLAUDE.md` e o índice dos relatórios;
+  - **achado:** sem o país configurado, o Wi-Fi fica nos canais 1–11, e a pulseira não acharia um hub no 12 ou no
+    13. Foi para as pendências, depois da apresentação.
+- **Verificado:**
+  - **builds sem avisos:**
+    - hub padrão;
+    - hub com o perfil de demonstração, conferido no `sdkconfig` gerado: PIR ligado, LM35 desligado, portas
+      `quarto,banheiro`, CAN em autoteste;
+    - hub com o perfil e um MAC de pulseira;
+    - pulseira com o perfil de demonstração e um MAC de hub (o caminho do ESP-NOW), com a coleta, 921600 baud e 5 s entre quedas no `sdkconfig` gerado;
+  - **testes no PC:** regras 87 e `report` 28;
+  - **Grafana:** a central subiu, e a API devolveu o painel com o "sem leitura" nos quatro painéis. A tela não foi
+    capturada.
+
+  **Nada disso rodou em placa:** falta o ensaio com as duas placas, antes da aula.
 
 ### 2026-11-18 — `aulas/` fora do histórico do git
 

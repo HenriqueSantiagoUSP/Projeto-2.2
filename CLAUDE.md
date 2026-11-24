@@ -126,6 +126,13 @@ Demonstração com uma placa só (pulseira sem hub, perfil `firmware/gadget/sdkc
 `interface/demo_pulseira.py`):
 `idf.py -B build/demo -D SDKCONFIG=build/demo/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.demo.defaults" build flash`.
 
+Demonstração com duas placas (Q3: pulseira → ESP-NOW → hub → MQTT): roteiro em
+`relatorios/Semestre 2/Projeto 3/Q3/roteiro-demonstracao.md`.
+- **Hub só com o PIR:** perfil `firmware/room/sdkconfig.demo.defaults`, com o mesmo comando acima, em
+  `firmware/room`.
+- **Pulseira:** o perfil de demonstração em `-B build/dupla`, com o MAC do hub no `menuconfig`.
+- O Wi-Fi, o broker, os MACs e as chaves ficam no `menuconfig` de cada pasta de build.
+
 Pegadinhas dos firmwares:
 
 - `MINIMAL_BUILD` está ligado: todo componente usado por `main` precisa estar em `PRIV_REQUIRES` de
