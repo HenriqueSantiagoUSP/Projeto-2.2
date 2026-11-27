@@ -29,6 +29,7 @@ futuro, nuvem.
 | `docs/coleta-de-dados.md` | protocolo de ensaios rotulados para o futuro modelo de queda |
 | `firmware/room/` | hub do quarto (ESP-IDF) |
 | `firmware/gadget/` | pulseira (ESP-IDF) |
+| `firmware/hwtest/` | teste de hardware da PCB (ESP-IDF): um binário que lê todas as peças da placa (hub e pulseira) e mostra na serial se cada uma funciona |
 | `firmware/common/` | componentes das duas placas: `pcb` (mapa de pinos da PCB única), `protocol` (contrato em C), `report` (quando publicar uma leitura periódica: envio por mudança), `rtos_util` (prioridades e núcleos), `sys_events` (event group), `net`, `mqtt_link`, `can`, `indicators` (LED; buzzer opcional, ausente na PCB atual) |
 | `interface/` | central em Docker Compose (Mosquitto, Telegraf, InfluxDB, Grafana, notificador) + `simulador.py`; `legado/` = demonstração de 18/09, só histórico |
 | `modelo/` | modelos de detecção de queda desenvolvidos no PC (Python 3.12 via `uv`): pipeline, atributos, AR, templates, DTW, classificadores, CNN, avaliação por pessoa; `resultados/resumo.md` tem os números |
@@ -115,6 +116,7 @@ sh firmware/gadget/components/fall_pipeline/test_host/run_tests.sh # pipeline de
 sh firmware/gadget/components/signal_proc/test_host/run_tests.sh # buffer circular, atributos, atividade
 sh firmware/gadget/components/button_gesture/test_host/run_tests.sh # gestos do botão: dois toques, segurar
 sh firmware/common/report/test_host/run_tests.sh                 # envio por mudança (temperatura, resumo da pulseira)
+sh firmware/hwtest/components/hwtest_checks/test_host/run_tests.sh # veredito de cada peça no teste de hardware
 ```
 
 Para compilar os caminhos opcionais da pulseira sem mexer no `sdkconfig` dela, use um build de teste com outro
@@ -132,6 +134,12 @@ Demonstração com duas placas (Q3: pulseira → ESP-NOW → hub → MQTT): rote
   `firmware/room`.
 - **Pulseira:** o perfil de demonstração em `-B build/dupla`, com o MAC do hub no `menuconfig`.
 - O Wi-Fi, o broker, os MACs e as chaves ficam no `menuconfig` de cada pasta de build.
+
+Teste de hardware da PCB recém-soldada (todas as peças, uma gravação, painel na serial; os dois cabos: a USB-C da
+PCB para o 5 V e a USB "UART" da DevKit para a serial): `cd firmware/hwtest` e `idf.py -p COMx build flash monitor`
+([`firmware/hwtest/README.md`](firmware/hwtest/README.md)). Ele reaproveita o driver do MPU-6050 da pulseira, o
+`can` comum e as constantes dos cabeçalhos do hub (`lm35.h`, `hcsr501.h`, `reedswitch.h`), sem copiá-los.
+O modo bancada do CAN **precisa do transceptor**: no ESP32-S3, o nó relê os próprios quadros pelo pino RX.
 
 Pegadinhas dos firmwares:
 

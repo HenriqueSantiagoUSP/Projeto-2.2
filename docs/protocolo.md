@@ -214,7 +214,7 @@ pedido de ajuda) vai só por ESP-NOW.
 | Quadro | CAN clássico, ID padrão de 11 bits, até 8 bytes de dados |
 | Filtro | de hardware: só IDs `0x000`–`0x0FF` (formato `0x0GS`) chegam ao firmware |
 | Erros | retransmissão até haver ACK (`fail_retry_cnt = -1`); em *bus-off*, nova tentativa de recuperação (`twai_node_recover`) após 1 s; quadros que não saem são descartados com log |
-| Modo de bancada | `menuconfig` → CAN bus (TWAI) → *Bench mode* (autoconfirmação + loopback), ligado por padrão. Desligue no barramento real da sala |
+| Modo de bancada | `menuconfig` → CAN bus (TWAI) → *Bench mode* (autoconfirmação + loopback), ligado por padrão: dispensa outro nó, mas não o transceptor, porque no ESP32-S3 o nó relê os próprios quadros pelo pino RX, vindos do barramento. Desligue no barramento real da sala |
 
 ### Formato do ID: `0x0GS`
 

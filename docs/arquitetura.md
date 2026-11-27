@@ -60,6 +60,7 @@ dispositivo que o residente usa no pulso. No código C, em inglês, são `room`/
 | Hub do quarto (gateway) | `firmware/room/` | ESP32-S3 DevKitC-1 | sensores do quarto, regras, alertas, recepção ESP-NOW, cliente MQTT, nó CAN | STA associado com `WIFI_PS_NONE` + ESP-NOW + TWAI |
 | Pulseira (pulseira) | `firmware/gadget/` | ESP32-S3 DevKitC-1 | aquisição inercial, detecção de queda, envio ESP-NOW; opcionais: MQTT direto e CAN de bancada | STA sem associação + ESP-NOW (com o MQTT opcional, STA associado) |
 | Central | `interface/` | Raspberry Pi 4 (PC no desenvolvimento) | broker, histórico, painéis, notificação | rede local |
+| Teste de hardware | `firmware/hwtest/` | a PCB v1 com a DevKit | lê todas as peças da placa e mostra na serial se cada uma funciona; não faz parte do sistema | nenhum |
 
 Nenhuma placa usa SoftAP nem AP+STA: o ESP-NOW funciona sobre a interface STA.
 

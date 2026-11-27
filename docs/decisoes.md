@@ -296,6 +296,40 @@ quando a queda não foi detectada ou quando é outra situação.
 | O código C continua em inglês: `firmware/gadget`, `wearable`, o menu "Wearable" | regra do projeto (código e comentários em inglês) |
 | Os materiais já entregues do Q1 (`relatorios/Semestre 2/Projeto 3/Q1/`) e o `interface/legado/` ficam como foram entregues, com "vestível" | são registro do que foi entregue; reescrevê-los separaria o fonte do PDF entregue |
 
+## Firmware de teste da PCB (2026-11-27)
+
+A PCB v1 ia ser soldada, e conferir cada peça exigia gravar o hub e a pulseira separadamente, esperar o
+processamento de sinal e olhar o Grafana.
+
+| Decisão | Por quê |
+|---|---|
+| Um firmware só, [`firmware/hwtest/`](../firmware/hwtest/README.md), lê **todas** as peças da placa, as do hub e as da pulseira, e mostra na serial se cada uma funciona. Não liga Wi-Fi, MQTT nem as regras | a placa é a mesma para os dois firmwares: uma gravação confere tudo, sem central |
+| Leituras cruas e rápidas: LM35 a cada 100 ms, MPU-6050 a 200 Hz, entradas a cada 5 ms | o hub lê a temperatura a cada 60 s, e a pulseira só mostra o sinal através do pipeline. O teste quer ver a peça, não a regra |
+| Reaproveita, sem copiar: o driver do MPU-6050 da pulseira, o `can` comum e as constantes dos cabeçalhos do hub (`lm35.h`, `hcsr501.h`, `reedswitch.h`) por *include*, sem compilar o componente | a mesma curva do LM35 e os mesmos tempos dos firmwares de verdade |
+| O teste liga a interrupção de *data ready* do MPU, além da de *overflow* que o driver usa, e conta os pulsos no GPIO 17 | sem isso o INT só pulsaria num *overflow*, e a trilha do INT ficaria sem teste |
+| O julgamento de cada peça fica num componente puro (`hwtest_checks`), com testes no PC | regra do projeto para lógica pura |
+| Textos do painel em português, sem acento | o `idf.py monitor` no console do Windows nem sempre mostra UTF-8 |
+
+**Correção do modo bancada do CAN.** Até aqui a documentação dizia que o modo bancada (`APP_CAN_SELF_TEST`) tinha
+*loopback* interno e dispensava o transceptor. No ESP32-S3 não é assim:
+- `twai_ll_set_mode` só liga o *self test*, que dispensa o ACK;
+- o *loopback* é a autorrecepção do controlador (SJA1000), que relê o quadro **pelo pino RX**, vindo do barramento;
+- o driver liga o RX ao pino com pull-up, sem rota interna.
+
+Sem transceptor, o quadro não volta, e sai "CAN bus not connected". Com o WCMCU-230 na PCB, o mesmo modo confere o
+transceptor e as trilhas 13/14, e é isso que o teste de hardware usa.
+
+Ficaram corrigidos:
+- o texto do `Kconfig`;
+- o perfil de demonstração do hub;
+- o README do hub;
+- o roteiro do Q3;
+- o `protocolo.md`;
+- a Seção 8 do relatório do Q2.
+
+A conclusão saiu da leitura do código do driver (ESP-IDF 6.0.1). Falta confirmar na placa: eco com o transceptor,
+nenhum eco sem ele.
+
 ## Estado atual no painel: só a conexão atual do hub (2026-11-23)
 
 O painel "Quartos" mostrava a pulseira "Online", a presença, as portas e a temperatura sem nada conectado. Eram os

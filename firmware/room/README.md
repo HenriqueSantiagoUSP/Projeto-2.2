@@ -71,7 +71,9 @@ Para mostrar a pulseira chegando ao hub por ESP-NOW e o hub publicando na centra
 1. **Perfil** [`sdkconfig.demo.defaults`](sdkconfig.demo.defaults):
    - o PIR fica ligado;
    - o LM35 e as duas portas ficam declarados ausentes (um aviso de cada no boot, e nada mais);
-   - o CAN fica em modo bancada: sem transceptor, cada mudança de presença volta como quadro CAN no log.
+   - o CAN fica em modo bancada. Sem transceptor, ele dá **um** aviso (`CAN bus not connected`) e o resto
+     continua. No ESP32-S3, o nó relê os próprios quadros **pelo transceptor**: eles só aparecem no log com
+     um transceptor ligado (na PCB, o WCMCU-230 do J1).
 
    Ele fica numa pasta de build própria, sem mexer no `sdkconfig` do dia a dia.
 2. **`menuconfig` nessa mesma pasta:**

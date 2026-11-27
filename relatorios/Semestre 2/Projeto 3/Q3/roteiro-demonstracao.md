@@ -8,7 +8,8 @@ pulseira (MPU-6050) ──ESP-NOW──► hub (PIR) ──Wi-Fi + MQTT──►
 
 - **A pulseira** só tem o MPU-6050. Ela detecta a queda no próprio ESP32 e manda ao hub por ESP-NOW, além de um
   heartbeat a cada 30 s.
-- **O hub** só tem o PIR. Ele roda as regras, publica por MQTT e espelha a presença no CAN em modo bancada. Os
+- **O hub** só tem o PIR. Ele roda as regras e publica por MQTT. Sem transceptor na protoboard, o CAN dá um aviso
+  e fica de fora. Os
   sensores que faltam (LM35, portas) estão declarados ausentes no firmware: um aviso de cada no boot, e nenhum
   alerta falso.
 
@@ -85,7 +86,7 @@ Os passos de cada placa estão nos READMEs:
 | # | Faça | Aparece | Diga |
 |---|---|---|---|
 | 1 | Aponte o monitor do hub | `heartbeat from <id>: rssi …` a cada 30 s | ESP-NOW: sem roteador nem conexão, quadros curtos direto ao MAC do hub, criptografados (PMK + LMK) e confirmados pelo rádio. A pulseira achou o canal do hub sozinha, mandando PING em cada canal até um ser confirmado. |
-| 2 | Passe a mão no PIR | `presence detected` e o quadro CAN de volta (`group_1/hcsr501: 1 byte(s), data[0] = 0x01`); a linha do tempo no Grafana | O hub publica por MQTT (QoS 1, retido) e espelha no CAN, aqui em autoteste por falta de transceptor. |
+| 2 | Passe a mão no PIR | `presence detected`; a linha do tempo no Grafana | O hub publica por MQTT (QoS 1, retido). Ele também espelha a presença no CAN, mas o quadro só volta com um transceptor ligado, que a protoboard não tem. |
 | 3 | Solte a pulseira de pé sobre a almofada e deixe-a deitada | `FALL from <id>, a2 = …, P = … %` e `alert queda ativo [queda-…]`; uma linha nova em "Alertas" em até ~15 s | A detecção roda na pulseira (gatilho → janela → 23 atributos → Random Forest). Pelo ar vão só 13 bytes: tipo, número de sequência, tempo, pico e P. A queda fica guardada e é reenviada até o hub confirmar, e o hub descarta a repetida. |
 | 4 | `docker compose logs -f notificador` | a mensagem que iria ao Telegram | Sem o bot configurado, o notificador só imprime. O bot entra na entrega final. |
 | 5 | Com botão: dois toques em até 15 s depois de uma queda | `FALL_CANCEL from <id>` e o alerta `cancelado` | O "estou bem" do residente fecha o episódio. |

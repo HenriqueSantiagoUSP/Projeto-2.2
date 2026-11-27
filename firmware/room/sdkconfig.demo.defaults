@@ -19,6 +19,7 @@ CONFIG_HUB_PIR_FITTED=y
 # CONFIG_HUB_LM35_FITTED is not set
 CONFIG_HUB_DOORS_ABSENT="quarto,banheiro"
 
-# No transceiver: the node acknowledges and receives its own frames (internal loopback),
-# so every presence change also shows as a CAN frame in the log.
+# Bench mode, as by default: with no transceiver wired, CAN gives one warning ("CAN bus
+# not connected") and the rest carries on. On the ESP32-S3 the node reads its own frames
+# back through the transceiver, so they only show in the log once one is on the board.
 CONFIG_APP_CAN_SELF_TEST=y

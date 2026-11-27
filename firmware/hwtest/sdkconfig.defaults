@@ -1,0 +1,7 @@
+# Versioned defaults; sdkconfig itself is generated and ignored by git.
+CONFIG_IDF_TARGET="esp32s3"
+
+# CAN bench mode: the node needs no other node on the bus and reads its own frames back
+# through the transceiver (J1), which is what the test checks. Turn it off to test against
+# another node on the room's real bus.
+CONFIG_APP_CAN_SELF_TEST=y

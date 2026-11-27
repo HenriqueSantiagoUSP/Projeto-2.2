@@ -75,6 +75,49 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
 
 ## Diário
 
+### 2026-11-27 — teste de hardware da PCB (`firmware/hwtest`) e a correção do modo bancada do CAN
+
+- **Pedido:** a PCB termina de ser soldada amanhã. Testar todos os sensores com uma gravação só, pela serial, sem
+  compilar os dois firmwares nem esperar o processamento de sinal e o Grafana.
+- **O que a placa tem ligado** (conferido nas redes do `.kicad_pcb`):
+  - LM35 → LM358 → RC no GPIO 4 (TP4);
+  - MPU-6050 no J5 (1/2, INT 17);
+  - PIR no J2 (8, por R4);
+  - portas no J3/J4 (11/12) e botão (18);
+  - transceptor CAN WCMCU-230 no J1 (13/14), com o barramento no J7.
+
+  As portas 3 e 4, a expansão e a bateria não têm trilha. O 5 V do LM35, do LM358 e do PIR vem da USB-C da PCB:
+  o D1 impede que a USB da DevKit alimente esse lado.
+- **Feito:**
+  - **`firmware/hwtest/`**, um projeto novo:
+    - um binário sem rede, com o painel na serial redesenhado a cada segundo;
+    - um item por peça: LM35 (mV, °C, ruído em 10 s), PIR (depois de 1 min de aquecimento), portas, botão,
+      MPU-6050 (taxa, \|a\|, eixos), INT (pulsos/s, com o *data ready* ligado pelo teste) e CAN (eco);
+    - o LED com o resumo;
+    - as teclas `c` (CAN a 200 quadros/s, para o ruído do LM35), `i` (I²C), `r`, `p` e `h`;
+    - os avisos dos drivers vão para uma área do painel.
+
+    Ele reaproveita o `mpu6050` da pulseira, o `can` e o `indicators` comuns e as constantes de `lm35.h`,
+    `hcsr501.h` e `reedswitch.h` por *include*, sem copiar nada. O julgamento fica no componente puro
+    `hwtest_checks`, com testes no PC;
+  - **correção:**
+    - **o erro:** o modo bancada do CAN **não** tem *loopback* interno no ESP32-S3. O `twai_ll_set_mode` só liga
+      o *self test*, e a autorrecepção relê o quadro pelo pino RX, que o driver liga ao pino com pull-up. Sem
+      transceptor, nada volta;
+    - **onde estava:** a afirmação de 23/11 ("dispensa o transceptor", e o quadro CAN de volta no log da
+      demonstração), o perfil de demonstração do hub, o README do hub, o roteiro do Q3, o `protocolo.md`, a
+      ajuda do `Kconfig` e a Seção 8 do relatório do Q2. Tudo corrigido;
+  - **documentação:** README do `hwtest`, `CLAUDE.md`, README da raiz, `arquitetura.md`, `decisoes.md` e
+    `pendencias.md`.
+- **Verificado:**
+  - build do `hwtest` sem avisos (286 KB, 73 % da partição livre);
+  - testes de host do `hwtest_checks`: 81 verificações. Um erro plantado ("basta um nível") foi pego por 3 delas;
+  - hub e pulseira compilam sem avisos depois da mudança no `Kconfig` do CAN;
+  - relatório do Q2 recompilado (depois que o leitor que travava o `main.pdf` foi fechado): 72 páginas, sem
+    referências indefinidas nem *overfull*. O texto novo da Seção 8 foi conferido no PDF com o `pdftotext`.
+
+  **Nada rodou na placa:** o teste de hardware e a correção do CAN se confirmam com a PCB soldada.
+
 ### 2026-11-24 — READMEs: como parar a central e onde ficam os menus do hub
 
 - **Pedido:** o `interface/README.md` ensinava a subir a central, mas não a parar.
@@ -159,7 +202,8 @@ Ela é atualizada ao fim de toda tarefa, junto com este arquivo.
   Também verificar o que faltava implementar.
 - **O que a verificação do código mostrou:** funcionalmente, nada faltava.
   - O menu "Room hub: sensors" já declara o LM35 e as portas ausentes.
-  - O CAN em modo bancada dispensa o transceptor.
+  - O CAN em modo bancada dispensa o transceptor. (**Errado**, corrigido em 2026-11-27: no ESP32-S3, o nó relê os
+    próprios quadros pelo transceptor; sem ele, sai um aviso, e o CAN fica de fora.)
   - A pulseira acha o canal do hub sozinha.
   - O botão solto fica em repouso pelo pull-up interno.
 

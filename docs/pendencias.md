@@ -171,9 +171,17 @@ Tudo isto já está no código e compila; falta rodar na placa.
   - Antes de encaixar a DevKit, com o multímetro: sem curto entre 5V e GND nem entre 3V3 e GND (TP1, TP2,
     TP3). Depois ligar pela USB-C e medir 5 V no TP1.
   - Encaixar a DevKit e medir 3,3 V no TP2.
-  - Gravar o hub e a pulseira e repetir na placa os testes de "Agora: verificação em bancada".
-  - O CANH passa a 0,9 mm do pino 2 do LM358: comparar a leitura do LM35 com o autoteste do CAN ligado e
-    desligado.
+  - **Gravar o teste de hardware** ([`firmware/hwtest/`](../firmware/hwtest/README.md), desde 2026-11-27), com
+    os dois cabos (USB-C da PCB e USB "UART" da DevKit), e deixar os 8 itens em OK:
+    - LM35, comparando o mV com o TP4;
+    - PIR, portas 1 e 2 e botão;
+    - MPU-6050 e o INT;
+    - eco do CAN.
+
+    Também confirma na placa a correção do modo bancada do CAN: eco com o WCMCU-230, nenhum eco sem ele.
+  - O CANH passa a 0,9 mm do pino 2 do LM358: com a tecla `c` do teste (CAN a 200 quadros/s), comparar o
+    ruído do LM35 com o CAN rápido ligado e desligado.
+  - Depois, gravar o hub e a pulseira e repetir na placa os testes de "Agora: verificação em bancada".
 - [ ] **Refazer a fiação de bancada com os pinos novos.**
   - Hub: LM35 no 4, CAN no 13/14, PIR no 8, portas no 11/12.
   - Pulseira: I²C no 1/2, INT no 17, botão no 18 (o buzzer e a medição da bateria saíram do esquema).
@@ -322,6 +330,19 @@ Detalhes em [`roadmap.md`](roadmap.md), seção Futuro.
 
 O mais recente no topo.
 
+- [x] **2026-11-27 — Teste de hardware da PCB (`firmware/hwtest`).** Um firmware só lê todas as peças da placa
+  e mostra na serial se cada uma funciona:
+  - LM35 (mV, °C e ruído), PIR, portas 1 e 2 e botão;
+  - MPU-6050 (taxa, \|a\|, eixos) e INT (pulsos/s);
+  - CAN (eco pelo transceptor);
+  - LED com o resumo.
+
+  Tem teclas para o CAN rápido, a varredura do I²C e recomeçar.
+  - Verificado:
+    - build sem avisos (286 KB, 73 % da partição livre);
+    - testes de host do `hwtest_checks`: 81 verificações, com um erro plantado pego;
+    - hub e pulseira compilam sem avisos depois da correção do texto do CAN.
+  - Falta rodar na PCB soldada (item "Montar e testar a PCB v1").
 - [x] **2026-11-23 — Repositório no GitHub com o e-mail privado.** O GitHub
   (`https://github.com/HenriqueSantiagoUSP/Projeto-2.2`, público) já tinha recebido os 33 commits até
   "aulas/ fora do histórico", num push feito fora destas sessões, com o Gmail pessoal como autor.

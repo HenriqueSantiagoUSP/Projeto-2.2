@@ -57,7 +57,8 @@ python simulador.py --host <IP da máquina> --senha <MQTT_HUB_PASSWORD do .env>
 ```
 
 **Firmware** (ESP-IDF 6.0.1, alvo `esp32s3`) — detalhes em [`firmware/room/README.md`](firmware/room/README.md)
-e [`firmware/gadget/README.md`](firmware/gadget/README.md):
+e [`firmware/gadget/README.md`](firmware/gadget/README.md). Para conferir uma PCB recém-soldada, o teste de
+hardware [`firmware/hwtest/`](firmware/hwtest/README.md) lê todas as peças com uma gravação só:
 
 ```powershell
 cd firmware\room

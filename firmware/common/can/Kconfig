@@ -4,8 +4,11 @@ menu "CAN bus (TWAI)"
         bool "Bench mode (self test + loopback)"
         default y
         help
-            The node acknowledges its own frames and receives them back, so it works
-            with no other node on the bus. Turn it off on the real bus, where another
-            node provides the ACK.
+            The node needs no ACK and receives its own frames back, so it works with no
+            other node on the bus. It still needs its transceiver: on the ESP32-S3 the
+            frame comes back through the RX pin, read from the bus, not by an internal
+            route. Without a transceiver nothing comes back and "CAN bus not connected"
+            is reported once. Turn it off on the real bus, where another node provides
+            the ACK.
 
 endmenu
